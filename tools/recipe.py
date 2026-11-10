@@ -241,7 +241,8 @@ class _Parser:
             return not self.failed
 
         length = len(token)
-        if length + 1 > room:
+        # One Write per byte. HID expands each Write into press then release.
+        if length > room:
             return False
         if any(not _plain(byte) for byte in token):
             self._add_skip(token, length, False)
@@ -249,8 +250,6 @@ class _Parser:
         for byte in token:
             if not self._put("W", "Char", byte, TAP_GAP):
                 return False
-        if not self._put("R", "Char", 0, GAP_NONE):
-            return False
         return True
 
     def parse(self, recipe: bytes) -> Parsed:

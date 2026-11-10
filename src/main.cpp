@@ -144,6 +144,15 @@ static void poll_fire_cmd(CmdPort &port) {
 
     char *arg = port.buf;
     while (*arg == ' ' || *arg == '\t') ++arg;
+    if (strncmp(arg, "drops", 5) == 0 && (arg[5] == '\0' || arg[5] == ' ' || arg[5] == '\t')) {
+      char *rest = arg + 5;
+      while (*rest == ' ' || *rest == '\t') ++rest;
+      size_t n = strlen(rest);
+      while (n > 0 && (rest[n - 1] == ' ' || rest[n - 1] == '\t')) rest[--n] = '\0';
+      if (rest[0] != '\0') continue;
+      hid_print_drops();
+      continue;
+    }
     if (strncmp(arg, "keys", 4) == 0 && (arg[4] == '\0' || arg[4] == ' ' || arg[4] == '\t')) {
       char *rest = arg + 4;
       while (*rest == ' ' || *rest == '\t') ++rest;

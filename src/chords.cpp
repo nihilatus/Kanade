@@ -325,7 +325,6 @@ static void fire(uint16_t mask) {
   const ChordRule &row = g_live[index];
   log_chord("send", row.id, mask, row.kana, row.output);
   if (row.output == nullptr || row.output[0] == '\0') return;
-  if (!hid_keyboard_ready()) return;
   hid_type_recipe(row.output);
 }
 
@@ -671,7 +670,7 @@ void chords_begin() {
   console_ensure();
   load_fire_mode();
   log_fire_mode();
-  console_println("序列指令：fire release | fire first");
+  console_println("序列指令：fire release | fire first | drops");
   g_fs = LittleFS.begin(false);
   if (!g_fs) {
     console_println("LittleFS 掛載失敗，格式化一次");

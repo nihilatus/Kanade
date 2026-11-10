@@ -51,7 +51,7 @@
 | `src/chords.cpp` | 出廠表與 LittleFS 活表、NVS 裡的送出模式。比對成功才呼叫送鍵；比對不到時序列埠印「無符合規則」與遮罩，不送鍵 |
 | `src/hid_keyboard.cpp` | 把配方排進同一條時間軸。`loop` 不會為了打完一串字而停住 |
 | `src/config_server.cpp` | GPIO15、SoftAP、和弦 JSON API 與手機頁。熱點關掉時鍵盤照常送鍵 |
-| `src/main.cpp` | `setup`／`loop` 把上面串起來。序列埠指令是 `fire`（送出時機）、`keys`（印目前按鍵）與 `trace`（傾印開機後最近 512 筆 raw 邊緣與穩定遮罩；傾印期間 `loop` 暫停） |
+| `src/main.cpp` | `setup`／`loop` 把上面串起來。序列埠指令是 `fire`（送出時機）、`keys`（印目前按鍵）、`drops`（開機後丟掉的配方、略過的 token、主機未就緒次數；UART0 也印）與 `trace`（傾印開機後最近 512 筆 raw 邊緣與穩定遮罩；傾印期間 `loop` 暫停） |
 | `web/index.html` | 用電腦鍵盤試打。讀機器表，不燒錄、不送 USB HID |
 | `test/test_chord_core` | `pio test -e native`。只編譯 `chord_core.cpp` |
 

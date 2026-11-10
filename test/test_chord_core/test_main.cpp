@@ -738,12 +738,12 @@ extern "C" void test_recipe_shapes(void) {
   TEST_ASSERT_FALSE(empty.failed);
   TEST_ASSERT_EQUAL_INT(0, static_cast<int>(empty.count));
 
-  const ChordEvent a[] = {ev_write('a'), ev_release(0)};
-  expect_events("a", a, 2);
-  const ChordEvent nn[] = {ev_write('n'), ev_write('n'), ev_release(0)};
-  expect_events("nn", nn, 3);
-  const ChordEvent kome[] = {ev_write('k'), ev_write('o'), ev_write('m'), ev_write('e'), ev_release(0)};
-  expect_events("kome", kome, 5);
+  const ChordEvent a[] = {ev_write('a')};
+  expect_events("a", a, 1);
+  const ChordEvent nn[] = {ev_write('n'), ev_write('n')};
+  expect_events("nn", nn, 2);
+  const ChordEvent kome[] = {ev_write('k'), ev_write('o'), ev_write('m'), ev_write('e')};
+  expect_events("kome", kome, 4);
 
   struct Named {
     const char *text;
@@ -767,14 +767,13 @@ extern "C" void test_recipe_shapes(void) {
                               ev_release(12)};
   expect_events("Ctrl+i", ctrli, 3);
 
-  const ChordEvent spaced[] = {ev_write('z'), ev_release(0), ev_write('.'), ev_release(0),
-                               ev_write('z'), ev_release(0), ev_write('.'), ev_release(0)};
-  expect_events("z . z .", spaced, 8);
-  const ChordEvent zbracket[] = {ev_write('z'), ev_release(0), ev_write('['), ev_release(0)};
-  expect_events("z [", zbracket, 4);
+  const ChordEvent spaced[] = {ev_write('z'), ev_write('.'), ev_write('z'), ev_write('.')};
+  expect_events("z . z .", spaced, 4);
+  const ChordEvent zbracket[] = {ev_write('z'), ev_write('[')};
+  expect_events("z [", zbracket, 2);
 
-  const ChordEvent plus[] = {ev_write('+'), ev_release(0)};
-  expect_events("+", plus, 2);
+  const ChordEvent plus[] = {ev_write('+')};
+  expect_events("+", plus, 1);
   const ChordEvent shift_plus[] = {ev_press(ChordKeyKind::Shift, 0, 0),
                                    ev_press(ChordKeyKind::Char, '+', 12), ev_release(12)};
   expect_events("Shift++", shift_plus, 3);
@@ -833,7 +832,8 @@ extern "C" void test_skip_overflow_is_flagged(void) {
 extern "C" void test_recipe_that_does_not_fit_fails(void) {
   char recipe[160];
   size_t n = 0;
-  for (int i = 0; i < 33; ++i) {
+  // 49 "aa" tokens are 98 Writes, one past the 96-event cap.
+  for (int i = 0; i < 49; ++i) {
     if (i > 0) recipe[n++] = ' ';
     recipe[n++] = 'a';
     recipe[n++] = 'a';
@@ -847,8 +847,10 @@ extern "C" void test_recipe_that_does_not_fit_fails(void) {
   TEST_ASSERT_EQUAL_INT(0, static_cast<int>(got.skip_count));
 
   n = 0;
+  // 47 "aa" tokens fill 94 events. Shift+a needs 3 more and does not fit.
   for (int i = 0; i < 47; ++i) {
     if (i > 0) recipe[n++] = ' ';
+    recipe[n++] = 'a';
     recipe[n++] = 'a';
   }
   recipe[n++] = ' ';
@@ -869,10 +871,9 @@ extern "C" void test_recipe_token_and_cap_bounds(void) {
   char plain23[24];
   memset(plain23, 'a', 23);
   plain23[23] = '\0';
-  ChordEvent want23[24];
+  ChordEvent want23[23];
   for (int i = 0; i < 23; ++i) want23[i] = ev_write('a');
-  want23[23] = ev_release(0);
-  expect_events(plain23, want23, 24);
+  expect_events(plain23, want23, 23);
 
   char long24[32];
   memset(long24, 'b', 24);
@@ -887,14 +888,13 @@ extern "C" void test_recipe_token_and_cap_bounds(void) {
   TEST_ASSERT_TRUE(got.skips[0].too_long);
   TEST_ASSERT_EQUAL_INT(24, static_cast<int>(got.skips[0].length));
   TEST_ASSERT_EQUAL_STRING("", got.skips[0].text);
-  TEST_ASSERT_EQUAL_INT(2, static_cast<int>(got.count));
+  TEST_ASSERT_EQUAL_INT(1, static_cast<int>(got.count));
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordEvOp::Write), static_cast<int>(got.events[0].op));
   TEST_ASSERT_EQUAL_INT('a', got.events[0].code);
-  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordEvOp::ReleaseAll), static_cast<int>(got.events[1].op));
 
-  char fit[160];
+  char fit[200];
   size_t n = 0;
-  for (int i = 0; i < 48; ++i) {
+  for (int i = 0; i < static_cast<int>(kChordRecipeCap); ++i) {
     if (i > 0) fit[n++] = ' ';
     fit[n++] = 'a';
   }
@@ -904,8 +904,9 @@ extern "C" void test_recipe_token_and_cap_bounds(void) {
   TEST_ASSERT_EQUAL_INT(static_cast<int>(kChordRecipeCap), static_cast<int>(got.count));
   TEST_ASSERT_EQUAL_INT(0, static_cast<int>(got.skip_count));
   TEST_ASSERT_EQUAL_INT('a', got.events[0].code);
-  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordEvOp::ReleaseAll),
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordEvOp::Write),
                         static_cast<int>(got.events[kChordRecipeCap - 1].op));
+  TEST_ASSERT_EQUAL_INT('a', got.events[kChordRecipeCap - 1].code);
 
   fit[n++] = ' ';
   fit[n++] = 'a';
@@ -931,9 +932,9 @@ extern "C" void test_recipe_token_and_cap_bounds(void) {
   TEST_ASSERT_EQUAL_INT(static_cast<int>(kChordSkipCap), static_cast<int>(got.skip_count));
   TEST_ASSERT_FALSE(got.skips[0].too_long);
   TEST_ASSERT_EQUAL_INT(1, static_cast<int>(got.skips[0].length));
-  TEST_ASSERT_EQUAL_INT(2, static_cast<int>(got.count));
+  TEST_ASSERT_EQUAL_INT(1, static_cast<int>(got.count));
   TEST_ASSERT_EQUAL_INT('z', got.events[0].code);
-  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordEvOp::ReleaseAll), static_cast<int>(got.events[1].op));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordEvOp::Write), static_cast<int>(got.events[0].op));
 }
 
 static int hex_nibble(char c) {

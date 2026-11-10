@@ -1,14 +1,24 @@
 #include "hid_keyboard.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #include "USB.h"
 #include "USBHIDKeyboard.h"
+#include "class/hid/hid_device.h"
 
 #include "chord_core.h"
+#include "console_log.h"
 
 static USBHIDKeyboard Keyboard;
 static bool g_begun = false;
+// Whole outputs not queued, tokens skipped while the rest was kept, and
+// outputs refused because the host was not enumerated or was asleep.
+static uint32_t g_drop_recipes = 0;
+static uint32_t g_skip_tokens = 0;
+static uint32_t g_not_ready = 0;
+
+static void note_dropped() { g_drop_recipes++; }
 
 enum class HidOp : uint8_t { ReleaseAll, Press, PressRaw };
 
@@ -18,7 +28,17 @@ struct HidEvent {
   uint8_t gap_after_ms;
 };
 
-// One slot stays free so a full queue can still be closed with release-all.
+// expand: Press(code) then ReleaseAll, both held for gap_after_ms.
+// Otherwise one report, op/code/gap as given.
+struct Stroke {
+  bool expand;
+  HidOp op;
+  uint8_t code;
+  uint8_t gap_after_ms;
+};
+
+// Last slot is only for hid_release_all. Recipes, romaji, and taps stop at
+// kQueueCap - 1, so a full keystroke queue can still be closed.
 static constexpr size_t kQueueCap = 192;
 static HidEvent g_queue[kQueueCap];
 static size_t g_head = 0;
@@ -60,8 +80,9 @@ static void log_skip(const char *token) {
 #endif
 }
 
-static bool enqueue(HidOp op, uint8_t code, uint8_t gap_after_ms) {
-  if (g_count >= kQueueCap) return false;
+static bool enqueue(HidOp op, uint8_t code, uint8_t gap_after_ms, bool allow_last) {
+  const size_t limit = allow_last ? kQueueCap : kQueueCap - 1;
+  if (g_count >= limit) return false;
   const size_t tail = (g_head + g_count) % kQueueCap;
   g_queue[tail] = HidEvent{op, code, gap_after_ms};
   g_count++;
@@ -82,8 +103,9 @@ static void log_queue_full(const char *what) {
 #endif
 }
 
-static bool take_slot(HidOp op, uint8_t code, uint8_t gap, size_t *added, const char *what) {
-  if (!enqueue(op, code, gap)) {
+static bool take_slot(HidOp op, uint8_t code, uint8_t gap, size_t *added, const char *what,
+                      bool allow_last = false) {
+  if (!enqueue(op, code, gap, allow_last)) {
     rollback(*added);
     log_queue_full(what);
     return false;
@@ -107,33 +129,70 @@ static void send_event(const HidEvent &event) {
   }
 }
 
+// Peak time spent inside one send, printed every 5 s while keys are going out.
+// Idle polls are not counted. SendReport waits for the host after tud_hid_ready()
+// is already true, so this is the number that shows a stall.
+static void note_send_us(uint32_t elapsed_us) {
+  static uint32_t max_us = 0;
+  static uint32_t window_ms = 0;
+  static bool window_open = false;
+  if (elapsed_us > max_us) max_us = elapsed_us;
+  const uint32_t now = millis();
+  if (!window_open) {
+    window_open = true;
+    window_ms = now;
+  }
+  if (static_cast<uint32_t>(now - window_ms) < 5000) return;
+  window_ms = now;
+  char line[40];
+  snprintf(line, sizeof(line), "hid poll max %u us", static_cast<unsigned>(max_us));
+  console_println(line);
+  max_us = 0;
+}
+
 void hid_keyboard_poll() {
   if (g_count == 0) return;
   const uint32_t now = millis();
   if (g_hold && static_cast<int32_t>(now - g_next_ms) < 0) return;
+  // Endpoint still holds the previous report. Leave this event queued.
+  if (!tud_hid_ready()) return;
 
+  const uint32_t t0 = micros();
   const HidEvent event = g_queue[g_head];
   g_head = (g_head + 1) % kQueueCap;
   g_count--;
   send_event(event);
+  const uint32_t elapsed = micros() - t0;
   g_next_ms = now + event.gap_after_ms;
   g_hold = true;
+  note_send_us(elapsed);
 }
 
-static bool push_events(const HidEvent *events, size_t count, bool release_first) {
-  const size_t need = count + (release_first ? 1 : 0);
-  if (g_count + need > kQueueCap) {
-    log_queue_full("recipe skipped");
+// Count slots, refuse the batch if it would use the release-all reserve, then
+// enqueue. A Write-style stroke is press plus release. Failure rolls the batch back.
+static bool enqueue_strokes(const Stroke *strokes, size_t count, bool release_first,
+                            const char *what) {
+  size_t need = release_first ? 1 : 0;
+  for (size_t i = 0; i < count; ++i) need += strokes[i].expand ? 2 : 1;
+  if (need == 0) return true;
+  if (g_count + need + 1 > kQueueCap) {
+    note_dropped();
+    log_queue_full(what);
     return false;
   }
   size_t added = 0;
-  if (release_first && !take_slot(HidOp::ReleaseAll, 0, kChordTapGapMs, &added, "recipe skipped")) {
-    return false;
-  }
+  if (release_first && !take_slot(HidOp::ReleaseAll, 0, kChordTapGapMs, &added, what)) return false;
   for (size_t i = 0; i < count; ++i) {
-    if (!take_slot(events[i].op, events[i].code, events[i].gap_after_ms, &added, "recipe skipped")) {
-      return false;
+    const Stroke &stroke = strokes[i];
+    if (stroke.expand) {
+      // A plain letter is press then release, each held across a host poll.
+      // One Keyboard.write() would queue both reports before the ~10 ms poll.
+      const uint8_t gap = stroke.gap_after_ms == 0 ? kChordTapGapMs : stroke.gap_after_ms;
+      if (!take_slot(HidOp::Press, stroke.code, gap, &added, what)) return false;
+      if (!take_slot(HidOp::ReleaseAll, 0, gap, &added, what)) return false;
+      continue;
     }
+    if (!take_slot(stroke.op, stroke.code, stroke.gap_after_ms, &added, what)) return false;
   }
   return true;
 }
@@ -194,11 +253,41 @@ static uint8_t press_code(const ChordEvent &event) {
   return 0;
 }
 
-// One buffer for loop(). hid_type_recipe must not be called reentrantly.
+// One buffer for loop(). hid_type_recipe and hid_type_romaji must not be called reentrantly.
 static ChordRecipe g_parsed_recipe;
+static Stroke g_strokes[kChordRecipeCap];
+
+static Stroke stroke_from(const ChordEvent &event) {
+  Stroke stroke{};
+  stroke.gap_after_ms = event.gap_after_ms;
+  if (event.op == ChordEvOp::Write) {
+    stroke.expand = true;
+    stroke.op = HidOp::Press;
+    stroke.code = event.code;
+    return stroke;
+  }
+  stroke.expand = false;
+  if (event.op == ChordEvOp::Press && event.key == ChordKeyKind::Raw) {
+    stroke.op = HidOp::PressRaw;
+    stroke.code = event.code;
+    return stroke;
+  }
+  if (event.op == ChordEvOp::Press) {
+    stroke.op = HidOp::Press;
+    stroke.code = press_code(event);
+    return stroke;
+  }
+  stroke.op = HidOp::ReleaseAll;
+  stroke.code = 0;
+  return stroke;
+}
 
 void hid_type_recipe(const char *recipe) {
-  if (!recipe || !hid_keyboard_ready()) return;
+  if (!recipe) return;
+  if (!hid_keyboard_ready()) {
+    g_not_ready++;
+    return;
+  }
   const bool release_first = queue_busy();
 
   ChordRecipe &parsed = g_parsed_recipe;
@@ -208,7 +297,13 @@ void hid_type_recipe(const char *recipe) {
     if (skip.too_long) log_long_token(skip.length);
     else log_skip(skip.text);
   }
-  if (!parsed_ok || parsed.overflow_skips) {
+  // parsed_ok is already !failed, with count cleared. Name failed here so a
+  // partial recipe cannot be queued if that return is missed.
+  // One unknown token stays in skips and the rest is typed. overflow_skips
+  // means a later unknown token was not stored, so the whole recipe is dropped
+  // instead of typed with a hole that was never recorded.
+  if (!parsed_ok || parsed.failed || parsed.overflow_skips) {
+    note_dropped();
 #if ARDUINO_USB_CDC_ON_BOOT
     if (parsed.failed) Serial.println(F("hid recipe too long, skipped"));
     else Serial.println(F("hid recipe dropped tokens, skipped"));
@@ -216,82 +311,70 @@ void hid_type_recipe(const char *recipe) {
     return;
   }
 
-  if (parsed.count == 0 && !release_first) return;
-  // A plain letter is press then release, each held across a host poll.
-  // One Keyboard.write() would queue both reports before the ~10 ms poll.
-  size_t slots = release_first ? 1 : 0;
-  for (size_t i = 0; i < parsed.count; ++i) {
-    slots += parsed.events[i].op == ChordEvOp::Write ? 2 : 1;
-  }
-  if (g_count + slots > kQueueCap) {
-    log_queue_full("recipe skipped");
+  if (parsed.count == 0 && !release_first) {
+    g_skip_tokens += static_cast<uint32_t>(parsed.skip_count);
     return;
   }
-  size_t added = 0;
-  if (release_first && !take_slot(HidOp::ReleaseAll, 0, kChordTapGapMs, &added, "recipe skipped")) {
-    return;
-  }
-  for (size_t i = 0; i < parsed.count; ++i) {
-    const ChordEvent &event = parsed.events[i];
-    if (event.op == ChordEvOp::Write) {
-      const uint8_t gap = event.gap_after_ms == 0 ? kChordTapGapMs : event.gap_after_ms;
-      if (!take_slot(HidOp::Press, event.code, gap, &added, "recipe skipped")) return;
-      if (!take_slot(HidOp::ReleaseAll, 0, gap, &added, "recipe skipped")) return;
-      continue;
-    }
-    HidOp op = HidOp::ReleaseAll;
-    uint8_t code = 0;
-    if (event.op == ChordEvOp::Press) {
-      if (event.key == ChordKeyKind::Raw) {
-        op = HidOp::PressRaw;
-        code = event.code;
-      } else {
-        op = HidOp::Press;
-        code = press_code(event);
-      }
-    }
-    if (!take_slot(op, code, event.gap_after_ms, &added, "recipe skipped")) return;
-  }
+  for (size_t i = 0; i < parsed.count; ++i) g_strokes[i] = stroke_from(parsed.events[i]);
+  if (!enqueue_strokes(g_strokes, parsed.count, release_first, "recipe skipped")) return;
+  g_skip_tokens += static_cast<uint32_t>(parsed.skip_count);
 }
 
 void hid_type_romaji(const char *text) {
-  if (!text || !hid_keyboard_ready()) return;
+  if (!text) return;
+  if (!hid_keyboard_ready()) {
+    g_not_ready++;
+    return;
+  }
   const bool release_first = queue_busy();
   const size_t len = strlen(text);
+  static_assert(80 <= kChordRecipeCap, "romaji shares g_strokes with recipes");
   if (len > 80) {
+    note_dropped();
 #if ARDUINO_USB_CDC_ON_BOOT
     Serial.println(F("hid romaji too long, skipped"));
 #endif
     return;
   }
   if (len == 0 && !release_first) return;
-  const size_t slots = len * 2 + (release_first ? 1 : 0);
-  if (g_count + slots > kQueueCap) {
-    log_queue_full("romaji skipped");
-    return;
-  }
-  size_t added = 0;
-  if (release_first && !take_slot(HidOp::ReleaseAll, 0, kChordTapGapMs, &added, "romaji skipped")) {
-    return;
+  for (size_t i = 0; i < len; ++i) {
+    // Keyboard.press() treats 0x80–0x87 as modifiers and 0x88+ as non-printing keys.
+    if (static_cast<unsigned char>(text[i]) >= 0x80) {
+      note_dropped();
+#if ARDUINO_USB_CDC_ON_BOOT
+      Serial.println(F("hid romaji non-ascii, skipped"));
+#endif
+      return;
+    }
   }
   for (size_t i = 0; i < len; ++i) {
-    const uint8_t code = static_cast<uint8_t>(text[i]);
-    if (!take_slot(HidOp::Press, code, kChordTapGapMs, &added, "romaji skipped")) return;
-    if (!take_slot(HidOp::ReleaseAll, 0, kChordTapGapMs, &added, "romaji skipped")) return;
+    g_strokes[i].expand = true;
+    g_strokes[i].op = HidOp::Press;
+    g_strokes[i].code = static_cast<uint8_t>(text[i]);
+    g_strokes[i].gap_after_ms = kChordTapGapMs;
   }
+  enqueue_strokes(g_strokes, len, release_first, "romaji skipped");
 }
 
 void hid_tap_key(uint8_t keycode) {
-  if (!hid_keyboard_ready()) return;
-  HidEvent batch[2] = {
-      HidEvent{HidOp::Press, keycode, kChordTapGapMs},
-      HidEvent{HidOp::ReleaseAll, 0, kChordTapGapMs},
-  };
-  push_events(batch, 2, queue_busy());
+  if (!hid_keyboard_ready()) {
+    g_not_ready++;
+    return;
+  }
+  const Stroke tap{true, HidOp::Press, keycode, kChordTapGapMs};
+  enqueue_strokes(&tap, 1, queue_busy(), "tap skipped");
 }
 
 void hid_release_all() {
   if (!g_begun) return;
   size_t added = 0;
-  take_slot(HidOp::ReleaseAll, 0, kChordTapGapMs, &added, "release skipped");
+  take_slot(HidOp::ReleaseAll, 0, kChordTapGapMs, &added, "release skipped", true);
+}
+
+void hid_print_drops() {
+  char line[72];
+  snprintf(line, sizeof(line), "drops recipes=%u tokens=%u not_ready=%u",
+           static_cast<unsigned>(g_drop_recipes), static_cast<unsigned>(g_skip_tokens),
+           static_cast<unsigned>(g_not_ready));
+  console_println(line);
 }

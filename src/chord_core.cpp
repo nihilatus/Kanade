@@ -461,7 +461,10 @@ static bool take_token(ChordRecipe *out, const char *token, bool *abort_recipe) 
   }
 
   const size_t len = strlen(token);
-  if (len + 1 > room) {
+  // One Write per byte. HID turns each Write into press then release, and that
+  // release already waits the Write's tap gap. A trailing ReleaseAll would be
+  // a second release report. Named and combo tokens still end on ReleaseAll.
+  if (len > room) {
     *abort_recipe = true;
     return false;
   }
@@ -477,12 +480,6 @@ static bool take_token(ChordRecipe *out, const char *token, bool *abort_recipe) 
       *abort_recipe = true;
       return false;
     }
-  }
-  // Trailer stays kChordGapNone: HID already applies each Write's tap gap to
-  // its release. Named and combo tokens end on ReleaseAll, so that event is the tap.
-  if (!put_event(out, ChordEvOp::ReleaseAll, ChordKeyKind::Char, 0, kChordGapNone)) {
-    *abort_recipe = true;
-    return false;
   }
   return true;
 }
