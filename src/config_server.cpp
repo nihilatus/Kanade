@@ -209,10 +209,38 @@ static void handle_fire_post() {
 
 static void handle_404() { server.send(404, "text/plain; charset=utf-8", "not found"); }
 
-void config_server_begin() {
-  console_ensure();
+static void register_routes() {
+  if (g_routes) return;
+  server.on("/", HTTP_GET, handle_root);
+  server.on("/api/chords", HTTP_GET, handle_get);
+  server.on("/api/chords", HTTP_POST, handle_post);
+  server.on("/api/chords/reset", HTTP_POST, handle_reset);
+  server.on("/api/fire", HTTP_GET, handle_fire_get);
+  server.on("/api/fire", HTTP_POST, handle_fire_post);
+  server.onNotFound(handle_404);
+  g_routes = true;
+}
+
+static bool switch_closed_raw() { return digitalRead(kWifiEnablePin) == LOW; }
+
+static void poll_switch() {
+  const uint32_t now = millis();
+  const bool closed = switch_closed_raw();
+  if (closed != g_switch_raw) {
+    g_switch_raw = closed;
+    g_switch_change_ms = now;
+  }
+  if ((now - g_switch_change_ms) >= kWifiSwitchDebounceMs && g_switch_stable != g_switch_raw) {
+    g_switch_stable = g_switch_raw;
+    if (!g_switch_stable) g_start_failed = false;
+  }
+}
+
+static void start_ap() {
+  if (g_http || g_start_failed) return;
   if (!ap_password_ok()) {
     console_println("AP stayed off: set WIFI_AP_PASSWORD in include/secrets.h");
+    g_start_failed = true;
     return;
   }
 
@@ -225,27 +253,45 @@ void config_server_begin() {
   const bool up = WiFi.softAP(kApSsid, kApPassword, 1, 0, 4);
 
   char line[96];
-  if (up) {
-    snprintf(line, sizeof(line), "AP %s", kApSsid);
-    console_println(line);
-    console_println("http://192.168.4.1/");
-  } else {
+  if (!up) {
     snprintf(line, sizeof(line), "AP %s failed to start", kApSsid);
     console_println(line);
+    WiFi.softAPdisconnect(true);
+    WiFi.mode(WIFI_OFF);
+    g_start_failed = true;
     return;
   }
 
-  server.on("/", HTTP_GET, handle_root);
-  server.on("/api/chords", HTTP_GET, handle_get);
-  server.on("/api/chords", HTTP_POST, handle_post);
-  server.on("/api/chords/reset", HTTP_POST, handle_reset);
-  server.on("/api/fire", HTTP_GET, handle_fire_get);
-  server.on("/api/fire", HTTP_POST, handle_fire_post);
-  server.onNotFound(handle_404);
+  snprintf(line, sizeof(line), "AP %s", kApSsid);
+  console_println(line);
+  console_println("http://192.168.4.1/");
   server.begin();
   g_http = true;
 }
 
+static void stop_ap() {
+  if (!g_http) return;
+  g_http = false;
+  server.stop();
+  WiFi.softAPdisconnect(true);
+  WiFi.mode(WIFI_OFF);
+  console_println("AP off");
+}
+
+void config_server_begin() {
+  console_ensure();
+  pinMode(kWifiEnablePin, INPUT_PULLUP);
+  g_switch_raw = switch_closed_raw();
+  g_switch_stable = g_switch_raw;
+  g_switch_change_ms = millis();
+  register_routes();
+  console_println("WiFi switch GPIO15, closed to GND");
+  if (g_switch_stable) start_ap();
+}
+
 void config_server_poll() {
+  poll_switch();
+  if (g_switch_stable && !g_http) start_ap();
+  else if (!g_switch_stable && g_http) stop_ap();
   if (g_http) server.handleClient();
 }
