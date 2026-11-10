@@ -523,6 +523,30 @@ extern "C" void test_recipe_shapes(void) {
   const ChordEvent shift_plus[] = {ev_press(ChordKeyKind::Shift, 0, 0),
                                    ev_press(ChordKeyKind::Char, '+', 12), ev_release(12)};
   expect_events("Shift++", shift_plus, 3);
+
+  struct RawKey {
+    const char *text;
+    uint8_t usage;
+  };
+  const RawKey raw[] = {
+      {"Hankaku", 0x35}, {"Henkan", 0x8A},  {"Muhenkan", 0x8B}, {"Kana", 0x88},
+      {"Eisuu", 0x91},   {"Yen", 0x89},     {"Ro", 0x87},       {"Delete", 0x4C},
+      {"Insert", 0x49},  {"Home", 0x4A},    {"End", 0x4D},      {"PageUp", 0x4B},
+      {"PageDown", 0x4E}, {"CapsLock", 0x39}, {"F1", 0x3A},     {"F2", 0x3B},
+      {"F3", 0x3C},      {"F4", 0x3D},      {"F5", 0x3E},       {"F6", 0x3F},
+      {"F7", 0x40},      {"F8", 0x41},      {"F9", 0x42},       {"F10", 0x43},
+      {"F11", 0x44},     {"F12", 0x45},
+  };
+  for (const RawKey &item : raw) {
+    const ChordEvent want[] = {ev_press(ChordKeyKind::Raw, item.usage, 12), ev_release(12)};
+    expect_events(item.text, want, 2);
+  }
+  const ChordEvent shift_henkan[] = {ev_press(ChordKeyKind::Shift, 0, 0),
+                                     ev_press(ChordKeyKind::Raw, 0x8A, 12), ev_release(12)};
+  expect_events("Shift+Henkan", shift_henkan, 3);
+  const ChordEvent ctrl_f1[] = {ev_press(ChordKeyKind::Ctrl, 0, 0),
+                                ev_press(ChordKeyKind::Raw, 0x3A, 12), ev_release(12)};
+  expect_events("Ctrl+F1", ctrl_f1, 3);
 }
 
 extern "C" void test_each_csv_output_parses(void) {

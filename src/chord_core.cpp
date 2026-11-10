@@ -158,27 +158,57 @@ ChordStep chord_engine_set_mode(ChordEngine *engine, ChordFireMode mode) {
 
 static bool is_plain_char(unsigned char c) { return c >= 0x21 && c <= 0x7E; }
 
-static bool named_key(const char *token, ChordKeyKind *kind) {
+static bool named_key(const char *token, ChordKeyKind *kind, uint8_t *code) {
   struct Item {
     const char *name;
     ChordKeyKind kind;
+    uint8_t code;
   };
+  // Raw codes are USB HID Keyboard/Keypad usages (pressRaw). The others keep
+  // the existing kind and a zero code so the firmware maps them itself.
   static const Item kNamed[] = {
-      {"Backspace", ChordKeyKind::Backspace},
-      {"Space", ChordKeyKind::Space},
-      {"Enter", ChordKeyKind::Enter},
-      {"Esc", ChordKeyKind::Esc},
-      {"ESC", ChordKeyKind::Esc},
-      {"[ESC]", ChordKeyKind::Esc},
-      {"Up", ChordKeyKind::Up},
-      {"Down", ChordKeyKind::Down},
-      {"Left", ChordKeyKind::Left},
-      {"Right", ChordKeyKind::Right},
-      {"Tab", ChordKeyKind::Tab},
+      {"Backspace", ChordKeyKind::Backspace, 0},
+      {"Space", ChordKeyKind::Space, 0},
+      {"Enter", ChordKeyKind::Enter, 0},
+      {"Esc", ChordKeyKind::Esc, 0},
+      {"ESC", ChordKeyKind::Esc, 0},
+      {"[ESC]", ChordKeyKind::Esc, 0},
+      {"Up", ChordKeyKind::Up, 0},
+      {"Down", ChordKeyKind::Down, 0},
+      {"Left", ChordKeyKind::Left, 0},
+      {"Right", ChordKeyKind::Right, 0},
+      {"Tab", ChordKeyKind::Tab, 0},
+      {"Hankaku", ChordKeyKind::Raw, 0x35},
+      {"Henkan", ChordKeyKind::Raw, 0x8A},
+      {"Muhenkan", ChordKeyKind::Raw, 0x8B},
+      {"Kana", ChordKeyKind::Raw, 0x88},
+      {"Eisuu", ChordKeyKind::Raw, 0x91},
+      {"Yen", ChordKeyKind::Raw, 0x89},
+      {"Ro", ChordKeyKind::Raw, 0x87},
+      {"Delete", ChordKeyKind::Raw, 0x4C},
+      {"Insert", ChordKeyKind::Raw, 0x49},
+      {"Home", ChordKeyKind::Raw, 0x4A},
+      {"End", ChordKeyKind::Raw, 0x4D},
+      {"PageUp", ChordKeyKind::Raw, 0x4B},
+      {"PageDown", ChordKeyKind::Raw, 0x4E},
+      {"CapsLock", ChordKeyKind::Raw, 0x39},
+      {"F1", ChordKeyKind::Raw, 0x3A},
+      {"F2", ChordKeyKind::Raw, 0x3B},
+      {"F3", ChordKeyKind::Raw, 0x3C},
+      {"F4", ChordKeyKind::Raw, 0x3D},
+      {"F5", ChordKeyKind::Raw, 0x3E},
+      {"F6", ChordKeyKind::Raw, 0x3F},
+      {"F7", ChordKeyKind::Raw, 0x40},
+      {"F8", ChordKeyKind::Raw, 0x41},
+      {"F9", ChordKeyKind::Raw, 0x42},
+      {"F10", ChordKeyKind::Raw, 0x43},
+      {"F11", ChordKeyKind::Raw, 0x44},
+      {"F12", ChordKeyKind::Raw, 0x45},
   };
   for (const Item &item : kNamed) {
     if (strcmp(token, item.name) == 0) {
       *kind = item.kind;
+      *code = item.code;
       return true;
     }
   }
@@ -277,7 +307,7 @@ static bool take_combo(ChordRecipe *out, const char *token) {
   if (last[0] != '\0' && last[1] == '\0' && is_plain_char(static_cast<unsigned char>(last[0]))) {
     key_kind = ChordKeyKind::Char;
     key_code = static_cast<uint8_t>(last[0]);
-  } else if (!named_key(last, &key_kind)) {
+  } else if (!named_key(last, &key_kind, &key_code)) {
     add_skip(out, token, len, false);
     return true;
   }
@@ -303,12 +333,13 @@ static bool take_token(ChordRecipe *out, const char *token, bool *abort_recipe) 
   const size_t room = kChordRecipeCap - out->count;
 
   ChordKeyKind named = ChordKeyKind::Char;
-  if (named_key(token, &named)) {
+  uint8_t named_code = 0;
+  if (named_key(token, &named, &named_code)) {
     if (room < 2) {
       *abort_recipe = true;
       return false;
     }
-    put_event(out, ChordEvOp::Press, named, 0, kChordTapGapMs);
+    put_event(out, ChordEvOp::Press, named, named_code, kChordTapGapMs);
     put_event(out, ChordEvOp::ReleaseAll, ChordKeyKind::Char, 0, kChordTapGapMs);
     return true;
   }

@@ -76,7 +76,7 @@ R"HTML(
 <div class="wrap">
   <header>
     <h1>JIS 和弦</h1>
-    <p class="hint">必＝一定要按。可＝可有可無。同一顆不能兩個都勾。假名只供辨識。output 空白表示這列不送鍵。</p>
+    <p class="hint">假名列填羅馬字。符號與操作列從清單選鍵。必＝一定要按。可＝可有可無。同一顆不能兩個都勾。假名只供辨識。output 空白表示這列不送鍵。</p>
     <div class="actions">
       <button id="fire-release" type="button">全放再送</button>
       <button id="fire-first" type="button">首鍵放開就送</button>
@@ -94,6 +94,34 @@ R"HTML(
 </div>
 <script>
 const KEYS = ["LL","LU","LR","LD","LT0","LT1","LT2","RL","RU","RR","RD","RT0","RT1","RT2"];
+const KEY_OPTIONS = [
+  ["Hankaku", "半角/全角"],
+  ["Henkan", "変換"],
+  ["Muhenkan", "無変換"],
+  ["Kana", "カタカナひらがな"],
+  ["Eisuu", "英数"],
+  ["Yen", "¥"],
+  ["Ro", "ろ"],
+  ["Backspace", "退格"],
+  ["Delete", "Delete"],
+  ["Space", "空白"],
+  ["Enter", "Enter"],
+  ["Esc", "Esc"],
+  ["Tab", "Tab"],
+  ["Up", "上"],
+  ["Down", "下"],
+  ["Left", "左"],
+  ["Right", "右"],
+  ["Home", "Home"],
+  ["End", "End"],
+  ["PageUp", "PageUp"],
+  ["PageDown", "PageDown"],
+  ["Insert", "Insert"],
+  ["CapsLock", "Caps Lock"],
+  ["F1", "F1"], ["F2", "F2"], ["F3", "F3"], ["F4", "F4"],
+  ["F5", "F5"], ["F6", "F6"], ["F7", "F7"], ["F8", "F8"],
+  ["F9", "F9"], ["F10", "F10"], ["F11", "F11"], ["F12", "F12"]
+];
 const qInput = document.getElementById("q");
 const list = document.getElementById("list");
 const none = document.getElementById("none");
@@ -176,16 +204,43 @@ function renderRow(row, index) {
   });
   root.appendChild(hands);
 
-  const output = document.createElement("input");
-  output.className = "output";
-  output.type = "text";
-  output.dataset.role = "output";
-  output.value = row.output;
-  output.maxLength = 63;
-  output.placeholder = "output，例如 nn、Shift+1、Backspace";
-  output.autocomplete = "off";
-  output.autocapitalize = "off";
-  output.spellcheck = false;
+  const id = Number(row.id);
+  const symbolRow = id >= 4 && id <= 31;
+  let output;
+  if (symbolRow) {
+    output = document.createElement("select");
+    output.className = "output";
+    output.dataset.role = "output";
+    const known = KEY_OPTIONS.some((item) => item[0] === row.output);
+    if (row.output !== "" && !known) {
+      const keep = document.createElement("option");
+      keep.value = row.output;
+      keep.textContent = "目前配方：" + row.output;
+      output.appendChild(keep);
+    }
+    const blank = document.createElement("option");
+    blank.value = "";
+    blank.textContent = "不送鍵";
+    output.appendChild(blank);
+    KEY_OPTIONS.forEach((item) => {
+      const opt = document.createElement("option");
+      opt.value = item[0];
+      opt.textContent = item[1];
+      output.appendChild(opt);
+    });
+    output.value = row.output;
+  } else {
+    output = document.createElement("input");
+    output.className = "output";
+    output.type = "text";
+    output.dataset.role = "output";
+    output.value = row.output;
+    output.maxLength = 63;
+    output.placeholder = "output，例如 nn、Shift+1、Backspace";
+    output.autocomplete = "off";
+    output.autocapitalize = "off";
+    output.spellcheck = false;
+  }
   root.appendChild(output);
   const hint = el("div", "empty-hint", "這列不送鍵");
   hint.hidden = row.output !== "";
@@ -289,8 +344,20 @@ async function withBusy(fn) {
   }
 }
 
+function applyOutput(input) {
+  if (!input || input.dataset.role !== "output") return;
+  const rowEl = input.closest(".row");
+  const row = rows[Number(rowEl.dataset.index)];
+  row.output = input.value;
+  rowEl.querySelector(".empty-hint").hidden = input.value !== "";
+}
+
 list.addEventListener("change", (ev) => {
   const input = ev.target;
+  if (input && input.dataset.role === "output") {
+    applyOutput(input);
+    return;
+  }
   if (!input || input.type !== "checkbox") return;
   const rowEl = input.closest(".row");
   const box = input.closest(".key");
@@ -309,12 +376,7 @@ list.addEventListener("change", (ev) => {
 });
 
 list.addEventListener("input", (ev) => {
-  const input = ev.target;
-  if (!input || input.dataset.role !== "output") return;
-  const rowEl = input.closest(".row");
-  const row = rows[Number(rowEl.dataset.index)];
-  row.output = input.value;
-  rowEl.querySelector(".empty-hint").hidden = input.value !== "";
+  applyOutput(ev.target);
 });
 
 qInput.addEventListener("input", () => {

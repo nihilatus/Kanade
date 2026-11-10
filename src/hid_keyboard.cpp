@@ -12,7 +12,7 @@ static bool g_begun = false;
 
 static constexpr uint16_t kTapGapMs = 12;
 
-enum class HidOp : uint8_t { ReleaseAll, Press };
+enum class HidOp : uint8_t { ReleaseAll, Press, PressRaw };
 
 struct HidEvent {
   HidOp op;
@@ -75,6 +75,9 @@ static void send_event(const HidEvent &event) {
       break;
     case HidOp::Press:
       Keyboard.press(event.code);
+      break;
+    case HidOp::PressRaw:
+      Keyboard.pressRaw(event.code);
       break;
   }
 }
@@ -157,6 +160,8 @@ static uint8_t press_code(const ChordEvent &event) {
       return KEY_RIGHT_ARROW;
     case ChordKeyKind::Tab:
       return KEY_TAB;
+    case ChordKeyKind::Raw:
+      return event.code;
   }
   return 0;
 }
@@ -204,8 +209,13 @@ void hid_type_recipe(const char *recipe) {
     HidOp op = HidOp::ReleaseAll;
     uint8_t code = 0;
     if (event.op == ChordEvOp::Press) {
-      op = HidOp::Press;
-      code = press_code(event);
+      if (event.key == ChordKeyKind::Raw) {
+        op = HidOp::PressRaw;
+        code = event.code;
+      } else {
+        op = HidOp::Press;
+        code = press_code(event);
+      }
     }
     enqueue(op, code, event.gap_after_ms);
   }

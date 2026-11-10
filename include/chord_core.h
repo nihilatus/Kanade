@@ -81,6 +81,10 @@ enum class ChordKeyKind : uint8_t {
   Left,
   Right,
   Tab,
+  // USB HID Keyboard usage in ChordEvent.code. Firmware sends it with
+  // pressRaw so usages above 0x77 (変換, 無変換, カタカナひらがな) are not
+  // folded by the ASCII layout map.
+  Raw,
 };
 
 enum class ChordEvOp : uint8_t { Write = 0, Press, ReleaseAll };
