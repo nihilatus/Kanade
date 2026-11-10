@@ -57,6 +57,7 @@ static constexpr char kPrefsNs[] = "jis";
 static constexpr char kPrefsFire[] = "fire";
 
 static ChordEngine g_engine;
+static ChordRepeat g_repeat;
 
 // JSON DOM lives in PSRAM so the WiFi stack can keep internal RAM.
 struct PsramAllocator : ArduinoJson::Allocator {
@@ -242,6 +243,7 @@ static void log_chord(const char *kind, uint16_t id, uint16_t mask, const char *
 }
 
 static void fire(uint16_t mask);  // defined below; send path uses the live table
+static void dispatch_chord_step(const ChordStep &step, uint32_t now_ms);
 
 static const char *fire_mode_name(ChordFireMode mode) {
   return mode == ChordFireMode::FirstUp ? "first" : "release";
@@ -299,8 +301,9 @@ bool chords_set_fire_mode_name(const char *name) {
   else if (strcmp(name, "first") == 0) next = ChordFireMode::FirstUp;
   else return false;
 
+  const uint32_t now = millis();
   const ChordStep step = chord_engine_set_mode(&g_engine, next);
-  if (step.fire) fire(step.fire_mask);
+  dispatch_chord_step(step, now);
   save_fire_mode();
   log_fire_mode();
   return true;
@@ -324,6 +327,23 @@ static void fire(uint16_t mask) {
   if (row.output == nullptr || row.output[0] == '\0') return;
   if (!hid_keyboard_ready()) return;
   hid_type_recipe(row.output);
+}
+
+static bool peak_auto_repeats(uint16_t mask) {
+  if (mask == 0 || g_live == nullptr) return false;
+  const int index = chord_find_rule(g_live, g_live_count, mask);
+  if (index < 0) return false;
+  return chord_output_auto_repeats(g_live[index].output);
+}
+
+static void dispatch_chord_step(const ChordStep &step, uint32_t now_ms) {
+  const bool holding = g_engine.phase == ChordPhase::Holding;
+  const uint16_t peak = holding ? g_engine.peak.mask : 0;
+  const ChordRepeatStep rep =
+      chord_repeat_step(&g_repeat, g_engine.phase, peak, holding && peak_auto_repeats(peak),
+                        step.fire, step.fire_mask, now_ms);
+  if (rep.send) fire(rep.mask);
+  if (step.fire && !rep.swallow_fire) fire(step.fire_mask);
 }
 
 size_t chords_count() { return g_live_count; }
@@ -646,6 +666,7 @@ static void try_load_saved() {
 
 void chords_begin() {
   chord_engine_reset(&g_engine);
+  chord_repeat_reset(&g_repeat);
 
   console_ensure();
   load_fire_mode();
@@ -661,6 +682,7 @@ void chords_begin() {
 }
 
 void chords_poll() {
-  const ChordStep step = chord_engine_step(&g_engine, buttons_mask(), millis());
-  if (step.fire) fire(step.fire_mask);
+  const uint32_t now = millis();
+  const ChordStep step = chord_engine_step(&g_engine, buttons_mask(), now);
+  dispatch_chord_step(step, now);
 }

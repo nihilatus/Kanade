@@ -14,6 +14,16 @@ static constexpr uint8_t kChordDebounceMs = 8;
 static constexpr uint32_t kChordReleaseGuardMs = 10;
 static constexpr uint8_t kChordTapGapMs = 12;
 static constexpr uint8_t kChordGapNone = 0;
+// Held arrows and Backspace: first tap after the peak stops growing, then
+// repeat. The delay is measured from the same moment as the settle. One poll
+// sends at most one tap, so a late poll does not catch up.
+static constexpr uint16_t kChordRepeatSettleMs = 50;
+static constexpr uint16_t kChordRepeatDelayMs = 400;
+static constexpr uint8_t kChordRepeatIntervalMs = 33;
+static_assert(kChordRepeatDelayMs > kChordRepeatSettleMs,
+              "repeat starts after the first tap");
+static_assert(kChordRepeatIntervalMs > kChordTapGapMs * 2,
+              "repeat gap must outlast one press and release");
 
 // Bit i is key i. Order is LL LU LR LD LT0 LT1 LT2 RL RU RR RD RT0 RT1 RT2.
 const char *chord_key_name(int index);
@@ -68,6 +78,34 @@ ChordStep chord_engine_step(ChordEngine *engine, uint16_t mask, uint32_t now_ms)
 
 // Switching to FirstUp while ReleaseGuard is waiting sends immediately.
 ChordStep chord_engine_set_mode(ChordEngine *engine, ChordFireMode mode);
+
+// True only for a whole output that is Up, Down, Left, Right, or Backspace.
+bool chord_output_auto_repeats(const char *output);
+
+enum class ChordRepeatPhase : uint8_t { Idle = 0, Watching, Sent, Repeating };
+
+struct ChordRepeat {
+  ChordRepeatPhase phase;
+  uint16_t mask;
+  uint32_t since_ms;
+  uint32_t next_ms;
+};
+
+struct ChordRepeatStep {
+  bool send;
+  uint16_t mask;
+  bool swallow_fire;
+};
+
+void chord_repeat_reset(ChordRepeat *rep);
+
+// Call after chord_engine_step or chord_engine_set_mode with that step's fire
+// fields. peak_mask is the engine peak while Holding, otherwise unused.
+// peak_repeats is the caller's lookup of that peak. send is one tap of mask.
+// swallow_fire drops the engine fire when this hold already produced a tap.
+ChordRepeatStep chord_repeat_step(ChordRepeat *rep, ChordPhase phase, uint16_t peak_mask,
+                                  bool peak_repeats, bool engine_fired, uint16_t fired_mask,
+                                  uint32_t now_ms);
 
 enum class ChordKeyKind : uint8_t {
   Char = 0,

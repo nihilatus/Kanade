@@ -165,6 +165,95 @@ ChordStep chord_engine_set_mode(ChordEngine *engine, ChordFireMode mode) {
   return step;
 }
 
+bool chord_output_auto_repeats(const char *output) {
+  if (output == nullptr) return false;
+  return strcmp(output, "Up") == 0 || strcmp(output, "Down") == 0 ||
+         strcmp(output, "Left") == 0 || strcmp(output, "Right") == 0 ||
+         strcmp(output, "Backspace") == 0;
+}
+
+void chord_repeat_reset(ChordRepeat *rep) {
+  if (rep == nullptr) return;
+  rep->phase = ChordRepeatPhase::Idle;
+  rep->mask = 0;
+  rep->since_ms = 0;
+  rep->next_ms = 0;
+}
+
+static void arm_repeat(ChordRepeat *rep, uint16_t mask, uint32_t now_ms) {
+  rep->phase = ChordRepeatPhase::Watching;
+  rep->mask = mask;
+  rep->since_ms = now_ms;
+  rep->next_ms = 0;
+}
+
+static bool repeat_already_sent(ChordRepeatPhase phase) {
+  return phase == ChordRepeatPhase::Sent || phase == ChordRepeatPhase::Repeating;
+}
+
+ChordRepeatStep chord_repeat_step(ChordRepeat *rep, ChordPhase phase, uint16_t peak_mask,
+                                  bool peak_repeats, bool engine_fired, uint16_t fired_mask,
+                                  uint32_t now_ms) {
+  ChordRepeatStep step;
+  step.send = false;
+  step.mask = 0;
+  step.swallow_fire = false;
+  if (rep == nullptr) return step;
+
+  // The engine fire is the release copy. Drop it when this hold already tapped.
+  if (engine_fired && repeat_already_sent(rep->phase) && fired_mask != 0 &&
+      fired_mask == rep->mask) {
+    step.swallow_fire = true;
+  }
+  if (engine_fired) {
+    // A fire that also starts the next hold must not also emit a repeat tap.
+    if (phase == ChordPhase::Holding && peak_mask != 0) arm_repeat(rep, peak_mask, now_ms);
+    else chord_repeat_reset(rep);
+    return step;
+  }
+
+  // ReleaseGuard and Draining keep the clock so a bounce can resume the same
+  // peak without a second first tap. Keys are up or draining, so do not send.
+  if (phase != ChordPhase::Holding || peak_mask == 0) return step;
+
+  if (peak_mask != rep->mask) {
+    arm_repeat(rep, peak_mask, now_ms);
+    return step;
+  }
+  if (!peak_repeats) return step;
+
+  const uint32_t held_ms = now_ms - rep->since_ms;
+  if (rep->phase == ChordRepeatPhase::Watching) {
+    if (held_ms < kChordRepeatSettleMs) return step;
+    step.send = true;
+    step.mask = peak_mask;
+    // A stalled poll may cross both marks. Still one tap; the next waits an interval.
+    if (held_ms >= kChordRepeatDelayMs) {
+      rep->phase = ChordRepeatPhase::Repeating;
+      rep->next_ms = now_ms + kChordRepeatIntervalMs;
+    } else {
+      rep->phase = ChordRepeatPhase::Sent;
+    }
+    return step;
+  }
+  if (rep->phase == ChordRepeatPhase::Sent) {
+    if (held_ms < kChordRepeatDelayMs) return step;
+    step.send = true;
+    step.mask = peak_mask;
+    rep->phase = ChordRepeatPhase::Repeating;
+    rep->next_ms = now_ms + kChordRepeatIntervalMs;
+    return step;
+  }
+  if (rep->phase == ChordRepeatPhase::Repeating) {
+    // One tap per poll. A late poll does not emit the ones it skipped.
+    if (static_cast<int32_t>(now_ms - rep->next_ms) < 0) return step;
+    step.send = true;
+    step.mask = peak_mask;
+    rep->next_ms = now_ms + kChordRepeatIntervalMs;
+  }
+  return step;
+}
+
 static bool is_plain_char(unsigned char c) { return c >= 0x21 && c <= 0x7E; }
 
 static bool named_key(const char *token, ChordKeyKind *kind, uint8_t *code) {

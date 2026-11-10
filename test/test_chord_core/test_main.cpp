@@ -1159,6 +1159,260 @@ extern "C" void test_shared_recipe_vectors(void) {
   TEST_ASSERT_TRUE_MESSAGE(cases > 0, "recipe vector file has no cases");
 }
 
+struct RepeatLog {
+  int taps;
+  int release_fires;
+  uint16_t last_tap;
+  uint16_t last_release;
+};
+
+static void repeat_poll(ChordEngine *engine, ChordRepeat *rep, RepeatLog *log, uint16_t keys,
+                        uint32_t now, bool (*repeats_at)(uint16_t peak)) {
+  const ChordStep step = chord_engine_step(engine, keys, now);
+  const bool holding = engine->phase == ChordPhase::Holding;
+  const uint16_t peak = holding ? engine->peak.mask : 0;
+  const bool repeats = holding && peak != 0 && repeats_at != nullptr && repeats_at(peak);
+  const ChordRepeatStep got =
+      chord_repeat_step(rep, engine->phase, peak, repeats, step.fire, step.fire_mask, now);
+  TEST_ASSERT_FALSE(got.send && step.fire);
+  if (got.send) {
+    log->taps++;
+    log->last_tap = got.mask;
+  }
+  if (step.fire && !got.swallow_fire) {
+    log->release_fires++;
+    log->last_release = step.fire_mask;
+  }
+}
+
+static bool repeats_bit0(uint16_t peak) { return peak == 0x0001; }
+
+static bool repeats_none(uint16_t peak) {
+  (void)peak;
+  return false;
+}
+
+static bool repeats_bit0_or_bit01(uint16_t peak) { return peak == 0x0001 || peak == 0x0003; }
+
+static void repeat_begin(ChordEngine *engine, ChordRepeat *rep, RepeatLog *log) {
+  chord_engine_reset(engine);
+  chord_repeat_reset(rep);
+  log->taps = 0;
+  log->release_fires = 0;
+  log->last_tap = 0;
+  log->last_release = 0;
+}
+
+extern "C" void test_output_auto_repeat_names(void) {
+  TEST_ASSERT_TRUE(chord_output_auto_repeats("Up"));
+  TEST_ASSERT_TRUE(chord_output_auto_repeats("Down"));
+  TEST_ASSERT_TRUE(chord_output_auto_repeats("Left"));
+  TEST_ASSERT_TRUE(chord_output_auto_repeats("Right"));
+  TEST_ASSERT_TRUE(chord_output_auto_repeats("Backspace"));
+  TEST_ASSERT_FALSE(chord_output_auto_repeats(nullptr));
+  TEST_ASSERT_FALSE(chord_output_auto_repeats(""));
+  TEST_ASSERT_FALSE(chord_output_auto_repeats("a"));
+  TEST_ASSERT_FALSE(chord_output_auto_repeats("Backspace "));
+  TEST_ASSERT_FALSE(chord_output_auto_repeats("Shift+Left"));
+  TEST_ASSERT_FALSE(chord_output_auto_repeats("Delete"));
+}
+
+extern "C" void test_repeat_settle_then_interval(void) {
+  ChordEngine engine;
+  ChordRepeat rep;
+  RepeatLog log;
+  repeat_begin(&engine, &rep, &log);
+
+  repeat_poll(&engine, &rep, &log, 0x0001, 0, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0x0001, 49, repeats_bit0);
+  TEST_ASSERT_EQUAL_INT(0, log.taps);
+  repeat_poll(&engine, &rep, &log, 0x0001, 50, repeats_bit0);
+  TEST_ASSERT_EQUAL_INT(1, log.taps);
+  TEST_ASSERT_EQUAL_UINT16(0x0001, log.last_tap);
+  repeat_poll(&engine, &rep, &log, 0x0001, 51, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0x0001, 399, repeats_bit0);
+  TEST_ASSERT_EQUAL_INT(1, log.taps);
+  repeat_poll(&engine, &rep, &log, 0x0001, 400, repeats_bit0);
+  TEST_ASSERT_EQUAL_INT(2, log.taps);
+  repeat_poll(&engine, &rep, &log, 0x0001, 432, repeats_bit0);
+  TEST_ASSERT_EQUAL_INT(2, log.taps);
+  repeat_poll(&engine, &rep, &log, 0x0001, 433, repeats_bit0);
+  TEST_ASSERT_EQUAL_INT(3, log.taps);
+  TEST_ASSERT_EQUAL_INT(0, log.release_fires);
+}
+
+extern "C" void test_repeat_short_tap_uses_release_fire(void) {
+  ChordEngine engine;
+  ChordRepeat rep;
+  RepeatLog log;
+  repeat_begin(&engine, &rep, &log);
+
+  repeat_poll(&engine, &rep, &log, 0x0001, 0, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0, 20, repeats_bit0);
+  TEST_ASSERT_EQUAL_INT(0, log.taps);
+  TEST_ASSERT_EQUAL_INT(0, log.release_fires);
+  repeat_poll(&engine, &rep, &log, 0, 30, repeats_bit0);
+  TEST_ASSERT_EQUAL_INT(0, log.taps);
+  TEST_ASSERT_EQUAL_INT(1, log.release_fires);
+  TEST_ASSERT_EQUAL_UINT16(0x0001, log.last_release);
+}
+
+extern "C" void test_repeat_release_after_first_tap_is_swallowed(void) {
+  ChordEngine engine;
+  ChordRepeat rep;
+  RepeatLog log;
+  repeat_begin(&engine, &rep, &log);
+
+  repeat_poll(&engine, &rep, &log, 0x0001, 0, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0x0001, 50, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0, 60, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0, 70, repeats_bit0);
+  TEST_ASSERT_EQUAL_INT(1, log.taps);
+  TEST_ASSERT_EQUAL_INT(0, log.release_fires);
+}
+
+extern "C" void test_repeat_guard_does_not_tick_while_up(void) {
+  ChordEngine engine;
+  ChordRepeat rep;
+  RepeatLog log;
+  repeat_begin(&engine, &rep, &log);
+
+  repeat_poll(&engine, &rep, &log, 0x0001, 0, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0x0001, 50, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0x0001, 400, repeats_bit0);
+  TEST_ASSERT_EQUAL_INT(2, log.taps);
+  repeat_poll(&engine, &rep, &log, 0, 430, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0, 433, repeats_bit0);
+  TEST_ASSERT_EQUAL_INT(2, log.taps);
+  repeat_poll(&engine, &rep, &log, 0, 440, repeats_bit0);
+  TEST_ASSERT_EQUAL_INT(2, log.taps);
+  TEST_ASSERT_EQUAL_INT(0, log.release_fires);
+}
+
+extern "C" void test_repeat_bounce_in_guard_does_not_retap(void) {
+  ChordEngine engine;
+  ChordRepeat rep;
+  RepeatLog log;
+  repeat_begin(&engine, &rep, &log);
+
+  repeat_poll(&engine, &rep, &log, 0x0001, 0, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0x0001, 50, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0, 55, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0x0001, 60, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0x0001, 100, repeats_bit0);
+  TEST_ASSERT_EQUAL_INT(1, log.taps);
+  repeat_poll(&engine, &rep, &log, 0x0001, 400, repeats_bit0);
+  TEST_ASSERT_EQUAL_INT(2, log.taps);
+  TEST_ASSERT_EQUAL_UINT16(0x0001, log.last_tap);
+}
+
+extern "C" void test_repeat_larger_peak_restarts_clock(void) {
+  ChordEngine engine;
+  ChordRepeat rep;
+  RepeatLog log;
+  repeat_begin(&engine, &rep, &log);
+
+  repeat_poll(&engine, &rep, &log, 0x0001, 0, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0x0003, 40, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0x0003, 90, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0x0003, 440, repeats_bit0);
+  TEST_ASSERT_EQUAL_INT(0, log.taps);
+  repeat_poll(&engine, &rep, &log, 0, 500, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0, 510, repeats_bit0);
+  TEST_ASSERT_EQUAL_INT(0, log.taps);
+  TEST_ASSERT_EQUAL_INT(1, log.release_fires);
+  TEST_ASSERT_EQUAL_UINT16(0x0003, log.last_release);
+}
+
+extern "C" void test_repeat_larger_repeatable_peak_waits_again(void) {
+  ChordEngine engine;
+  ChordRepeat rep;
+  RepeatLog log;
+  repeat_begin(&engine, &rep, &log);
+
+  repeat_poll(&engine, &rep, &log, 0x0001, 0, repeats_bit0_or_bit01);
+  repeat_poll(&engine, &rep, &log, 0x0001, 50, repeats_bit0_or_bit01);
+  TEST_ASSERT_EQUAL_UINT16(0x0001, log.last_tap);
+  repeat_poll(&engine, &rep, &log, 0x0003, 60, repeats_bit0_or_bit01);
+  repeat_poll(&engine, &rep, &log, 0x0003, 100, repeats_bit0_or_bit01);
+  TEST_ASSERT_EQUAL_INT(1, log.taps);
+  repeat_poll(&engine, &rep, &log, 0x0003, 110, repeats_bit0_or_bit01);
+  TEST_ASSERT_EQUAL_INT(2, log.taps);
+  TEST_ASSERT_EQUAL_UINT16(0x0003, log.last_tap);
+}
+
+extern "C" void test_repeat_letter_hold_does_not_repeat(void) {
+  ChordEngine engine;
+  ChordRepeat rep;
+  RepeatLog log;
+  repeat_begin(&engine, &rep, &log);
+
+  repeat_poll(&engine, &rep, &log, 0x0001, 0, repeats_none);
+  repeat_poll(&engine, &rep, &log, 0x0001, 1000, repeats_none);
+  TEST_ASSERT_EQUAL_INT(0, log.taps);
+  repeat_poll(&engine, &rep, &log, 0, 1010, repeats_none);
+  repeat_poll(&engine, &rep, &log, 0, 1020, repeats_none);
+  TEST_ASSERT_EQUAL_INT(0, log.taps);
+  TEST_ASSERT_EQUAL_INT(1, log.release_fires);
+  TEST_ASSERT_EQUAL_UINT16(0x0001, log.last_release);
+}
+
+extern "C" void test_repeat_late_poll_does_not_catch_up(void) {
+  ChordEngine engine;
+  ChordRepeat rep;
+  RepeatLog log;
+  repeat_begin(&engine, &rep, &log);
+
+  repeat_poll(&engine, &rep, &log, 0x0001, 0, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0x0001, 500, repeats_bit0);
+  TEST_ASSERT_EQUAL_INT(1, log.taps);
+  repeat_poll(&engine, &rep, &log, 0x0001, 510, repeats_bit0);
+  TEST_ASSERT_EQUAL_INT(1, log.taps);
+  repeat_poll(&engine, &rep, &log, 0x0001, 533, repeats_bit0);
+  TEST_ASSERT_EQUAL_INT(2, log.taps);
+}
+
+extern "C" void test_repeat_first_up_swallows_after_tap(void) {
+  ChordEngine engine;
+  ChordRepeat rep;
+  RepeatLog log;
+  repeat_begin(&engine, &rep, &log);
+  engine.mode = ChordFireMode::FirstUp;
+
+  repeat_poll(&engine, &rep, &log, 0x0001, 0, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0, 20, repeats_bit0);
+  TEST_ASSERT_EQUAL_INT(0, log.taps);
+  TEST_ASSERT_EQUAL_INT(1, log.release_fires);
+
+  repeat_begin(&engine, &rep, &log);
+  engine.mode = ChordFireMode::FirstUp;
+  repeat_poll(&engine, &rep, &log, 0x0001, 0, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0x0001, 50, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0, 80, repeats_bit0);
+  TEST_ASSERT_EQUAL_INT(1, log.taps);
+  TEST_ASSERT_EQUAL_INT(0, log.release_fires);
+}
+
+extern "C" void test_repeat_switch_to_first_swallows_guard_fire(void) {
+  ChordEngine engine;
+  ChordRepeat rep;
+  RepeatLog log;
+  repeat_begin(&engine, &rep, &log);
+
+  repeat_poll(&engine, &rep, &log, 0x0001, 0, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0x0001, 50, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0, 60, repeats_bit0);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::ReleaseGuard), static_cast<int>(engine.phase));
+
+  const ChordStep step = chord_engine_set_mode(&engine, ChordFireMode::FirstUp);
+  TEST_ASSERT_TRUE(step.fire);
+  const ChordRepeatStep got = chord_repeat_step(&rep, engine.phase, 0, false, step.fire,
+                                                step.fire_mask, 65);
+  TEST_ASSERT_FALSE(got.send);
+  TEST_ASSERT_TRUE(got.swallow_fire);
+  TEST_ASSERT_EQUAL_INT(1, log.taps);
+}
+
 extern "C" void test_each_csv_output_parses(void) {
   TEST_ASSERT_TRUE_MESSAGE(g_count > 0, g_error);
   for (size_t i = 0; i < g_count; ++i) {
@@ -1195,5 +1449,17 @@ int main(int argc, char **argv) {
   RUN_TEST(test_csv_bits_match_firmware_table);
   RUN_TEST(test_each_csv_row_matches_spec);
   RUN_TEST(test_each_csv_output_parses);
+  RUN_TEST(test_output_auto_repeat_names);
+  RUN_TEST(test_repeat_settle_then_interval);
+  RUN_TEST(test_repeat_short_tap_uses_release_fire);
+  RUN_TEST(test_repeat_release_after_first_tap_is_swallowed);
+  RUN_TEST(test_repeat_guard_does_not_tick_while_up);
+  RUN_TEST(test_repeat_bounce_in_guard_does_not_retap);
+  RUN_TEST(test_repeat_larger_peak_restarts_clock);
+  RUN_TEST(test_repeat_larger_repeatable_peak_waits_again);
+  RUN_TEST(test_repeat_letter_hold_does_not_repeat);
+  RUN_TEST(test_repeat_late_poll_does_not_catch_up);
+  RUN_TEST(test_repeat_first_up_swallows_after_tap);
+  RUN_TEST(test_repeat_switch_to_first_swallows_guard_fire);
   return UNITY_END();
 }

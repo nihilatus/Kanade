@@ -157,7 +157,7 @@ pio device monitor
 | 已有 | 尚未 |
 | --- | --- |
 | PlatformIO + Arduino + TinyUSB HID 鍵盤。描述符用途 0–255，已含 変換（0x8A）、無変換（0x8B）、カタカナひらがな（0x88）；配方裡的 `Henkan` 等走 `pressRaw` | VID/PID 仍是原型值 |
-| 14 鍵直連、每鍵 `kChordDebounceMs` 穩定消彈跳 | 連發 |
+| 14 鍵直連、每鍵 `kChordDebounceMs` 穩定消彈跳。`Up`／`Down`／`Left`／`Right`／`Backspace` 在高峰穩定 50ms 後送第一下，同一組按住到 400ms 後每 33ms 連發 | — |
 | [送出時機](#輸入邏輯)；手機熱點可改表並存進 LittleFS | 外殼／PCB |
 | 配方送出（羅馬字、`Shift+1`、`Backspace`、`Ctrl+i` 等），ASCII 走 JIS 配列（`KeyboardLayout_ja_JP`）。USB 國碼不設定；一般鍵盤試打頁 | — |
 
