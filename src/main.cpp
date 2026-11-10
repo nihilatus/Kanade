@@ -37,6 +37,7 @@ void setup() {
 void loop() {
   buttons_poll();
   chords_poll();
+  hid_keyboard_poll();
   config_server_poll();
   delay(1);
 }
