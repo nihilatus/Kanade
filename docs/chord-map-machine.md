@@ -6,6 +6,8 @@ Generated machine table: [`../data/chord_map.machine.csv`](../data/chord_map.mac
 
 Rebuild: `python tools/build_chord_map_machine.py`
 
+That command rewrites the machine CSV and [`../include/chord_map.inc`](../include/chord_map.inc). Firmware matches the generated include; it does not parse CSV at boot.
+
 ## Columns
 
 | Column | Meaning |
@@ -39,8 +41,8 @@ Bare `RT0` (no parentheses) is a normal required key (e.g. あ → `keys_require
 
 1. Track keys while the chord is held.
 2. Let `max_chord` be the **maximum simultaneous** down-set observed during the hold (largest `|pressed|` snapshot; if tied, use the latest such snapshot).
-3. Fire **once** on **full release** (transition to no keys down).
-4. Skip if `max_chord` is empty or the matched row’s `output` is empty (empty outputs are not present in this CSV).
+3. Fire **once** on **full release** (transition to no keys down). Firmware confirms release only after the debounced mask stays empty for **25 ms**, so contact bounce on the way up does not split the chord or send it twice. Each key becomes stable only after its raw level holds for **15 ms**.
+4. Skip if `max_chord` is empty or the matched row’s `output` is empty (empty outputs are not present in this CSV). A mask that matches no row is not sent.
 
 ## Matching rule
 

@@ -3,67 +3,44 @@
 #include <Arduino.h>
 #include <stdint.h>
 
-// Logical buttons — same product roles as joystick-writer / store pinout,
-// but consumed here as a keyboard chord surface (not a gamepad).
-// Physical wiring is a diode key matrix (see docs/pinout.md), not 1 GPIO/key.
+// 14 discrete chord keys. Each switch sits between its GPIO and GND.
+// Firmware uses INPUT_PULLUP (released = HIGH, pressed = LOW).
+// Bit 0..13 of buttons_mask() follow this enum order, which is also the
+// canonical order in data/chord_map.machine.csv.
 
 enum ButtonId : uint8_t {
-  BTN_DPAD_UP = 0,
-  BTN_DPAD_DOWN,
-  BTN_DPAD_LEFT,
-  BTN_DPAD_RIGHT,
-  BTN_A,
-  BTN_B,
-  BTN_X,
-  BTN_Y,
-  BTN_L1,
-  BTN_R1,
-  BTN_L2,
-  BTN_R2,
-  BTN_START,
-  BTN_SELECT,
-  BTN_LEFT_N,
-  BTN_LEFT_NE,
-  BTN_LEFT_E,
-  BTN_LEFT_SE,
-  BTN_LEFT_S,
-  BTN_LEFT_SW,
-  BTN_LEFT_W,
-  BTN_LEFT_NW,
-  BTN_LEFT_CENTER,   // L3-style physical center
-  BTN_RIGHT_N,
-  BTN_RIGHT_NE,
-  BTN_RIGHT_E,
-  BTN_RIGHT_SE,
-  BTN_RIGHT_S,
-  BTN_RIGHT_SW,
-  BTN_RIGHT_W,
-  BTN_RIGHT_NW,
-  BTN_RIGHT_CENTER,  // R3-style physical center
+  BTN_LL = 0,
+  BTN_LU,
+  BTN_LR,
+  BTN_LD,
+  BTN_LT0,
+  BTN_LT1,
+  BTN_LT2,
+  BTN_RL,
+  BTN_RU,
+  BTN_RR,
+  BTN_RD,
+  BTN_RT0,
+  BTN_RT1,
+  BTN_RT2,
   BTN_COUNT
 };
 
-static constexpr uint8_t kMatrixRows = 6;
-static constexpr uint8_t kMatrixCols = 6;
+static constexpr uint8_t kButtonCount = BTN_COUNT;
 
-// Empty / unused matrix cell
-static constexpr int8_t kMatrixEmpty = -1;
-
-struct MatrixKey {
-  int8_t button;  // ButtonId, or kMatrixEmpty if spare
+struct ButtonDef {
+  int pin;
   const char *name;
 };
 
-extern const int kMatrixRowPins[kMatrixRows];
-extern const int kMatrixColPins[kMatrixCols];
-extern const MatrixKey kMatrixMap[kMatrixRows][kMatrixCols];
+extern const ButtonDef kButtons[BTN_COUNT];
 
 void buttons_begin();
-void buttons_poll();  // scan matrix + debounce
+void buttons_poll();  // sample GPIOs + per-key debounce
 
-bool button_pressed(ButtonId id);   // current debounced level (active → true)
+bool button_pressed(ButtonId id);  // debounced level (pressed → true)
 bool button_just_pressed(ButtonId id);
 bool button_just_released(ButtonId id);
 
-// Stub helpers: which logical keys are sampled this build
-bool button_gpio_enabled(ButtonId id);
+// Bit i set when ButtonId i is debounced down. Chord engine reads this only.
+uint16_t buttons_mask();

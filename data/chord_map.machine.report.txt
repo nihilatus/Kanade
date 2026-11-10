@@ -1,0 +1,7 @@
+source: eps32jischordboard-premapping.csv
+rows_written: 224
+omitted_empty_kana_and_output: 25
+key_codes (14): LL, LU, LR, LD, LT0, LT1, LT2, RL, RU, RR, RD, RT0, RT1, RT2
+parse_errors: 0
+true_conflicts: 0
+same_keys_same_output_dups: 0
