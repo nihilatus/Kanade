@@ -167,13 +167,6 @@ ChordStep chord_engine_set_mode(ChordEngine *engine, ChordFireMode mode) {
   return step;
 }
 
-bool chord_output_auto_repeats(const char *output) {
-  if (output == nullptr) return false;
-  return strcmp(output, "Up") == 0 || strcmp(output, "Down") == 0 ||
-         strcmp(output, "Left") == 0 || strcmp(output, "Right") == 0 ||
-         strcmp(output, "Backspace") == 0;
-}
-
 void chord_repeat_reset(ChordRepeat *rep) {
   if (rep == nullptr) return;
   rep->phase = ChordRepeatPhase::Idle;

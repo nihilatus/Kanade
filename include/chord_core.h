@@ -25,7 +25,7 @@ static_assert(kChordBounceMs <= kChordReleaseGuardMs,
               "nested chords must split once the release guard has elapsed");
 static constexpr uint8_t kChordTapGapMs = 12;
 static constexpr uint8_t kChordGapNone = 0;
-// Held arrows and Backspace: first tap after the peak stops growing, then
+// Rows with ChordRule::repeat: first tap after the peak stops growing, then
 // repeat. The delay is measured from the same moment as the settle. One poll
 // sends at most one tap, so a late poll does not catch up.
 static constexpr uint16_t kChordRepeatSettleMs = 50;
@@ -46,6 +46,9 @@ struct ChordRule {
   uint16_t optional;
   const char *kana;
   const char *output;
+  // True when the machine-table column repeat is allow. The caller decides
+  // whether a held peak may tap again. This is not the release/first timing.
+  bool repeat;
 };
 
 // required ⊆ mask ⊆ required ∪ optional.
@@ -90,9 +93,6 @@ ChordStep chord_engine_step(ChordEngine *engine, uint16_t mask, uint32_t now_ms)
 
 // Switching to FirstUp while ReleaseGuard is waiting sends immediately.
 ChordStep chord_engine_set_mode(ChordEngine *engine, ChordFireMode mode);
-
-// True only for a whole output that is Up, Down, Left, Right, or Backspace.
-bool chord_output_auto_repeats(const char *output);
 
 enum class ChordRepeatPhase : uint8_t { Idle = 0, Watching, Sent, Repeating };
 

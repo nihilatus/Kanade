@@ -139,9 +139,9 @@ static bool load_csv() {
 
   bool header_seen = false;
   while (*p != '\0') {
-    char fields[6][160];
+    char fields[8][160];
     int nfields = 0;
-    while (nfields < 6 && *p != '\0' && *p != '\n' && *p != '\r') {
+    while (nfields < 8 && *p != '\0' && *p != '\n' && *p != '\r') {
       if (!read_field(&p, fields[nfields], sizeof(fields[nfields]))) {
         free(text);
         set_error("a csv field is too long");
@@ -158,7 +158,7 @@ static bool load_csv() {
       continue;
     }
     if (fields[0][0] == '\0') continue;
-    if (nfields < 4) {
+    if (nfields < 7) {
       free(text);
       set_error("a csv row is missing columns");
       return false;
@@ -190,12 +190,18 @@ static bool load_csv() {
       set_error("string pool full");
       return false;
     }
+    if (strcmp(fields[6], "allow") != 0 && strcmp(fields[6], "no") != 0) {
+      free(text);
+      snprintf(g_error, sizeof(g_error), "bad repeat on id %ld", id);
+      return false;
+    }
     ChordRule &row = g_rules[g_count++];
     row.id = static_cast<uint16_t>(id);
     row.required = required;
     row.optional = optional;
     row.kana = kana;
     row.output = output;
+    row.repeat = strcmp(fields[6], "allow") == 0;
   }
   free(text);
   if (!header_seen || g_count == 0) {
@@ -1257,18 +1263,24 @@ static void repeat_begin(ChordEngine *engine, ChordRepeat *rep, RepeatLog *log) 
   log->last_release = 0;
 }
 
-extern "C" void test_output_auto_repeat_names(void) {
-  TEST_ASSERT_TRUE(chord_output_auto_repeats("Up"));
-  TEST_ASSERT_TRUE(chord_output_auto_repeats("Down"));
-  TEST_ASSERT_TRUE(chord_output_auto_repeats("Left"));
-  TEST_ASSERT_TRUE(chord_output_auto_repeats("Right"));
-  TEST_ASSERT_TRUE(chord_output_auto_repeats("Backspace"));
-  TEST_ASSERT_FALSE(chord_output_auto_repeats(nullptr));
-  TEST_ASSERT_FALSE(chord_output_auto_repeats(""));
-  TEST_ASSERT_FALSE(chord_output_auto_repeats("a"));
-  TEST_ASSERT_FALSE(chord_output_auto_repeats("Backspace "));
-  TEST_ASSERT_FALSE(chord_output_auto_repeats("Shift+Left"));
-  TEST_ASSERT_FALSE(chord_output_auto_repeats("Delete"));
+extern "C" void test_csv_repeat_comes_from_column(void) {
+  TEST_ASSERT_TRUE_MESSAGE(load_csv(), g_error);
+  const uint16_t allow_ids[] = {4, 5, 6, 7, 26};
+  for (uint16_t id : allow_ids) {
+    const ChordRule *row = rule_by_id(id);
+    char msg[48];
+    snprintf(msg, sizeof(msg), "id %u should allow repeat", static_cast<unsigned>(id));
+    TEST_ASSERT_NOT_NULL_MESSAGE(row, msg);
+    TEST_ASSERT_TRUE_MESSAGE(row->repeat, msg);
+  }
+  const ChordRule *nn = rule_by_id(1);
+  TEST_ASSERT_NOT_NULL(nn);
+  TEST_ASSERT_FALSE(nn->repeat);
+  int allows = 0;
+  for (size_t i = 0; i < g_count; ++i) {
+    if (g_rules[i].repeat) ++allows;
+  }
+  TEST_ASSERT_EQUAL_INT(5, allows);
 }
 
 extern "C" void test_repeat_settle_then_interval(void) {
@@ -1504,7 +1516,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_csv_bits_match_firmware_table);
   RUN_TEST(test_each_csv_row_matches_spec);
   RUN_TEST(test_each_csv_output_parses);
-  RUN_TEST(test_output_auto_repeat_names);
+  RUN_TEST(test_csv_repeat_comes_from_column);
   RUN_TEST(test_repeat_settle_then_interval);
   RUN_TEST(test_repeat_short_tap_uses_release_fire);
   RUN_TEST(test_repeat_release_after_first_tap_is_swallowed);

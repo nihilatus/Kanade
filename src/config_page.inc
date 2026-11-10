@@ -164,6 +164,7 @@ function norm(row) {
     id: row.id,
     kana: row.kana || "",
     output: row.output || "",
+    repeat: row.repeat === true,
     required: KEYS.filter((name) => required.indexOf(name) !== -1),
     optional: KEYS.filter((name) => optional.indexOf(name) !== -1 && required.indexOf(name) === -1)
   };
@@ -283,7 +284,8 @@ function payload() {
       required: KEYS.filter((name) => row.required.indexOf(name) !== -1),
       optional: KEYS.filter((name) => row.optional.indexOf(name) !== -1),
       kana: row.kana,
-      output: row.output
+      output: row.output,
+      repeat: row.repeat === true
     }))
   };
 }

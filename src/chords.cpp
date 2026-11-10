@@ -332,7 +332,7 @@ static bool peak_auto_repeats(uint16_t mask) {
   if (mask == 0 || g_live == nullptr) return false;
   const int index = chord_find_rule(g_live, g_live_count, mask);
   if (index < 0) return false;
-  return chord_output_auto_repeats(g_live[index].output);
+  return g_live[index].repeat;
 }
 
 static void dispatch_chord_step(const ChordStep &step, uint32_t now_ms) {
@@ -381,6 +381,7 @@ void chords_load_factory() {
     g_live[i].optional = 0;
     g_live[i].kana = "";
     g_live[i].output = "";
+    g_live[i].repeat = false;
   }
   g_live_count = kFactoryCount;
   g_from_file = false;
@@ -449,6 +450,13 @@ ChordStageStatus chords_stage_json(const char *json, size_t len, char *err, size
     const char *output = "";
     if (!take_string(obj, "kana", &kana, err, err_len, row_no, "的假名不對")) return g_stage_status;
     if (!take_string(obj, "output", &output, err, err_len, row_no, "的 output 不對")) return g_stage_status;
+    // Missing on an older chords.json means no repeat. A present value must be bool.
+    bool repeat = false;
+    const JsonVariant repeat_value = obj["repeat"];
+    if (!repeat_value.isNull()) {
+      if (!repeat_value.is<bool>()) return set_row_err(err, err_len, row_no, "的連射允許不對");
+      repeat = repeat_value.as<bool>();
+    }
     if (strlen(kana) > kKanaMax) return set_row_err(err, err_len, row_no, "的假名太長");
     if (strlen(output) > kOutputMax) return set_row_err(err, err_len, row_no, "的 output 太長");
     if (!text_ok(kana, false)) return set_row_err(err, err_len, row_no, "的假名有無法顯示的字元");
@@ -473,6 +481,7 @@ ChordStageStatus chords_stage_json(const char *json, size_t len, char *err, size
     dst.optional = optional;
     dst.kana = kana_copy;
     dst.output = output_copy;
+    dst.repeat = repeat;
   }
 
   g_stage_count = arr.size();
@@ -500,6 +509,7 @@ void chords_commit_staged() {
     g_live[i].optional = 0;
     g_live[i].kana = "";
     g_live[i].output = "";
+    g_live[i].repeat = false;
   }
   g_live_count = g_stage_count;
   g_from_file = true;
@@ -522,6 +532,7 @@ char *chords_format_json() {
     add_key_names(obj["optional"].to<JsonArray>(), row.optional);
     obj["kana"] = row.kana != nullptr ? row.kana : "";
     obj["output"] = row.output != nullptr ? row.output : "";
+    obj["repeat"] = row.repeat;
   }
   if (doc.overflowed()) return nullptr;
   const size_t need = measureJson(doc) + 1;
