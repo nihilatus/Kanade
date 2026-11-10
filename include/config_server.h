@@ -6,7 +6,13 @@
 // config_server_poll() debounces that switch. While the AP is up it reads and
 // writes at most a small slice of one HTTP client and returns, so a slow or
 // oversized request cannot stall the key scan. JSON parsing and LittleFS run
-// on the other core. The live chord table is swapped only on this poll.
+// on the other core. If that task cannot start, chord GET, POST, and reset
+// answer 503 and do not run on the key scan. The live chord table is swapped
+// only on this poll.
+//
+// The AP passphrase is the trust boundary. An empty WIFI_API_TOKEN allows
+// every station that has joined. A browser Origin other than the config page
+// is still rejected. Set the token when the passphrase is shared.
 
 void config_server_begin();
 void config_server_poll();
