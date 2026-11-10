@@ -1,5 +1,7 @@
 # ESP32 設定檔配置計畫（v1）
 
+> **過時：** 下文是早期 32 鍵手把矩陣與 premapping 編號。現行硬體是 14 顆直連按鍵，見 [pinout.md](pinout.md)；和弦對照以 [`../eps32jischordboard-premapping.csv`](../eps32jischordboard-premapping.csv) 與 [`../data/chord_map.machine.csv`](../data/chord_map.machine.csv) 為準。
+
 本文件說明前置輸入代號、矩陣座標與 `mapping_table.csv` 的關係，以及哪些內容應編譯進韌體、哪些可放可寫檔案系統。
 
 ## 編號方案（前置輸入代號）

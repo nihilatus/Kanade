@@ -1,8 +1,7 @@
 #pragma once
 
-// Minimal chord → romaji stub.
-// Full engine later ports timing + mapping_table.csv from sibling
-// "joystick writer" repo. Do not expect complete kana coverage here.
+// Chord engine. Tracks the largest simultaneous set while any key is down,
+// confirms full release for 25 ms, then matches include/chord_map.inc once.
 
 void chords_begin();
 void chords_poll();  // call after buttons_poll()

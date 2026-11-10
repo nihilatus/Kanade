@@ -2,7 +2,7 @@
 
 實體離散按鍵 → ESP32 和弦引擎 → USB HID JIS 鍵盤 → PC 日文 IME。
 
-硬體適配器：把 14 顆實體鍵解讀成和弦，在 MCU 上產出羅馬字／鍵位，PC 端只要開日文 IME。與同系列 Python 專案 `joystick writer` 分開；完整和弦引擎尚未移植，目前韌體仍是 stub 證明。
+硬體適配器：把 14 顆實體鍵解讀成和弦，在 MCU 上產出羅馬字／鍵位，PC 端只要開日文 IME。與同系列 Python 專案 `joystick writer` 分開。韌體依 14 鍵和弦表送出羅馬字與快捷鍵配方。
 
 遠端倉庫（private）：https://github.com/nihilatus/esp32-jis-keyboard
 
@@ -16,7 +16,7 @@
 | 板子 | ESP32-S3-DevKitC-1 **N16R8** |
 | 輸入 | **14 顆**離散按鍵（無類比 stick） |
 | 輸出 | 羅馬字／快捷鍵配方 → 主機日文 IME |
-| 現況 | PlatformIO + TinyUSB HID 骨架；和弦表已有 machine CSV；執行時引擎仍是 demo stub |
+| 現況 | 14 鍵直連採樣、15 ms 消彈跳、全放 25 ms 後依 machine 表送 HID 配方 |
 
 ---
 
@@ -58,7 +58,7 @@
 | [`docs/chord-map-machine.md`](docs/chord-map-machine.md) | 欄位、RT0、觸發／比對規則 |
 | [`tools/build_chord_map_machine.py`](tools/build_chord_map_machine.py) | 人表 → 機器表重建腳本 |
 
-重建機器表：
+重建機器表與韌體用的 [`include/chord_map.inc`](include/chord_map.inc)：
 
 ```bat
 cd /d "E:\cline play\esp32-jis-keyboard"
@@ -79,8 +79,7 @@ python tools/build_chord_map_machine.py
 | 燒錄／序列 | 接標示 **UART** 的口 |
 | 保留 | **GPIO19 / GPIO20**（USB 資料線，勿當按鍵腳） |
 
-**按鍵數量：14。**  
-[`docs/pinout.md`](docs/pinout.md)、[`docs/bom.md`](docs/bom.md) 等仍可能殘留早期 **6×6／32 鍵**矩陣敘述——硬體接線文件需要後續專趟更新，本 README 不重寫那些細節。實體配線以 14 鍵為準。
+**按鍵數量：14。** 每顆開關一腳接 GPIO、一腳接 GND（內部上拉，按下為 LOW）。腳位與零件見 [`docs/pinout.md`](docs/pinout.md)、[`docs/bom.md`](docs/bom.md)。不要再照舊的 6×6 矩陣或二極體清單接線。[`docs/config-plan.md`](docs/config-plan.md) 開頭已標成過時的 32 鍵文件。
 
 ### 建置與燒錄（Windows）
 
@@ -103,29 +102,29 @@ pio device monitor
 
 ## 現況與待辦
 
-| 已有 | 尚未／stub |
+| 已有 | 尚未 |
 | --- | --- |
-| PlatformIO + Arduino + TinyUSB HID 鍵盤 | 完整 14 鍵採樣與接線對應（韌體仍用舊 stub 細胞／命名） |
-| 人表 + machine CSV + 重建腳本 | 依 machine 表實作「全放觸發／max_chord」引擎 |
-| 板子／雙 USB 口說明 | 更新 pinout／BOM／矩陣文件至 14 鍵 |
-| Demo 和弦 → 羅馬字 HID（少數 stub） | VID/PID、產品字串、真正 JIS report 微調 |
-| | 外殼／PCB（非本 scaffold 範圍） |
+| PlatformIO + Arduino + TinyUSB HID 鍵盤 | VID/PID 仍是原型值 |
+| 14 鍵直連、每鍵 15 ms 穩定消彈跳 | 自訂 JIS HID report／國碼 |
+| 全放 25 ms 確認後依 `chord_map.inc` 比對 | 連發、LittleFS 熱更新 |
+| 配方送出（羅馬字、`Shift+1`、`Backspace`、`Ctrl+i` 等） | 外殼／PCB |
 
-**不要假設完整和弦引擎已上板**——`src/chords.cpp` 仍是少數 combo 的 demo。
+和弦引擎讀編譯期表，不再是少數 combo 的 demo。改人表後要重建機器表與 `include/chord_map.inc` 再燒錄。
 
 ### 目錄速覽
 
 ```
 platformio.ini
 src/main.cpp
-src/buttons.cpp       掃描／debounce（文件與 stub 命名可能仍偏舊矩陣）
-src/hid_keyboard.cpp  USB HID 送鍵
-src/chords.cpp        stub 和弦 → 羅馬字
+src/buttons.cpp       14 鍵直連／每鍵 15 ms 消彈跳
+src/hid_keyboard.cpp  配方 → USB HID
+src/chords.cpp        max_chord，全放 25 ms 後比對
+include/chord_map.inc 由機器表產生，勿手改
 include/*.h
 eps32jischordboard-premapping.csv
 data/chord_map.machine.csv
 tools/build_chord_map_machine.py
 docs/chord-map-machine.md
-docs/pinout.md        ※ 可能仍寫 32 鍵，待更新
-docs/bom.md           ※ 同上
+docs/pinout.md
+docs/bom.md
 ```

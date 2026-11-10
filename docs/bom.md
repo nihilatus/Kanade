@@ -1,53 +1,50 @@
-# BOM — diode key matrix prototype
+# BOM — 14 鍵直連原型
 
-Materials Augustine must buy or prepare for the ESP32-S3 JIS chord keyboard matrix.  
-Quantities include a small spare margin.
+ESP32-S3 JIS 和弦鍵盤。14 顆開關各接一隻 GPIO 到 GND，沒有矩陣、沒有二極體。數量含少量備品。
 
-## Already on hand
+## 手上已有
 
-| Item | Qty | Notes |
+| 項目 | 數量 | 備註 |
 | --- | ---: | --- |
-| ESP32-S3-DevKitC-1 **N16R8** | 1 | Already have — do not buy another for this build |
-| USB cable for **USB (OTG)** port | 1 | Data-capable; HID enumerates on the OTG connector, not UART |
+| ESP32-S3-DevKitC-1 **N16R8** | 1 | 已有，不必再買一塊 |
+| 可傳資料的 USB 線（**USB / OTG** 口） | 1 | HID 從 OTG 口列舉，不是 UART 口 |
 
-## Must buy / prepare
+## 要準備
 
-| Item | Qty | Suggest | Notes |
+| 項目 | 數量 | 建議 | 備註 |
 | --- | ---: | --- | --- |
-| Momentary switches | **32** (+4 spare ≈ **36**) | **6×6 mm tactile** through-hole (e.g. TS-1187 / common soft-touch) | One per logical button; 6×6 mm fits breadboard / proto well |
-| Signal diodes | **32** (+4 spare ≈ **36**) | **1N4148** (DO-35) or SOD-123 1N4148W | Anti-ghosting; cathode toward **row** (see pinout) |
-| Hook-up wire | 1 spool or mixed | 22–28 AWG solid for proto, or DuPont jumpers | Row/col buses + switch legs |
-| DuPont / jumper wires | ~40–60 | M-M and/or M-F | DevKit header → protoboard |
-| Protoboard **or** breadboard | 1–2 | Solder proto (preferred once layout stable) **or** half/full breadboard for dry-run | 6×6 matrix needs space for 32 switches + diodes |
+| 瞬時開關 | **14**（備品後約 **18**） | 6×6 mm 輕觸開關，直插 | 一顆邏輯鍵一顆；麵包板或洞洞板都好焊 |
+| 杜邦線 | 約 30 條 | 公–公，必要時公–母 | 每鍵兩條（GPIO、GND），GND 可先匯到一條匯流 |
+| 洞洞板或麵包板 | 1 | 接線穩定後用洞洞板；先試用麵包板 | 只放 14 顆開關 |
+| 連接線 | 1 小卷 | 22–28 AWG，若不用杜邦線 | 開關到排針 |
 
-## Optional but useful
+## 有用但非必須
 
-| Item | Qty | Notes |
+| 項目 | 數量 | 備註 |
 | --- | ---: | --- |
-| Male/female header pins | 1–2 strips | Break out rows/cols; strain relief to DevKit |
-| USB cable for **UART** port | 1 | Flash / serial monitor while OTG is used for HID (or one cable swapped between ports) |
-| Extra 1N4148 / tactiles | ~10 | Replacements while soldering |
-| Multimeter | 1 | Continuity + diode-orientation checks |
-| Hot glue / cable ties | — | Keep matrix harness from yanking GPIO headers |
+| 排針 | 1–2 條 | 從 DevKit 引出 GPIO／GND，減少直接拉排針 |
+| UART 口 USB 線 | 1 | 燒錄與序列監控；OTG 同時給 HID 時要第二條線 |
+| 備用輕觸開關 | 約 4 | 焊壞時替換 |
+| 三用電表 | 1 | 確認按下時 GPIO 與 GND 導通，放開時不通 |
+| 熱熔膠或束帶 | — | 避免線材扯到排針 |
 
-## Not required for matrix bring-up
+## 這份清單不需要
 
-- Extra ESP32 boards  
-- PSRAM / flash modules  
-- Level shifters (matrix is 3.3 V logic, internal pull-ups)  
-- I²C GPIO expander (matrix frees enough pins)
+- 第二塊 ESP32
+- 1N4148 或任何串在按鍵上的二極體（舊 6×6 矩陣才需要）
+- 電容並在開關上（會拖長邊緣，和韌體 15 ms 消彈跳打架）
+- 外加上拉電阻（使用腳內上拉）
+- 位準轉換、I²C GPIO 擴充
 
-## Approximate buy list (shopping shorthand)
+## 採購簡記
 
 ```
-36×  6x6mm tactile momentary switches
-36×  1N4148 signal diodes
-1×   solder protoboard (or breadboard for first dry-run)
-1×   DuPont jumper pack (M-M / M-F)
-1×   hook-up wire (if not using only DuPont)
-—    headers / glue / spare USB-UART cable as needed
+18×  6x6mm 輕觸開關
+1×   麵包板或洞洞板
+1×   杜邦線（公–公）
+—    排針、束帶、UART 用 USB 線視需要
 ```
 
-Board + OTG USB cable: **already owned**.
+板子與 OTG 線：**已有**。
 
-Pin / cell map: [`docs/pinout.md`](pinout.md).
+腳位：[`docs/pinout.md`](pinout.md)。

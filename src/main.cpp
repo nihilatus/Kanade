@@ -4,26 +4,31 @@
 #include "chords.h"
 #include "hid_keyboard.h"
 
-// ESP32-S3-DevKitC-1 N16R8 — native USB HID keyboard scaffold.
+// ESP32-S3-DevKitC-1 N16R8 — USB HID chord keyboard.
 // Plug the PC into the board port labeled USB (OTG), not UART.
+// Each switch: GPIO to one side, GND to the other. Pressed = LOW.
 
 void setup() {
 #if ARDUINO_USB_CDC_ON_BOOT
   Serial.begin(115200);
   delay(200);
   Serial.println();
-  Serial.println(F("esp32-jis-keyboard scaffold"));
-  Serial.println(F("HID on USB OTG; 6x6 diode matrix; chord→romaji stub"));
+  Serial.println(F("esp32-jis-keyboard"));
+  Serial.println(F("14 direct keys, active-low, 15 ms debounce"));
+  Serial.print(F("pins"));
+  for (uint8_t i = 0; i < BTN_COUNT; ++i) {
+    Serial.print(' ');
+    Serial.print(kButtons[i].name);
+    Serial.print(F("=GPIO"));
+    Serial.print(kButtons[i].pin);
+  }
+  Serial.println();
+  Serial.println(F("chord fires after all keys stay up for 25 ms"));
 #endif
 
   buttons_begin();
   hid_keyboard_begin();
   chords_begin();
-
-#if ARDUINO_USB_CDC_ON_BOOT
-  Serial.println(F("Matrix rows GPIO1-6, cols GPIO7-12"));
-  Serial.println(F("Stub: LC a, LN+RE ka, A shi, Start space"));
-#endif
 }
 
 void loop() {
