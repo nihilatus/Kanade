@@ -963,6 +963,7 @@
         resultEl.dataset.locked = "";
       }
       syncFireButton();
+      if (quizOn && currentLesson()) coachEl.textContent = howTo(currentLesson());
       renderStage();
       paintKeys();
       noticeEl.textContent = fireMode === "first"
@@ -991,6 +992,17 @@
       if (data && (data.fire === "first" || data.fire === "release")) {
         fireMode = data.fire;
         localStorage.setItem(STORAGE_FIRE, fireMode);
+        clearTimeout(guardTimer);
+        if (downMask === 0) {
+          phase = "idle";
+          maxChord = 0;
+          maxCount = 0;
+        } else {
+          phase = "holding";
+          maxChord = 0;
+          maxCount = 0;
+          noteSnapshot(downMask);
+        }
         syncFireButton();
       }
       if (data && typeof data.voice === "boolean") {
