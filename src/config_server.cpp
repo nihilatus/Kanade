@@ -59,7 +59,17 @@ static const char kConfigPage[] PROGMEM =
 
 static void send_json(int code, const char *body) {
   server.sendHeader("Cache-Control", "no-store");
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  server.sendHeader("Access-Control-Allow-Headers", "Content-Type, X-Api-Token");
   server.send(code, "application/json; charset=utf-8", body);
+}
+
+static void handle_options() {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  server.sendHeader("Access-Control-Allow-Headers", "Content-Type, X-Api-Token");
+  server.send(204);
 }
 
 static void send_error(int code, const char *msg) {
@@ -235,11 +245,15 @@ static void register_routes() {
   static const char *kHeaders[] = {"X-Api-Token"};
   server.collectHeaders(kHeaders, 1);
   server.on("/", HTTP_GET, handle_root);
+  server.on("/", HTTP_OPTIONS, handle_options);
   server.on("/api/chords", HTTP_GET, handle_get);
   server.on("/api/chords", HTTP_POST, handle_post);
+  server.on("/api/chords", HTTP_OPTIONS, handle_options);
   server.on("/api/chords/reset", HTTP_POST, handle_reset);
+  server.on("/api/chords/reset", HTTP_OPTIONS, handle_options);
   server.on("/api/fire", HTTP_GET, handle_fire_get);
   server.on("/api/fire", HTTP_POST, handle_fire_post);
+  server.on("/api/fire", HTTP_OPTIONS, handle_options);
   server.onNotFound(handle_404);
   g_routes = true;
 }
