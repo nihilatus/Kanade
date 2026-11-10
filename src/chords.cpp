@@ -9,20 +9,13 @@
 #include <esp_heap_caps.h>
 
 #include "buttons.h"
+#include "chord_core.h"
 #include "console_log.h"
 #include "hid_keyboard.h"
 
 // required ⊆ max_chord ⊆ required ∪ optional.
 // Prefer more required bits, then fewer optional bits, then smaller id.
-// See docs/chord-map-machine.md.
-
-struct ChordRule {
-  uint16_t id;
-  uint16_t required;
-  uint16_t optional;
-  const char *kana;
-  const char *output;
-};
+// See docs/chord-map-machine.md. Matching lives in chord_core.
 
 static const ChordRule kFactory[] = {
 #include "chord_map.inc"
@@ -54,26 +47,12 @@ static size_t g_stage_pool_used = 0;
 static bool g_staged = false;
 
 // Debounce has already required the raw level to hold before this mask
-// goes empty. This second wait only covers a bounce that returns after
-// that stable release. 10 ms is a trial; raise it if a chord splits.
-// ReleaseAll waits this long before sending. FirstUp sends on the first
-// peak-key release and does not use this wait.
-static constexpr uint32_t kReleaseGuardMs = 10;
+// goes empty. ReleaseAll waits kChordReleaseGuardMs after that. FirstUp
+// sends on the first peak-key release and does not use this wait.
 static constexpr char kPrefsNs[] = "jis";
 static constexpr char kPrefsFire[] = "fire";
 
-enum class Phase : uint8_t { Idle, Holding, ReleaseGuard, Draining };
-enum class FireMode : uint8_t { ReleaseAll = 0, FirstUp = 1 };
-
-static Phase g_phase = Phase::Idle;
-static FireMode g_fire_mode = FireMode::ReleaseAll;
-static uint16_t g_max_chord = 0;
-static uint8_t g_max_count = 0;
-static uint32_t g_guard_since = 0;
-
-static uint8_t popcount16(uint16_t value) {
-  return static_cast<uint8_t>(__builtin_popcount(static_cast<unsigned>(value)));
-}
+static ChordEngine g_engine;
 
 // JSON DOM lives in PSRAM so the WiFi stack can keep internal RAM.
 struct PsramAllocator : ArduinoJson::Allocator {
@@ -188,30 +167,6 @@ static void add_key_names(JsonArray arr, uint16_t mask) {
   }
 }
 
-static void note_snapshot(uint16_t mask) {
-  const uint8_t count = popcount16(mask);
-  // Largest set wins. Same size: keep the later snapshot.
-  if (count > g_max_count || (count == g_max_count && mask != g_max_chord)) {
-    g_max_chord = mask;
-    g_max_count = count;
-  }
-}
-
-static bool peak_broken(uint16_t mask) {
-  return g_max_count > 0 && (mask & g_max_chord) != g_max_chord;
-}
-
-static void clear_peak() {
-  g_max_chord = 0;
-  g_max_count = 0;
-}
-
-static void begin_hold(uint16_t mask) {
-  g_phase = Phase::Holding;
-  clear_peak();
-  note_snapshot(mask);
-}
-
 static void format_mask(uint16_t mask, char *buf, size_t buflen) {
   if (buflen == 0) return;
   buf[0] = '\0';
@@ -259,53 +214,20 @@ static void log_chord(const char *kind, uint16_t id, uint16_t mask, const char *
 #endif
 }
 
-static int find_rule(uint16_t mask) {
-  if (g_live == nullptr) return -1;
-  int best = -1;
-  int best_req = -1;
-  int best_opt = 255;
-  uint16_t best_id = 0xFFFF;
-
-  for (size_t i = 0; i < g_live_count; ++i) {
-    const ChordRule &row = g_live[i];
-    if ((row.required & mask) != row.required) continue;
-    const uint16_t allowed = static_cast<uint16_t>(row.required | row.optional);
-    if ((mask & static_cast<uint16_t>(~allowed)) != 0) continue;
-
-    const int req_n = popcount16(row.required);
-    const int opt_n = popcount16(row.optional);
-    const bool better = best < 0 || req_n > best_req ||
-                        (req_n == best_req && opt_n < best_opt) ||
-                        (req_n == best_req && opt_n == best_opt && row.id < best_id);
-    if (!better) continue;
-    best = static_cast<int>(i);
-    best_req = req_n;
-    best_opt = opt_n;
-    best_id = row.id;
-  }
-  return best;
-}
-
 static void fire(uint16_t mask);  // defined below; send path uses the live table
 
-static void fire_peak() {
-  const uint16_t chord = g_max_chord;
-  clear_peak();
-  fire(chord);
-}
-
-static const char *fire_mode_name(FireMode mode) {
-  return mode == FireMode::FirstUp ? "first" : "release";
+static const char *fire_mode_name(ChordFireMode mode) {
+  return mode == ChordFireMode::FirstUp ? "first" : "release";
 }
 
 static void log_fire_mode() {
   char line[120];
-  if (g_fire_mode == FireMode::FirstUp) {
+  if (g_engine.mode == ChordFireMode::FirstUp) {
     snprintf(line, sizeof(line),
              "送出模式：首鍵放開就送（高峰後第一顆放開即送，其餘放開前不接新和弦）");
   } else {
     snprintf(line, sizeof(line), "送出模式：全放再送（全部放開並維持 %u ms）",
-             static_cast<unsigned>(kReleaseGuardMs));
+             static_cast<unsigned>(kChordReleaseGuardMs));
   }
   console_println(line);
 }
@@ -315,7 +237,7 @@ static void load_fire_mode() {
   if (!prefs.begin(kPrefsNs, true)) return;
   const uint8_t stored = prefs.getUChar(kPrefsFire, 0);
   prefs.end();
-  g_fire_mode = stored == 1 ? FireMode::FirstUp : FireMode::ReleaseAll;
+  g_engine.mode = stored == 1 ? ChordFireMode::FirstUp : ChordFireMode::ReleaseAll;
 }
 
 static void save_fire_mode() {
@@ -324,25 +246,21 @@ static void save_fire_mode() {
     console_println("送出模式這次沒寫進記憶體，重開機會回到上次成功的設定");
     return;
   }
-  prefs.putUChar(kPrefsFire, g_fire_mode == FireMode::FirstUp ? 1 : 0);
+  prefs.putUChar(kPrefsFire, g_engine.mode == ChordFireMode::FirstUp ? 1 : 0);
   prefs.end();
 }
 
-const char *chords_fire_mode_name() { return fire_mode_name(g_fire_mode); }
+const char *chords_fire_mode_name() { return fire_mode_name(g_engine.mode); }
 
 bool chords_set_fire_mode_name(const char *name) {
   if (name == nullptr) return false;
-  FireMode next;
-  if (strcmp(name, "release") == 0) next = FireMode::ReleaseAll;
-  else if (strcmp(name, "first") == 0) next = FireMode::FirstUp;
+  ChordFireMode next;
+  if (strcmp(name, "release") == 0) next = ChordFireMode::ReleaseAll;
+  else if (strcmp(name, "first") == 0) next = ChordFireMode::FirstUp;
   else return false;
 
-  if (next != g_fire_mode && next == FireMode::FirstUp && g_phase == Phase::ReleaseGuard) {
-    // The chord is already fully up; don't keep waiting out the empty guard.
-    fire_peak();
-    g_phase = Phase::Idle;
-  }
-  g_fire_mode = next;
+  const ChordStep step = chord_engine_set_mode(&g_engine, next);
+  if (step.fire) fire(step.fire_mask);
   save_fire_mode();
   log_fire_mode();
   return true;
@@ -351,7 +269,7 @@ bool chords_set_fire_mode_name(const char *name) {
 static void fire(uint16_t mask) {
   if (mask == 0) return;
 
-  const int index = find_rule(mask);
+  const int index = chord_find_rule(g_live, g_live_count, mask);
   if (index < 0) {
     log_chord("no-match", 0, mask, "", "");
     return;
@@ -670,9 +588,7 @@ static void try_load_saved() {
 }
 
 void chords_begin() {
-  g_phase = Phase::Idle;
-  clear_peak();
-  g_guard_since = 0;
+  chord_engine_reset(&g_engine);
 
   console_ensure();
   load_fire_mode();
@@ -684,47 +600,6 @@ void chords_begin() {
 }
 
 void chords_poll() {
-  const uint16_t mask = buttons_mask();
-  const uint32_t now = millis();
-
-  switch (g_phase) {
-    case Phase::Idle:
-      if (mask != 0) begin_hold(mask);
-      break;
-
-    case Phase::Holding:
-      if (g_fire_mode == FireMode::FirstUp) {
-        if (peak_broken(mask)) {
-          // A key that belonged to the peak went up. Send that peak now.
-          // Keys still down are the tail, not the start of the next chord.
-          fire_peak();
-          g_phase = mask == 0 ? Phase::Idle : Phase::Draining;
-        } else {
-          note_snapshot(mask);
-        }
-      } else if (mask == 0) {
-        g_phase = Phase::ReleaseGuard;
-        g_guard_since = now;
-      } else {
-        note_snapshot(mask);
-      }
-      break;
-
-    case Phase::ReleaseGuard:
-      if (mask != 0) {
-        // Bounce or a finger that was not actually up. Keep max_chord.
-        g_phase = Phase::Holding;
-        note_snapshot(mask);
-      } else if ((now - g_guard_since) >= kReleaseGuardMs) {
-        g_phase = Phase::Idle;
-        fire_peak();
-      }
-      break;
-
-    case Phase::Draining:
-      // FirstUp already sent. Ignore presses until the board is clear,
-      // otherwise the tail and the next chord merge into one mask.
-      if (mask == 0) g_phase = Phase::Idle;
-      break;
-  }
+  const ChordStep step = chord_engine_step(&g_engine, buttons_mask(), millis());
+  if (step.fire) fire(step.fire_mask);
 }

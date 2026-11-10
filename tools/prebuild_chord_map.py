@@ -4,7 +4,8 @@ Import("env")
 import sys
 from pathlib import Path
 
-tools_dir = Path(__file__).resolve().parent
+# SCons exec() does not define __file__. This script lives in <project>/tools.
+tools_dir = Path(env.subst("$PROJECT_DIR")) / "tools"
 if str(tools_dir) not in sys.path:
     sys.path.insert(0, str(tools_dir))
 

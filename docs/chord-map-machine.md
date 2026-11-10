@@ -68,3 +68,13 @@ If several candidates match:
 With the current table there are **no** duplicate `(keys_required, keys_optional)` pairs with different outputs, so step 1–2 already uniquely identify a row for any matching `max_chord`.
 
 Equivalent view: among rows whose allowed envelope `required ∪ optional` covers `max_chord` and whose `required` keys were all down in that snapshot, pick the most specific required set.
+
+## Host tests
+
+Rule matching, the peak snapshot, both send timings, and recipe parsing live in [`../src/chord_core.cpp`](../src/chord_core.cpp). That file does not use Arduino. From the repo root, before flashing a change to the guard time, first-up behavior, or match order:
+
+```text
+pio test -e native
+```
+
+The test reads every row of [`../data/chord_map.machine.csv`](../data/chord_map.machine.csv) and rebuilds the expected match from that row.

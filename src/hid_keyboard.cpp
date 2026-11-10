@@ -5,11 +5,12 @@
 #include "USB.h"
 #include "USBHIDKeyboard.h"
 
+#include "chord_core.h"
+
 static USBHIDKeyboard Keyboard;
 static bool g_begun = false;
 
 static constexpr uint16_t kTapGapMs = 12;
-static constexpr uint8_t kGapNone = 0;
 
 enum class HidOp : uint8_t { ReleaseAll, Press, Write };
 
@@ -52,57 +53,6 @@ static void log_skip(const char *token) {
 #else
   (void)token;
 #endif
-}
-
-static bool is_plain_char(unsigned char c) {
-  return c >= 0x21 && c <= 0x7E;
-}
-
-static bool named_key(const char *token, uint8_t *code) {
-  struct Item {
-    const char *name;
-    uint8_t code;
-  };
-  static const Item kNamed[] = {
-      {"Backspace", KEY_BACKSPACE},
-      {"Space", ' '},
-      {"Enter", KEY_RETURN},
-      {"Esc", KEY_ESC},
-      {"ESC", KEY_ESC},
-      {"[ESC]", KEY_ESC},
-      {"Up", KEY_UP_ARROW},
-      {"Down", KEY_DOWN_ARROW},
-      {"Left", KEY_LEFT_ARROW},
-      {"Right", KEY_RIGHT_ARROW},
-      {"Tab", KEY_TAB},
-  };
-  for (const Item &item : kNamed) {
-    if (strcmp(token, item.name) == 0) {
-      *code = item.code;
-      return true;
-    }
-  }
-  return false;
-}
-
-static bool modifier_code(const char *word, uint8_t *code) {
-  if (strcmp(word, "Shift") == 0) {
-    *code = KEY_LEFT_SHIFT;
-    return true;
-  }
-  if (strcmp(word, "Ctrl") == 0) {
-    *code = KEY_LEFT_CTRL;
-    return true;
-  }
-  if (strcmp(word, "Alt") == 0) {
-    *code = KEY_LEFT_ALT;
-    return true;
-  }
-  if (strcmp(word, "Gui") == 0) {
-    *code = KEY_LEFT_GUI;
-    return true;
-  }
-  return false;
 }
 
 static bool enqueue(HidOp op, uint8_t code, uint8_t gap_after_ms) {
@@ -171,149 +121,83 @@ static bool queue_busy() {
   return true;
 }
 
-// Build one token into events. Returns false only when the token is not a combo
-// and the caller should try another interpretation. A handled-but-invalid token
-// returns true and logs a skip.
-static bool queue_modifier_combo(const char *token, HidEvent *out, size_t cap, size_t *count) {
-  if (strchr(token, '+') == nullptr) return false;
-  // A lone "+" is the plus character, not a modifier chord.
-  if (token[0] == '+' && token[1] == '\0') return false;
-
-  char buf[24];
-  const size_t len = strlen(token);
-  if (len == 0 || len >= sizeof(buf)) {
-    log_skip(token);
-    *count = 0;
-    return true;
-  }
-  memcpy(buf, token, len + 1);
-
-  char *parts[6];
-  int n = 0;
-  char *cursor = buf;
-  while (n < 6) {
-    parts[n++] = cursor;
-    char *plus = strchr(cursor, '+');
-    if (plus == nullptr) break;
-    // The last component may itself be "+": "Shift++" is Shift and plus.
-    if (plus[1] == '\0') break;
-    *plus = '\0';
-    cursor = plus + 1;
-  }
-  const bool last_is_plus = cursor[0] == '+' && cursor[1] == '\0';
-  if (n < 2 || (strchr(cursor, '+') != nullptr && !last_is_plus) || n - 1 > 4) {
-    log_skip(token);
-    *count = 0;
-    return true;
-  }
-
-  uint8_t mods[4];
-  for (int i = 0; i < n - 1; ++i) {
-    if (!modifier_code(parts[i], &mods[i])) {
-      log_skip(token);
-      *count = 0;
-      return true;
-    }
-  }
-
-  uint8_t key = 0;
-  const char *last = parts[n - 1];
-  if (last[0] != '\0' && last[1] == '\0' && is_plain_char(static_cast<unsigned char>(last[0]))) {
-    key = static_cast<uint8_t>(last[0]);
-  } else if (!named_key(last, &key)) {
-    log_skip(token);
-    *count = 0;
-    return true;
-  }
-
-  const size_t presses = static_cast<size_t>(n - 1) + 1;
-  if (presses + 1 > cap) {
-    log_skip(token);
-    *count = 0;
-    return true;
-  }
-  for (int i = 0; i < n - 1; ++i) {
-    out[i] = HidEvent{HidOp::Press, mods[i], kGapNone};
-  }
-  out[n - 1] = HidEvent{HidOp::Press, key, kTapGapMs};
-  out[n] = HidEvent{HidOp::ReleaseAll, 0, kTapGapMs};
-  *count = presses + 1;
-  return true;
+static void log_long_token(size_t len) {
+#if ARDUINO_USB_CDC_ON_BOOT
+  Serial.print(F("hid skip long token, len="));
+  Serial.println(len);
+#else
+  (void)len;
+#endif
 }
 
-static bool queue_token(const char *token, HidEvent *out, size_t cap, size_t *count) {
-  *count = 0;
-  uint8_t named = 0;
-  if (named_key(token, &named)) {
-    if (cap < 2) return false;
-    out[0] = HidEvent{HidOp::Press, named, kTapGapMs};
-    out[1] = HidEvent{HidOp::ReleaseAll, 0, kTapGapMs};
-    *count = 2;
-    return true;
+static uint8_t press_code(const ChordEvent &event) {
+  switch (event.key) {
+    case ChordKeyKind::Char:
+      return event.code;
+    case ChordKeyKind::Shift:
+      return KEY_LEFT_SHIFT;
+    case ChordKeyKind::Ctrl:
+      return KEY_LEFT_CTRL;
+    case ChordKeyKind::Alt:
+      return KEY_LEFT_ALT;
+    case ChordKeyKind::Gui:
+      return KEY_LEFT_GUI;
+    case ChordKeyKind::Backspace:
+      return KEY_BACKSPACE;
+    case ChordKeyKind::Space:
+      return ' ';
+    case ChordKeyKind::Enter:
+      return KEY_RETURN;
+    case ChordKeyKind::Esc:
+      return KEY_ESC;
+    case ChordKeyKind::Up:
+      return KEY_UP_ARROW;
+    case ChordKeyKind::Down:
+      return KEY_DOWN_ARROW;
+    case ChordKeyKind::Left:
+      return KEY_LEFT_ARROW;
+    case ChordKeyKind::Right:
+      return KEY_RIGHT_ARROW;
+    case ChordKeyKind::Tab:
+      return KEY_TAB;
   }
-
-  size_t combo_count = 0;
-  if (queue_modifier_combo(token, out, cap, &combo_count)) {
-    *count = combo_count;
-    return true;
-  }
-
-  const size_t len = strlen(token);
-  if (len + 1 > cap) {
-    log_skip(token);
-    return true;
-  }
-  for (size_t i = 0; i < len; ++i) {
-    if (!is_plain_char(static_cast<unsigned char>(token[i]))) {
-      log_skip(token);
-      *count = 0;
-      return true;
-    }
-    out[i] = HidEvent{HidOp::Write, static_cast<uint8_t>(token[i]), kTapGapMs};
-  }
-  out[len] = HidEvent{HidOp::ReleaseAll, 0, kGapNone};
-  *count = len + 1;
-  return true;
+  return 0;
 }
 
 void hid_type_recipe(const char *recipe) {
   if (!recipe || !hid_keyboard_ready()) return;
-
-  HidEvent batch[96];
-  size_t n = 0;
   const bool release_first = queue_busy();
 
-  const char *p = recipe;
-  while (*p) {
-    while (*p == ' ') ++p;
-    if (*p == '\0') break;
-    const char *start = p;
-    while (*p && *p != ' ') ++p;
-    const size_t len = static_cast<size_t>(p - start);
-    char token[24];
-    if (len == 0 || len >= sizeof(token)) {
+  static ChordRecipe parsed;
+  if (!chord_parse_recipe(recipe, &parsed)) return;
+  for (size_t i = 0; i < parsed.skip_count; ++i) {
+    const ChordSkip &skip = parsed.skips[i];
+    if (skip.too_long) log_long_token(skip.length);
+    else log_skip(skip.text);
+  }
+  if (parsed.failed) {
 #if ARDUINO_USB_CDC_ON_BOOT
-      Serial.print(F("hid skip long token, len="));
-      Serial.println(len);
+    Serial.println(F("hid recipe too long, skipped"));
 #endif
-      continue;
-    }
-    memcpy(token, start, len);
-    token[len] = '\0';
-
-    size_t added = 0;
-    if (n >= sizeof(batch) / sizeof(batch[0]) ||
-        !queue_token(token, batch + n, (sizeof(batch) / sizeof(batch[0])) - n, &added)) {
-#if ARDUINO_USB_CDC_ON_BOOT
-      Serial.println(F("hid recipe too long, skipped"));
-#endif
-      return;
-    }
-    n += added;
+    return;
   }
 
-  if (n == 0 && !release_first) return;
-  push_events(batch, n, release_first);
+  if (parsed.count == 0 && !release_first) return;
+  HidEvent batch[kChordRecipeCap];
+  for (size_t i = 0; i < parsed.count; ++i) {
+    const ChordEvent &event = parsed.events[i];
+    HidOp op = HidOp::ReleaseAll;
+    uint8_t code = 0;
+    if (event.op == ChordEvOp::Write) {
+      op = HidOp::Write;
+      code = event.code;
+    } else if (event.op == ChordEvOp::Press) {
+      op = HidOp::Press;
+      code = press_code(event);
+    }
+    batch[i] = HidEvent{op, code, event.gap_after_ms};
+  }
+  push_events(batch, parsed.count, release_first);
 }
 
 void hid_type_romaji(const char *text) {
