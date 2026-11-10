@@ -179,6 +179,9 @@ static bool named_key(const char *token, ChordKeyKind *kind, uint8_t *code) {
   };
   // Raw codes are USB HID Keyboard/Keypad usages (pressRaw). The others keep
   // the existing kind and a zero code so the firmware maps them itself.
+  // Eisuu is LANG2 (0x91), the macOS JIS 英数 key; Windows often ignores it.
+  // Hankaku, Muhenkan, Henkan, and Kana are the ones Windows maps, and only
+  // after the host keyboard type is Japanese 106/109.
   static const Item kNamed[] = {
       {"Backspace", ChordKeyKind::Backspace, 0},
       {"Space", ChordKeyKind::Space, 0},

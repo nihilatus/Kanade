@@ -42,7 +42,7 @@
     → config_server  合上才開熱點；只在熱點開著時處理網頁與 JSON
 ```
 
-遮罩的 bit0..13 固定是 `LL LU LR LD LT0 LT1 LT2 RL RU RR RD RT0 RT1 RT2`。PC 收到的是一般鍵盤的羅馬字與少數特殊鍵，日文轉換交給 IME，韌體不做假名轉換。字元走 JIS 鍵位：`a`–`z` 與數字的用途碼和美式相同，出廠表裡不同的是 `[`（0x30）和 `]`（0x31）。`Shift+8`／`Shift+9` 要主機鍵盤類型是日文才會是（）。Windows 看的是這個設定，不看 USB 國碼。
+遮罩的 bit0..13 固定是 `LL LU LR LD LT0 LT1 LT2 RL RU RR RD RT0 RT1 RT2`。PC 收到的是一般鍵盤的羅馬字與少數特殊鍵，日文轉換交給 IME，韌體不做假名轉換。字元走 JIS 鍵位：`a`–`z` 與數字的用途碼和美式相同，出廠表裡不同的是 `[`（0x30）和 `]`（0x31）。`Shift+8`／`Shift+9` 要主機鍵盤類型是日文才會是（）。USB 國碼不設定；Windows 的 106/109 版面看的是鍵盤類型這項設定。
 
 | 模組 | 做什麼 |
 | --- | --- |
@@ -144,7 +144,7 @@ pio run -t upload
 pio device monitor
 ```
 
-燒錄走 **UART**。燒完把資料線改接 **USB（OTG）**，讓 Windows 列舉 HID 鍵盤。把鍵盤類型設成日文（106/109），開記事本、啟用日文 IME（羅馬字），再測按鍵。只切換輸入法、鍵盤類型仍是美式時，`[`、`]` 和 `Shift+8`／`Shift+9` 會對到美式符號。
+燒錄走 **UART**。燒完把資料線改接 **USB（OTG）**，讓 Windows 列舉 HID 鍵盤。把鍵盤類型設成日文（106/109），開記事本、啟用日文 IME（羅馬字），再測按鍵。只切換輸入法、鍵盤類型仍是美式時，`[`、`]` 和 `Shift+8`／`Shift+9` 會對到美式符號。`Hankaku`、`Muhenkan`、`Henkan`、`Kana` 也要這個鍵盤類型，Windows 才會當成半角/全角、無変換、変換、ひらがな。沒反應時先看鍵盤類型。`Eisuu`（0x91，LANG2）是 macOS 的英数，Windows 常常沒有反應。
 
 若 OTG HID 佔住埠導致上傳失敗：按住 **BOOT** → 點 **EN/RST** → 放開 BOOT，再於 UART 重試。
 
@@ -159,7 +159,7 @@ pio device monitor
 | PlatformIO + Arduino + TinyUSB HID 鍵盤。描述符用途 0–255，已含 変換（0x8A）、無変換（0x8B）、カタカナひらがな（0x88）；配方裡的 `Henkan` 等走 `pressRaw` | VID/PID 仍是原型值 |
 | 14 鍵直連、每鍵 `kChordDebounceMs` 穩定消彈跳 | 連發 |
 | [送出時機](#輸入邏輯)；手機熱點可改表並存進 LittleFS | 外殼／PCB |
-| 配方送出（羅馬字、`Shift+1`、`Backspace`、`Ctrl+i` 等），ASCII 走 JIS 配列（`KeyboardLayout_ja_JP`）；一般鍵盤試打頁 | USB 國碼先不送。多數主機不看；要不要做，接上日文鍵盤類型實測後再決定 |
+| 配方送出（羅馬字、`Shift+1`、`Backspace`、`Ctrl+i` 等），ASCII 走 JIS 配列（`KeyboardLayout_ja_JP`）。USB 國碼不設定；一般鍵盤試打頁 | — |
 
 出廠表仍由 `include/chord_map.inc` 編譯進去。改人表後，下一次 `pio run` 會重建機器表，燒錄才會更新出廠內容；手機上儲存的表會蓋過它，直到在網頁還原出廠。
 

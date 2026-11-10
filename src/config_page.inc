@@ -100,7 +100,7 @@ const KEY_OPTIONS = [
   ["Henkan", "変換"],
   ["Muhenkan", "無変換"],
   ["Kana", "カタカナひらがな"],
-  ["Eisuu", "英数"],
+  ["Eisuu", "英数（macOS）"],
   ["Yen", "¥"],
   ["Ro", "ろ"],
   ["Backspace", "退格"],

@@ -30,9 +30,11 @@ void hid_keyboard_begin() {
   // ASCII goes through the JIS map. a–z and the digits share usages with a
   // US keyboard; the characters this table actually sends that do not are
   // '[' (0x30) and ']' (0x31). Shift+8 / Shift+9 become （ ） only when the
-  // host keyboard type is Japanese. Windows reads that setting, not the USB
-  // country code, so this device leaves the country code unset.
-  // Henkan (0x8A), Muhenkan (0x8B), and Kana (0x88) are pressRaw usages.
+  // host keyboard type is Japanese. The USB country code stays unset: it
+  // does not switch Windows to the 106/109 layout.
+  // Hankaku (0x35), Henkan (0x8A), Muhenkan (0x8B), and Kana (0x88) are
+  // pressRaw usages Windows maps under that keyboard type. Eisuu is LANG2
+  // (0x91), which macOS uses for 英数 and Windows often ignores.
   // The stock keyboard descriptor already declares usages 0–255.
   USB.VID(0x303A);  // Espressif
   USB.PID(0x4004);  // local prototype — change before shipping

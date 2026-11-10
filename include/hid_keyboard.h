@@ -5,8 +5,10 @@
 // Native USB HID keyboard (6KRO boot-protocol style via Arduino USBHIDKeyboard).
 // ASCII uses the JIS layout. Romaji letters match a US keyboard; '[' and ']'
 // do not. The PC Japanese IME converts romaji. Henkan, Muhenkan, and Kana
-// are raw usages inside the stock descriptor (usages 0–255). The USB country
-// code is left unset: Windows follows the user's keyboard type. Product
+// are raw usages inside the stock descriptor (usages 0–255). Windows maps
+// those once its keyboard type is Japanese 106/109. Eisuu (LANG2, 0x91) is
+// the macOS 英数 key; Windows often ignores it. The USB country code stays
+// unset; it does not select that layout. Product
 // presents as a keyboard — not a gamepad.
 //
 // Recipes are queued. hid_keyboard_poll() sends at most one report when it
