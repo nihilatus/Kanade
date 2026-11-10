@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>和弦打法測試</title>
+  <style>
+    :root {
+      --bg: #101218;
+      --panel: #1a1e28;
+      --line: #2c3344;
+      --text: #f3efe6;
+      --muted: #9aa3b5;
+      --accent: #8eb6ff;
+      --held: #f0c36a;
+      --bad: #e07a7a;
+      --ok: #8fd0a8;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", "Yu Gothic UI", "Noto Sans JP", sans-serif;
+    }
+
+    body {
+      min-height: 100%;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+    }
+
+    header, footer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 20px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 22px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    footer {
+      border-bottom: 0;
+      border-top: 1px solid var(--line);
+      align-items: flex-start;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 650;
+      letter-spacing: 0.02em;
+    }
+
+    .tools, .status-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    button, .file-btn {
+      appearance: none;
+      border: 1px solid var(--line);
+      background: #242a38;
+      color: var(--text);
+      border-radius: 8px;
+      padding: 7px 12px;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    button:hover, .file-btn:hover { border-color: var(--accent); }
+
+    button[aria-pressed="true"] {
+      background: #24324a;
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    button:disabled { opacity: 0.45; cursor: default; }
+
+    .file-btn input { display: none; }
+
+    #status { color: var(--muted); font-size: 13px; }
+
+    main {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: auto;
+    }
+
+    #stage {
+      display: flex;
+      flex: 0 0 auto;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 24px 18px;
+      text-align: center;
+      min-height: 180px;
+    }
+
+    #result {
+      margin: 0;
+      font-size: clamp(56px, 12vw, 128px);
+      line-height: 1.05;
+      font-weight: 650;
+      word-break: break-word;
+    }
+
+    #result.held { color: var(--held); font-size: clamp(28px, 5vw, 64px); }
+    #result.miss { color: var(--bad); font-size: clamp(40px, 7vw, 80px); }
+    #result.idle { color: var(--muted); font-size: clamp(28px, 4vw, 42px); font-weight: 500; }
+
+    #detail {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 16px;
+      min-height: 1.4em;
+    }
+
+    #expect-label {
+      margin: 0 0 6px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    #expect-label[hidden] { display: none; }
+
+    #coach {
+      margin: 8px 0 0;
+      max-width: 720px;
+      color: var(--text);
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    #coach[hidden] { display: none; }
+
+    #quiz-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 14px;
+    }
+
+    #quiz-bar[hidden] { display: none; }
+
+    #quiz-score {
+      display: flex;
+      gap: 14px;
+      margin: 0;
+      font-size: 15px;
+    }
+
+    #quiz-passed { color: var(--ok); font-weight: 650; }
+    #quiz-left { color: var(--held); font-weight: 650; }
+
+    #result.ok { color: var(--ok); }
+
+    .keycap.target { box-shadow: inset 0 0 0 3px var(--accent); }
+    .keycap.target-optional { box-shadow: inset 0 0 0 3px var(--held); }
+
+    #keymap {
+      border-top: 1px solid var(--line);
+      padding: 16px 16px 20px;
+      background: var(--panel);
+    }
+
+    #keymap h2 {
+      margin: 0 0 6px;
+      font-size: 15px;
+    }
+
+    .hint {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .hands {
+      --cap: 74px;
+      display: grid;
+      grid-template-columns: repeat(8, var(--cap));
+      grid-template-rows: var(--cap) var(--cap) 28px var(--cap) var(--cap) var(--cap);
+      grid-template-areas:
+        ".  lu  .   .    .    .   ru  ."
+        "ll ld  lr  .    .    rl  rd  rr"
+        ".  .   .   .    .    .   .   ."
+        ".  .   .   lt0  rt0  .   .   ."
+        ".  .   .   lt1  rt1  .   .   ."
+        ".  .   .   lt2  rt2  .   .   .";
+      justify-content: center;
+      gap: 8px;
+      width: max-content;
+      max-width: 100%;
+      margin: 4px auto 0;
+    }
+
+    .keycap {
+      width: var(--cap);
+      height: var(--cap);
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      padding: 4px;
+      line-height: 1.1;
+    }
+
+    .key-name { font-size: 13px; font-weight: 650; }
+    .key-bind { font-size: 12px; color: var(--muted); }
+
+    .keycap.down {
+      border-color: var(--held);
+      color: var(--held);
+    }
+
+    .keycap.armed {
+      border-color: var(--held);
+      color: var(--held);
+    }
+
+    .keycap.armed .key-bind,
+    .keycap.down .key-bind { color: inherit; }
+
+    .side-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    #notice {
+      min-height: 1.3em;
+      margin: 8px 0 0;
+      color: var(--held);
+      font-size: 13px;
+    }
+
+    #history {
+      display: flex;
+      flex: 1;
+      flex-wrap: wrap;
+      gap: 8px;
+      min-width: 0;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    #history li {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 14px;
+    }
+
+    #history .kana { font-size: 18px; margin-right: 6px; }
+    #history .meta { color: var(--muted); }
+
+    .foot-label {
+      color: var(--muted);
+      font-size: 13px;
+      margin-right: 8px;
+    }
+
+    @media (max-width: 680px) {
+      .hands { --cap: 56px; gap: 6px; }
+      .key-name { font-size: 11px; }
+      .key-bind { font-size: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>和弦打法測試</h1>
+    <div class="tools">
+      <button id="quiz" type="button" aria-pressed="false">逐項驗證</button>
+      <button id="voice" type="button" aria-pressed="true">語音開</button>
+      <label class="file-btn">載入 CSV
+        <input id="csv-file" type="file" accept=".csv,text/csv">
+      </label>
+      <button id="reload" type="button">改回機器表</button>
+    </div>
+    <div id="status">讀取和弦表…</div>
+  </header>
+
+  <main>
+    <section id="stage" aria-live="polite">
+      <div id="quiz-bar" hidden>
+        <p id="quiz-score"><span id="quiz-passed">已通過 0</span><span id="quiz-left">尚未通過 0</span></p>
+        <button id="quiz-skip" type="button">下一個</button>
+        <button id="quiz-restart" type="button">重新開始</button>
+      </div>
+      <p id="expect-label" hidden>請打出</p>
+      <p id="result" class="idle">按下和弦後放開</p>
+      <p id="coach" hidden></p>
+      <p id="detail"></p>
+    </section>
+    <aside id="keymap">
+      <h2>14 鍵對應</h2>
+      <p class="hint">排列照手型。點一顆圓鍵，再按要綁的鍵盤鍵；指定中再點一次會清除。這個瀏覽器會自動記住。要留檔或換電腦，用「儲存設定檔」，下次用「讀取設定檔」。</p>
+      <div id="key-list" class="hands"></div>
+      <div class="side-actions">
+        <button id="save-settings" type="button">儲存設定檔</button>
+        <label class="file-btn">讀取設定檔
+          <input id="settings-file" type="file" accept=".json,application/json">
+        </label>
+        <button id="reset-map" type="button">還原預設對應</button>
+      </div>
+      <p id="notice"></p>
+    </aside>
+  </main>
+
+  <footer>
+    <span class="foot-label">最近</span>
+    <ul id="history"></ul>
+  </footer>
+
+  <script>
+    const KEYS = ["LL", "LU", "LR", "LD", "LT0", "LT1", "LT2", "RL", "RU", "RR", "RD", "RT0", "RT1", "RT2"];
+    const KEY_BIT = Object.fromEntries(KEYS.map((name, index) => [name, 1 << index]));
+    const RELEASE_MS = 25;
+    const STORAGE_MAP = "chord-practice-keymap";
+    const STORAGE_VOICE = "chord-practice-voice";
+    const DEFAULT_MAP = {
+      LL: { code: "KeyA", label: "A" },
+      LU: { code: "KeyW", label: "W" },
+      LR: { code: "KeyD", label: "D" },
+      LD: { code: "KeyS", label: "S" },
+      LT0: { code: "KeyQ", label: "Q" },
+      LT1: { code: "KeyE", label: "E" },
+      LT2: { code: "KeyZ", label: "Z" },
+      RL: { code: "KeyJ", label: "J" },
+      RU: { code: "KeyI", label: "I" },
+      RR: { code: "KeyL", label: "L" },
+      RD: { code: "KeyK", label: "K" },
+      RT0: { code: "KeyU", label: "U" },
+      RT1: { code: "KeyO", label: "O" },
+      RT2: { code: "Space", label: "Space" }
+    };
+    const OUTPUT_SPEECH = {
+      Up: "上",
+      Down: "下",
+      Left: "左",
+      Right: "右",
+      Enter: "換行",
+      "[ESC]": "取消",
+      kigou: "符號"
+    };
+
+    const resultEl = document.getElementById("result");
+    const detailEl = document.getElementById("detail");
+    const coachEl = document.getElementById("coach");
+    const expectLabelEl = document.getElementById("expect-label");
+    const quizBarEl = document.getElementById("quiz-bar");
+    const quizBtn = document.getElementById("quiz");
+    const quizPassedEl = document.getElementById("quiz-passed");
+    const quizLeftEl = document.getElementById("quiz-left");
+    const quizSkipBtn = document.getElementById("quiz-skip");
+    const statusEl = document.getElementById("status");
+    const noticeEl = document.getElementById("notice");
+    const historyEl = document.getElementById("history");
+    const keyListEl = document.getElementById("key-list");
+    const voiceBtn = document.getElementById("voice");
+
+    let rules = [];
+    let quizOn = false;
+    let lessons = [];
+    let passed = new Set();
+    let lessonIndex = 0;
+    let bindings = loadBindings();
+    let captureId = null;
+    let voiceOn = localStorage.getItem(STORAGE_VOICE) !== "0";
+    let speakToken = 0;
+    let downMask = 0;
+    let phase = "idle";
+    let maxChord = 0;
+    let maxCount = 0;
+    let guardTimer = 0;
+    const history = [];
+
+    function popcount(value) {
+      let count = 0;
+      let bits = value;
+      while (bits) {
+        bits &= bits - 1;
+        count += 1;
+      }
+      return count;
+    }
+
+    function maskNames(mask) {
+      return KEYS.filter((name) => mask & KEY_BIT[name]);
+    }
+
+    function formatMask(mask) {
+      const names = maskNames(mask);
+      return names.length ? names.join("+") : "—";
+    }
+
+    function maskFromSpec(spec, rowNo) {
+      if (!spec) return 0;
+      let mask = 0;
+      for (const name of spec.split("+")) {
+        if (!name) continue;
+        const bit = KEY_BIT[name];
+        if (!bit) throw new Error("第 " + rowNo + " 列有不認識的鍵 " + name);
+        if (mask & bit) throw new Error("第 " + rowNo + " 列的鍵重複");
+        mask |= bit;
+      }
+      return mask;
+    }
+
+    function parseCsv(text) {
+      const rows = [];
+      let row = [];
+      let field = "";
+      let inQuotes = false;
+      for (let i = 0; i < text.length; i += 1) {
+        const ch = text[i];
+        if (inQuotes) {
+          if (ch === '"') {
+            if (text[i + 1] === '"') {
+              field += '"';
+              i += 1;
+            } else {
+              inQuotes = false;
+            }
+          } else {
+            field += ch;
+          }
+        } else if (ch === '"') {
+          inQuotes = true;
+        } else if (ch === ",") {
+          row.push(field);
+          field = "";
+        } else if (ch === "\n") {
+          row.push(field);
+          rows.push(row);
+          row = [];
+          field = "";
+        } else if (ch !== "\r") {
+          field += ch;
+        }
+      }
+      if (field.length || row.length) {
+        row.push(field);
+        rows.push(row);
+      }
+      return rows;
+    }
+
+    function loadTable(text, sourceLabel) {
+      const table = parseCsv(text.replace(/^\uFEFF/, ""));
+      if (!table.length) throw new Error("CSV 是空的");
+      const header = table[0].map((cell) => cell.trim());
+      const col = (name) => header.indexOf(name);
+      const idCol = col("id");
+      const kanaCol = col("kana");
+      const outputCol = col("output");
+      const requiredCol = col("keys_required");
+      const optionalCol = col("keys_optional");
+      const categoryCol = col("category");
+      if (idCol < 0 || kanaCol < 0 || outputCol < 0 || requiredCol < 0 || optionalCol < 0) {
+        throw new Error("需要 id、kana、output、keys_required、keys_optional 欄");
+      }
+      const next = [];
+      for (let i = 1; i < table.length; i += 1) {
+        const cells = table[i];
+        if (cells.every((cell) => cell.trim() === "")) continue;
+        const id = Number(cells[idCol]);
+        if (!Number.isFinite(id)) throw new Error("第 " + (i + 1) + " 列的 id 不對");
+        const required = maskFromSpec((cells[requiredCol] || "").trim(), i + 1);
+        const optional = maskFromSpec((cells[optionalCol] || "").trim(), i + 1);
+        if (required & optional) throw new Error("第 " + (i + 1) + " 列的必按與可選重疊");
+        next.push({
+          id,
+          kana: (cells[kanaCol] || "").trim(),
+          output: (cells[outputCol] || "").trim(),
+          category: categoryCol >= 0 ? (cells[categoryCol] || "").trim() : "",
+          required,
+          optional
+        });
+      }
+      if (!next.length) throw new Error("沒有和弦列");
+      rules = next;
+      statusEl.textContent = sourceLabel + " · " + rules.length + " 列";
+      resetQuiz();
+    }
+
+    function findRule(mask) {
+      let best = null;
+      let bestReq = -1;
+      let bestOpt = 255;
+      let bestId = 0xffff;
+      for (const row of rules) {
+        if ((row.required & mask) !== row.required) continue;
+        const allowed = row.required | row.optional;
+        if ((mask & ~allowed) !== 0) continue;
+        const reqN = popcount(row.required);
+        const optN = popcount(row.optional);
+        const better = best === null || reqN > bestReq ||
+          (reqN === bestReq && optN < bestOpt) ||
+          (reqN === bestReq && optN === bestOpt && row.id < bestId);
+        if (!better) continue;
+        best = row;
+        bestReq = reqN;
+        bestOpt = optN;
+        bestId = row.id;
+      }
+      return best;
+    }
+
+    function displayOf(row) {
+      return row.kana || row.output || "無對應";
+    }
+
+    function setResult(text, kind, detail) {
+      resultEl.textContent = text;
+      resultEl.className = kind;
+      detailEl.textContent = detail;
+    }
+
+    function renderStage() {
+      if (quizOn) {
+        if (phase === "holding" || phase === "guard") {
+          const shown = phase === "holding" ? downMask : maxChord;
+          detailEl.textContent = (phase === "guard" ? "放開確認中 · " : "按住中 · ") + formatMask(shown);
+        }
+        return;
+      }
+      if (phase === "holding" || phase === "guard") {
+        const shown = phase === "holding" ? downMask : maxChord;
+        setResult(formatMask(shown), "held", phase === "guard"
+          ? "放開確認中 · 最大 " + formatMask(maxChord)
+          : "按住中 · 最大 " + formatMask(maxChord));
+        return;
+      }
+      if (resultEl.dataset.locked === "1") return;
+      setResult("按下和弦後放開", "idle", "");
+    }
+
+    function remember(text, detail) {
+      history.unshift({ text, detail });
+      if (history.length > 16) history.pop();
+      historyEl.replaceChildren();
+      for (const item of history) {
+        const li = document.createElement("li");
+        const main = document.createElement("span");
+        main.className = "kana";
+        main.textContent = item.text;
+        const meta = document.createElement("span");
+        meta.className = "meta";
+        meta.textContent = item.detail;
+        li.append(main, meta);
+        historyEl.append(li);
+      }
+    }
+
+    function speak(text, lang) {
+      if (!voiceOn || !text || !window.speechSynthesis) return;
+      const synth = window.speechSynthesis;
+      const token = ++speakToken;
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = lang;
+      // Chrome drops an utterance that starts in the same turn as cancel().
+      synth.cancel();
+      window.setTimeout(() => {
+        if (token !== speakToken || !voiceOn) return;
+        synth.resume();
+        synth.speak(utterance);
+      }, 50);
+    }
+
+    function currentLesson() {
+      return lessons[lessonIndex] || null;
+    }
+
+    function remainingCount() {
+      return lessons.filter((row) => !passed.has(row.id)).length;
+    }
+
+    function updateScore() {
+      const left = remainingCount();
+      quizPassedEl.textContent = "已通過 " + (lessons.length - left);
+      quizLeftEl.textContent = "尚未通過 " + left;
+    }
+
+    function nextUnpassed(from, skipCurrent) {
+      if (!lessons.length) return -1;
+      const start = skipCurrent ? 1 : 0;
+      for (let step = start; step < lessons.length; step += 1) {
+        const index = (from + step) % lessons.length;
+        if (!passed.has(lessons[index].id)) return index;
+      }
+      return -1;
+    }
+
+    function boundName(name) {
+      const bound = bindings[name];
+      return bound ? name + "（" + bound.label + "）" : name + "（尚未指定）";
+    }
+
+    function howTo(row) {
+      const required = maskNames(row.required).map(boundName);
+      const parts = [];
+      if (row.category) parts.push(row.category);
+      parts.push("同時按住 " + (required.join(" + ") || "（沒有必按鍵）") + "，然後全部放開");
+      if (row.optional) {
+        parts.push(maskNames(row.optional).map(boundName).join("、") + " 可按可不按");
+      }
+      if (row.kana && row.output) parts.push("送出 " + row.output);
+      return parts.join("。");
+    }
+
+    function clearTargets() {
+      for (const button of keyListEl.querySelectorAll(".keycap")) {
+        button.classList.remove("target", "target-optional");
+      }
+    }
+
+    function markTargets(row) {
+      clearTargets();
+      if (!row) return;
+      for (const name of maskNames(row.required)) {
+        const button = keyListEl.querySelector('[data-key="' + name + '"]');
+        if (button) button.classList.add("target");
+      }
+      for (const name of maskNames(row.optional)) {
+        const button = keyListEl.querySelector('[data-key="' + name + '"]');
+        if (button) button.classList.add("target-optional");
+      }
+    }
+
+    function resetQuiz() {
+      lessons = rules.filter((row) => row.output);
+      passed = new Set();
+      lessonIndex = 0;
+      quizSkipBtn.disabled = false;
+      updateScore();
+      if (quizOn) renderLesson("");
+    }
+
+    function renderDone() {
+      clearTargets();
+      expectLabelEl.hidden = false;
+      expectLabelEl.textContent = "這一輪結束";
+      coachEl.hidden = false;
+      coachEl.textContent = "表上每一題都通過了。按「重新開始」可以再練一輪。";
+      setResult("全部通過", "ok", "");
+      quizSkipBtn.disabled = true;
+    }
+
+    function renderLesson(note) {
+      updateScore();
+      if (!lessons.length) {
+        expectLabelEl.hidden = false;
+        expectLabelEl.textContent = "請打出";
+        coachEl.hidden = true;
+        clearTargets();
+        setResult("沒有題目", "idle", "");
+        return;
+      }
+      if (remainingCount() === 0) {
+        renderDone();
+        return;
+      }
+      quizSkipBtn.disabled = false;
+      if (!currentLesson() || passed.has(currentLesson().id)) {
+        const next = nextUnpassed(lessonIndex, false);
+        if (next >= 0) lessonIndex = next;
+      }
+      const lesson = currentLesson();
+      markTargets(lesson);
+      expectLabelEl.hidden = false;
+      expectLabelEl.textContent = "請打出";
+      coachEl.hidden = false;
+      coachEl.textContent = howTo(lesson);
+      setResult(displayOf(lesson), "", note || "");
+      resultEl.dataset.locked = "1";
+    }
+
+    function grade(mask) {
+      const lesson = currentLesson();
+      if (!lesson || remainingCount() === 0) return;
+      const row = mask ? findRule(mask) : null;
+      if (row && row.output && row.id === lesson.id) {
+        passed.add(lesson.id);
+        remember(displayOf(lesson), "通過");
+        if (lesson.kana) speak(lesson.kana, "ja-JP");
+        else speak(OUTPUT_SPEECH[lesson.output] || lesson.output, "zh-TW");
+        const next = nextUnpassed(lessonIndex, true);
+        if (next < 0) {
+          renderDone();
+          return;
+        }
+        lessonIndex = next;
+        renderLesson("上一題通過");
+        return;
+      }
+      const got = !row || !row.output ? "無對應" : displayOf(row);
+      detailEl.textContent = "這次是「" + got + "」";
+      remember(got, "未通過");
+      resultEl.dataset.locked = "1";
+    }
+
+    function fire(mask) {
+      if (quizOn) {
+        grade(mask);
+        return;
+      }
+      resultEl.dataset.locked = "1";
+      if (!mask) {
+        setResult("按下和弦後放開", "idle", "");
+        resultEl.dataset.locked = "";
+        return;
+      }
+      const keys = formatMask(mask);
+      const row = findRule(mask);
+      if (!row || !row.output) {
+        setResult("無對應", "miss", keys);
+        remember("無對應", keys);
+        return;
+      }
+      const text = displayOf(row);
+      setResult(text, "", row.output + " · " + keys + " · id " + row.id);
+      remember(text, row.output);
+      if (row.kana) speak(row.kana, "ja-JP");
+      else speak(OUTPUT_SPEECH[row.output] || row.output, "zh-TW");
+    }
+
+    function noteSnapshot(mask) {
+      const count = popcount(mask);
+      if (count > maxCount || (count === maxCount && mask !== maxChord)) {
+        maxChord = mask;
+        maxCount = count;
+      }
+    }
+
+    function chordDown(bit) {
+      if (downMask & bit) return;
+      downMask |= bit;
+      if (phase === "idle") {
+        phase = "holding";
+        maxChord = 0;
+        maxCount = 0;
+        resultEl.dataset.locked = "";
+      } else if (phase === "guard") {
+        clearTimeout(guardTimer);
+        phase = "holding";
+      }
+      noteSnapshot(downMask);
+      renderStage();
+      paintKeys();
+    }
+
+    function chordUp(bit) {
+      if ((downMask & bit) === 0) return;
+      downMask = (downMask & ~bit) & 0x3fff;
+      if (downMask === 0 && phase === "holding") {
+        phase = "guard";
+        guardTimer = setTimeout(finishGuard, RELEASE_MS);
+      } else if (downMask !== 0 && (phase === "holding" || phase === "guard")) {
+        noteSnapshot(downMask);
+      }
+      renderStage();
+      paintKeys();
+    }
+
+    function finishGuard() {
+      if (phase !== "guard") return;
+      if (downMask !== 0) {
+        phase = "holding";
+        noteSnapshot(downMask);
+        renderStage();
+        return;
+      }
+      const chord = maxChord;
+      phase = "idle";
+      maxChord = 0;
+      maxCount = 0;
+      fire(chord);
+      paintKeys();
+    }
+
+    function releaseAll() {
+      if (downMask === 0 && phase === "idle") return;
+      downMask = 0;
+      if (phase === "holding") {
+        phase = "guard";
+        clearTimeout(guardTimer);
+        guardTimer = setTimeout(finishGuard, RELEASE_MS);
+        renderStage();
+        paintKeys();
+      }
+    }
+
+    function codeOwner(code) {
+      for (const name of KEYS) {
+        if (bindings[name] && bindings[name].code === code) return name;
+      }
+      return null;
+    }
+
+    function labelForEvent(event) {
+      if (event.code === "Space") return "Space";
+      if (event.key && event.key.length === 1) return event.key.toUpperCase();
+      return event.key || event.code;
+    }
+
+    function normalizeBindings(saved) {
+      if (!saved || typeof saved !== "object" || Array.isArray(saved)) return null;
+      const next = {};
+      const used = new Set();
+      for (const name of KEYS) {
+        const item = saved[name];
+        if (!item || typeof item.code !== "string" || !item.code || used.has(item.code)) continue;
+        used.add(item.code);
+        next[name] = {
+          code: item.code,
+          label: typeof item.label === "string" && item.label ? item.label : item.code
+        };
+      }
+      return next;
+    }
+
+    function loadBindings() {
+      try {
+        const saved = normalizeBindings(JSON.parse(localStorage.getItem(STORAGE_MAP) || "null"));
+        return saved || structuredClone(DEFAULT_MAP);
+      } catch (err) {
+        return structuredClone(DEFAULT_MAP);
+      }
+    }
+
+    function saveBindings() {
+      localStorage.setItem(STORAGE_MAP, JSON.stringify(bindings));
+    }
+
+    function paintKeys() {
+      for (const name of KEYS) {
+        const button = keyListEl.querySelector('[data-key="' + name + '"]');
+        if (!button) continue;
+        const bound = bindings[name];
+        const bindEl = button.querySelector(".key-bind");
+        button.classList.toggle("down", (downMask & KEY_BIT[name]) !== 0);
+        button.classList.toggle("armed", captureId === name);
+        if (captureId === name) bindEl.textContent = bound ? "再點清除" : "按下鍵";
+        else bindEl.textContent = bound ? bound.label : "指定";
+        button.setAttribute("aria-label", name + "，" + bindEl.textContent);
+      }
+      if (quizOn && phase === "idle" && remainingCount() > 0) {
+        markTargets(currentLesson());
+        coachEl.textContent = howTo(currentLesson());
+      }
+    }
+
+    function buildKeyList() {
+      keyListEl.replaceChildren();
+      for (const name of KEYS) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "keycap";
+        button.dataset.key = name;
+        button.style.gridArea = name.toLowerCase();
+        const label = document.createElement("span");
+        label.className = "key-name";
+        label.textContent = name;
+        const bind = document.createElement("span");
+        bind.className = "key-bind";
+        button.append(label, bind);
+        button.addEventListener("click", () => arm(name));
+        keyListEl.append(button);
+      }
+      paintKeys();
+    }
+
+    function syncVoiceButton() {
+      voiceBtn.setAttribute("aria-pressed", voiceOn ? "true" : "false");
+      voiceBtn.textContent = voiceOn ? "語音開" : "語音關";
+    }
+
+    function settingsDocument() {
+      const bindingsOut = {};
+      for (const name of KEYS) {
+        if (bindings[name]) bindingsOut[name] = bindings[name];
+      }
+      return { version: 1, voice: voiceOn, bindings: bindingsOut };
+    }
+
+    function applySettings(data) {
+      const source = data && data.bindings && typeof data.bindings === "object" ? data.bindings : data;
+      const next = normalizeBindings(source);
+      if (!next || Object.keys(next).length === 0) throw new Error("設定檔裡沒有按鍵對應");
+      bindings = next;
+      if (data && typeof data.voice === "boolean") {
+        voiceOn = data.voice;
+        localStorage.setItem(STORAGE_VOICE, voiceOn ? "1" : "0");
+        if (!voiceOn && window.speechSynthesis) window.speechSynthesis.cancel();
+        syncVoiceButton();
+      }
+      captureId = null;
+      saveBindings();
+      paintKeys();
+    }
+
+    function downloadSettings() {
+      const blob = new Blob([JSON.stringify(settingsDocument(), null, 2) + "\n"], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "chord-keymap.json";
+      link.click();
+      URL.revokeObjectURL(url);
+      noticeEl.textContent = "已下載 chord-keymap.json";
+    }
+
+    function arm(name) {
+      noticeEl.textContent = "";
+      if (captureId === name) {
+        delete bindings[name];
+        captureId = null;
+        saveBindings();
+        paintKeys();
+        return;
+      }
+      captureId = name;
+      paintKeys();
+    }
+
+    function onKeyDown(event) {
+      if (event.repeat) {
+        if (codeOwner(event.code)) event.preventDefault();
+        return;
+      }
+      if (captureId) {
+        event.preventDefault();
+        const owner = codeOwner(event.code);
+        if (owner && owner !== captureId) {
+          noticeEl.textContent = labelForEvent(event) + " 已經綁給 " + owner;
+          return;
+        }
+        bindings[captureId] = { code: event.code, label: labelForEvent(event) };
+        captureId = null;
+        noticeEl.textContent = "";
+        saveBindings();
+        paintKeys();
+        return;
+      }
+      const name = codeOwner(event.code);
+      if (!name) return;
+      event.preventDefault();
+      chordDown(KEY_BIT[name]);
+    }
+
+    function onKeyUp(event) {
+      if (captureId) return;
+      const name = codeOwner(event.code);
+      if (!name) return;
+      event.preventDefault();
+      chordUp(KEY_BIT[name]);
+    }
+
+    async function loadDefaultCsv() {
+      statusEl.textContent = "讀取和弦表…";
+      const response = await fetch("../data/chord_map.machine.csv");
+      if (!response.ok) throw new Error("讀不到機器表（" + response.status + "）");
+      loadTable(await response.text(), "機器表");
+    }
+
+    voiceBtn.addEventListener("click", () => {
+      voiceOn = !voiceOn;
+      localStorage.setItem(STORAGE_VOICE, voiceOn ? "1" : "0");
+      voiceBtn.setAttribute("aria-pressed", voiceOn ? "true" : "false");
+      voiceBtn.textContent = voiceOn ? "語音開" : "語音關";
+      if (!voiceOn && window.speechSynthesis) window.speechSynthesis.cancel();
+    });
+
+    document.getElementById("csv-file").addEventListener("change", async (event) => {
+      const file = event.target.files && event.target.files[0];
+      event.target.value = "";
+      if (!file) return;
+      try {
+        loadTable(await file.text(), file.name);
+        noticeEl.textContent = "";
+      } catch (err) {
+        statusEl.textContent = err.message || "CSV 讀取失敗";
+      }
+    });
+
+    document.getElementById("reload").addEventListener("click", () => {
+      loadDefaultCsv().catch((err) => {
+        statusEl.textContent = err.message || "讀不到機器表";
+      });
+    });
+
+    document.getElementById("reset-map").addEventListener("click", () => {
+      bindings = structuredClone(DEFAULT_MAP);
+      captureId = null;
+      noticeEl.textContent = "";
+      saveBindings();
+      paintKeys();
+    });
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", releaseAll);
+
+    quizBtn.addEventListener("click", () => {
+      quizOn = !quizOn;
+      quizBtn.setAttribute("aria-pressed", quizOn ? "true" : "false");
+      quizBtn.textContent = quizOn ? "結束驗證" : "逐項驗證";
+      quizBarEl.hidden = !quizOn;
+      expectLabelEl.hidden = !quizOn;
+      coachEl.hidden = !quizOn;
+      resultEl.dataset.locked = "";
+      if (quizOn) renderLesson("");
+      else {
+        clearTargets();
+        setResult("按下和弦後放開", "idle", "");
+      }
+    });
+
+    quizSkipBtn.addEventListener("click", () => {
+      const next = nextUnpassed(lessonIndex, true);
+      if (next < 0) {
+        detailEl.textContent = "尚未通過的只剩這一題";
+        return;
+      }
+      lessonIndex = next;
+      renderLesson("");
+    });
+
+    document.getElementById("quiz-restart").addEventListener("click", () => {
+      passed = new Set();
+      lessonIndex = 0;
+      quizSkipBtn.disabled = false;
+      if (quizOn) renderLesson("");
+      else updateScore();
+    });
+
+    document.getElementById("save-settings").addEventListener("click", downloadSettings);
+
+    document.getElementById("settings-file").addEventListener("change", async (event) => {
+      const file = event.target.files && event.target.files[0];
+      event.target.value = "";
+      if (!file) return;
+      try {
+        applySettings(JSON.parse(await file.text()));
+        noticeEl.textContent = "已讀取 " + file.name;
+      } catch (err) {
+        noticeEl.textContent = err.message || "設定檔讀取失敗";
+      }
+    });
+
+    syncVoiceButton();
+    buildKeyList();
+
+    loadDefaultCsv().catch((err) => {
+      statusEl.textContent = (err.message || "讀不到機器表") + "。請在專案根目錄執行 python -m http.server 8765，再開 http://127.0.0.1:8765/web/";
+    });
+  </script>
+</body>
+</html>
