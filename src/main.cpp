@@ -81,6 +81,32 @@ static void format_key_trace(uint16_t mask, char *buf, size_t buflen) {
   }
 }
 
+static void dump_button_trace() {
+  const size_t n = button_trace_count();
+  if (n == 0) {
+    console_println("trace empty");
+    return;
+  }
+  char line[80];
+  char keys[64];
+  for (size_t i = 0; i < n; ++i) {
+    ButtonTraceEvent ev;
+    if (!button_trace_at(i, &ev)) break;
+    if (ev.kind == ButtonTraceKind::Raw) {
+      const char *name = ev.index < kChordKeyCount ? chord_key_name(ev.index) : nullptr;
+      if (name == nullptr) name = "?";
+      snprintf(line, sizeof(line), "%lu raw %s %s", static_cast<unsigned long>(ev.ms), name,
+               ev.value != 0 ? "down" : "up");
+    } else {
+      format_key_trace(ev.value, keys, sizeof(keys));
+      snprintf(line, sizeof(line), "%lu stable %s", static_cast<unsigned long>(ev.ms), keys);
+    }
+    console_println(line);
+  }
+  snprintf(line, sizeof(line), "trace %u", static_cast<unsigned>(n));
+  console_println(line);
+}
+
 static void trace_keys_if_changed() {
   if (!g_key_trace) return;
   const uint16_t mask = buttons_mask();
@@ -127,6 +153,15 @@ static void poll_fire_cmd(CmdPort &port) {
       g_key_trace = !g_key_trace;
       if (g_key_trace) g_key_trace_mask = buttons_mask();
       console_println(g_key_trace ? "keys on" : "keys off");
+      continue;
+    }
+    if (strncmp(arg, "trace", 5) == 0 && (arg[5] == '\0' || arg[5] == ' ' || arg[5] == '\t')) {
+      char *rest = arg + 5;
+      while (*rest == ' ' || *rest == '\t') ++rest;
+      size_t n = strlen(rest);
+      while (n > 0 && (rest[n - 1] == ' ' || rest[n - 1] == '\t')) rest[--n] = '\0';
+      if (rest[0] != '\0') continue;
+      dump_button_trace();
       continue;
     }
     if (strncmp(arg, "fire", 4) != 0) continue;

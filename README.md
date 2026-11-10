@@ -46,12 +46,12 @@
 
 | 模組 | 做什麼 |
 | --- | --- |
-| `src/buttons.cpp` | 一鍵一 GPIO，按下為 LOW。只輸出去彈跳後的遮罩 |
+| `src/buttons.cpp` | 一鍵一 GPIO，按下為 LOW。去彈跳後的遮罩給和弦引擎；raw 邊緣與穩定遮罩同時寫進 512 筆 RAM 環形緩衝 |
 | `src/chord_core.cpp` | 鍵名、高峰快照、全放／首鍵放開、規則比對、配方解析 |
-| `src/chords.cpp` | 出廠表與 LittleFS 活表、NVS 裡的送出模式。比對成功才呼叫送鍵 |
+| `src/chords.cpp` | 出廠表與 LittleFS 活表、NVS 裡的送出模式。比對成功才呼叫送鍵；比對不到時序列埠印「無符合規則」與遮罩，不送鍵 |
 | `src/hid_keyboard.cpp` | 把配方排進同一條時間軸。`loop` 不會為了打完一串字而停住 |
 | `src/config_server.cpp` | GPIO15、SoftAP、和弦 JSON API 與手機頁。熱點關掉時鍵盤照常送鍵 |
-| `src/main.cpp` | `setup`／`loop` 把上面串起來。序列埠指令是 `fire`（送出時機）與 `keys`（印目前按鍵） |
+| `src/main.cpp` | `setup`／`loop` 把上面串起來。序列埠指令是 `fire`（送出時機）、`keys`（印目前按鍵）與 `trace`（傾印開機後最近 512 筆 raw 邊緣與穩定遮罩；傾印期間 `loop` 暫停） |
 | `web/index.html` | 用電腦鍵盤試打。讀機器表，不燒錄、不送 USB HID |
 | `test/test_chord_core` | `pio test -e native`。只編譯 `chord_core.cpp` |
 

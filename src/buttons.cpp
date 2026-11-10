@@ -28,8 +28,40 @@ static bool edge_press[BTN_COUNT];
 static bool edge_release[BTN_COUNT];
 static uint32_t last_change_ms[BTN_COUNT];
 
+static ButtonTraceEvent g_trace[kButtonTraceCap];
+static size_t g_trace_head = 0;
+static size_t g_trace_count = 0;
+static uint16_t g_trace_stable = 0;
+
+static_assert(sizeof(ButtonTraceEvent) == 8, "trace event is 8 bytes");
+
+static void trace_reset() {
+  g_trace_head = 0;
+  g_trace_count = 0;
+  g_trace_stable = 0;
+}
+
+static void trace_push(uint32_t ms, ButtonTraceKind kind, uint8_t index, uint16_t value) {
+  g_trace[g_trace_head].ms = ms;
+  g_trace[g_trace_head].value = value;
+  g_trace[g_trace_head].kind = kind;
+  g_trace[g_trace_head].index = index;
+  g_trace_head = (g_trace_head + 1) % kButtonTraceCap;
+  if (g_trace_count < kButtonTraceCap) ++g_trace_count;
+}
+
+size_t button_trace_count() { return g_trace_count; }
+
+bool button_trace_at(size_t oldest_index, ButtonTraceEvent *out) {
+  if (out == nullptr || oldest_index >= g_trace_count) return false;
+  const size_t start = g_trace_count < kButtonTraceCap ? 0 : g_trace_head;
+  *out = g_trace[(start + oldest_index) % kButtonTraceCap];
+  return true;
+}
+
 void buttons_begin() {
   const uint32_t now = millis();
+  trace_reset();
   for (uint8_t i = 0; i < BTN_COUNT; ++i) {
     raw_down[i] = false;
     stable_down[i] = false;
@@ -52,6 +84,7 @@ void buttons_poll() {
     if (down != raw_down[i]) {
       raw_down[i] = down;
       last_change_ms[i] = now;
+      trace_push(now, ButtonTraceKind::Raw, i, down ? 1 : 0);
     }
 
     if ((now - last_change_ms[i]) >= kChordDebounceMs && stable_down[i] != raw_down[i]) {
@@ -61,6 +94,12 @@ void buttons_poll() {
     if (stable_down[i] && !prev_down[i]) edge_press[i] = true;
     if (!stable_down[i] && prev_down[i]) edge_release[i] = true;
     prev_down[i] = stable_down[i];
+  }
+
+  const uint16_t mask = buttons_mask();
+  if (mask != g_trace_stable) {
+    trace_push(now, ButtonTraceKind::Stable, 0, mask);
+    g_trace_stable = mask;
   }
 }
 

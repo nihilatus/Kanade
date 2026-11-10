@@ -44,3 +44,20 @@ bool button_just_released(ButtonId id);
 
 // Bit i set when ButtonId i is debounced down. Chord engine reads this only.
 uint16_t buttons_mask();
+
+// Boot records every raw GPIO edge and every debounced mask change.
+// The ring holds this many events (8 bytes each). A full ring drops the oldest.
+static constexpr size_t kButtonTraceCap = 512;
+
+enum class ButtonTraceKind : uint8_t { Raw = 0, Stable = 1 };
+
+struct ButtonTraceEvent {
+  uint32_t ms;
+  uint16_t value;  // Raw: 1 down, 0 up. Stable: buttons_mask().
+  ButtonTraceKind kind;
+  uint8_t index;  // Raw: ButtonId. Stable: unused.
+};
+
+// oldest_index 0 is the oldest event still kept.
+size_t button_trace_count();
+bool button_trace_at(size_t oldest_index, ButtonTraceEvent *out);

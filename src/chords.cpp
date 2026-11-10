@@ -311,7 +311,11 @@ static void fire(uint16_t mask) {
 
   const int index = chord_find_rule(g_live, g_live_count, mask);
   if (index < 0) {
-    log_chord("no-match", 0, mask, "", "");
+    char keys[80];
+    char line[96];
+    format_mask(mask, keys, sizeof(keys));
+    snprintf(line, sizeof(line), "無符合規則 %s", keys);
+    console_println(line);
     return;
   }
 
