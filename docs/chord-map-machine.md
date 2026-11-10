@@ -1,6 +1,6 @@
 # Machine chord map
 
-Source of truth (human / editable): [`../eps32jischordboard-premapping.csv`](../eps32jischordboard-premapping.csv)
+Source of truth (human / editable): [`../esp32-jis-chordboard-premapping.csv`](../esp32-jis-chordboard-premapping.csv)
 
 Generated machine table: [`../data/chord_map.machine.csv`](../data/chord_map.machine.csv)
 

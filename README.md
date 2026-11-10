@@ -20,6 +20,45 @@
 
 ---
 
+## 架構
+
+採樣、和弦判斷、送鍵、改表分開。判斷本身在 `chord_core`，不碰 GPIO、檔案或 USB，所以宿主測試不用燒板。
+
+```text
+人編 CSV
+  └─ 編譯前 → data/chord_map.machine.csv
+              include/chord_map.inc   出廠表，編進韌體
+
+開機 chords_begin
+  LittleFS /chords.json 有效 → 用這份活表
+  否則用出廠表
+
+每一圈 loop
+  14 顆 GPIO
+    → buttons        去彈跳，得到 14-bit 遮罩
+    → chords         交給 chord_core：高峰、送出時機、比對活表
+    → hid_keyboard   配方排隊，到點才送一個 USB HID report
+  GPIO15
+    → config_server  合上才開熱點；只在熱點開著時處理網頁與 JSON
+```
+
+遮罩的 bit0..13 固定是 `LL LU LR LD LT0 LT1 LT2 RL RU RR RD RT0 RT1 RT2`。PC 收到的是一般鍵盤的羅馬字與少數特殊鍵，日文轉換交給 IME，韌體不做假名轉換。
+
+| 模組 | 做什麼 |
+| --- | --- |
+| `src/buttons.cpp` | 一鍵一 GPIO，按下為 LOW。只輸出去彈跳後的遮罩 |
+| `src/chord_core.cpp` | 鍵名、高峰快照、全放／首鍵放開、規則比對、配方解析 |
+| `src/chords.cpp` | 出廠表與 LittleFS 活表、NVS 裡的送出模式。比對成功才呼叫送鍵 |
+| `src/hid_keyboard.cpp` | 把配方排進同一條時間軸。`loop` 不會為了打完一串字而停住 |
+| `src/config_server.cpp` | GPIO15、SoftAP、和弦 JSON API 與手機頁。熱點關掉時鍵盤照常送鍵 |
+| `src/main.cpp` | `setup`／`loop` 把上面串起來。序列埠指令是 `fire`（送出時機）與 `keys`（印目前按鍵） |
+| `web/index.html` | 用電腦鍵盤試打。讀機器表，不燒錄、不送 USB HID |
+| `test/test_chord_core` | `pio test -e native`。只編譯 `chord_core.cpp` |
+
+手機存檔會蓋過出廠表，直到網頁上還原出廠。送出時機寫在 NVS，與和弦表分開。試打頁的開關只存在那個瀏覽器。
+
+---
+
 ## 按鍵
 
 14 個實體鍵 ID（左／右各 7）：
@@ -29,26 +68,15 @@
 | 左 | `LL` `LU` `LR` `LD` `LT0` `LT1` `LT2` |
 | 右 | `RL` `RU` `RR` `RD` `RT0` `RT1` `RT2` |
 
-沒有類比 stick；舊文件若仍寫「32 鍵／手把」屬過時敘述，請以本 README 的 14 鍵為準。
+沒有類比 stick，也不要照早期 32 鍵矩陣接線。
 
 ---
 
 ## 輸入邏輯
 
-1. 按住期間持續追蹤按下集合。
-2. `max_chord` = 這次按住期間**同時按下數量最大**的那一組（同大小取較晚的快照）。
-3. 送出時機可切換。NVS 有紀錄時沿用上次選擇；沒有紀錄時用編譯旗標 `CHORD_FIRE_DEFAULT_FIRST`（沒設就是全放）：
-   - **全放再送**：全部放開，並再維持 `kChordReleaseGuardMs`（`include/chord_core.h`）空檔，才比對與送出一次。下一組若在 mask 回到 0 之前就按下，會被併進同一組。
-   - **首鍵放開就送**：高峰後第一顆屬於高峰的鍵放開就送出，然後進入收尾，等全部放開才開始新的和弦。手感前提是同一組先一起按下、再放開。不等 `kChordReleaseGuardMs`。
-   手機熱點頁的兩個按鈕，或序列埠的 `fire release` / `fire first`，都會寫進 NVS，並蓋過編譯旗標。試打頁頁首的同一個開關只影響瀏覽器。每鍵要先穩定 `kChordDebounceMs` 才算按下或放開。
-4. 比對規則（詳見 [`docs/chord-map-machine.md`](docs/chord-map-machine.md)）：
+按住期間取同時按下數量最大的一組，送出一次。時機是全放再送，或首鍵放開就送。`(RT0)`、比對與候選優先序見 [`docs/chord-map-machine.md`](docs/chord-map-machine.md)。
 
-   ```text
-   required ⊆ max_chord ⊆ required ∪ optional
-   ```
-
-5. 人表中的 `(RT0)` 表示 RT0 **可有可無**（寫入 machine 表的 `keys_optional`）；空的人表列不匯出。
-6. 多筆候選時：優先 `|required|` 較大 → 再 `|optional|` 較小 → 再較小的 `id`。
+沒有 NVS 紀錄時，開機用 `CHORD_FIRE_DEFAULT_FIRST`（沒設就是全放）。手機熱點頁或序列埠 `fire release` / `fire first` 會寫進 NVS，並蓋過編譯旗標。試打頁的開關只影響瀏覽器。每鍵要先穩定 `kChordDebounceMs` 才算按下或放開。
 
 ---
 
@@ -56,10 +84,10 @@
 
 | 檔案 | 用途 |
 | --- | --- |
-| [`eps32jischordboard-premapping.csv`](eps32jischordboard-premapping.csv) | **人編**版面／和弦（來源真相） |
-| [`data/chord_map.machine.csv`](data/chord_map.machine.csv) | **機器**表（韌體／工具讀取） |
-| [`docs/chord-map-machine.md`](docs/chord-map-machine.md) | 欄位、RT0、觸發／比對規則 |
-| [`tools/build_chord_map_machine.py`](tools/build_chord_map_machine.py) | 人表 → 機器表重建腳本 |
+| [`esp32-jis-chordboard-premapping.csv`](esp32-jis-chordboard-premapping.csv) | **人編**和弦表，唯一可手改的來源 |
+| [`data/chord_map.machine.csv`](data/chord_map.machine.csv) | **機器**表，由下一支腳本產生；韌體與試打頁讀這份 |
+| [`docs/chord-map-machine.md`](docs/chord-map-machine.md) | 欄位、RT0、觸發與比對 |
+| [`tools/build_chord_map_machine.py`](tools/build_chord_map_machine.py) | 人表 → 機器表 |
 
 `pio run` 與 `pio run -t upload` 會在編譯前自動重建機器表與韌體用的 [`include/chord_map.inc`](include/chord_map.inc)。人表有未知鍵名，或同一組鍵對到不同輸出時，建置會失敗。只想更新 CSV、還不編譯時：
 
@@ -68,10 +96,7 @@ cd /d "E:\cline play\esp32-jis-keyboard"
 python tools/build_chord_map_machine.py
 ```
 
-手機改表：複製 [`include/secrets.h.example`](include/secrets.h.example) 成 `include/secrets.h`，把熱點密碼改成至少 8 碼。`include/secrets.h` 在 `.gitignore` 裡，不要提交、也不要寫進文件。`tools/check_secrets_untracked.py` 會在編譯前確認這份檔沒有被 git 追蹤。想要設定 API 帶 token 時，把 `WIFI_API_TOKEN` 設成非空字串；留空則維持熱點內開放。把 **GPIO15** 接到 GND（維持型開關合上）熱點才會出現；沒接或撥開就關，不用重開機，和弦與 USB 鍵盤照常。合上後手機瀏覽 `http://192.168.4.1/`。存檔寫進板子的 LittleFS，蓋過編譯進去的出廠表；網頁上的「還原出廠表」會刪掉那份存檔。LittleFS 第一次掛載失敗才會格式化，並在序列埠留下一行說明。
-
-`data/mapping_table.csv`、`data/parameter_list.csv` 仍是舊 joystick-writer 移植殘件；新路徑以 `chord_map.machine.csv` 為準。  
-舊的 [`docs/esp32-jis-chordboard-premapping.csv`](docs/esp32-jis-chordboard-premapping.csv)／[`premapping.csv`](premapping.csv) 若仍寫 32 ID，視為待清理。
+手機改表、熱點密碼與 GPIO15 開關見 [`docs/pinout.md`](docs/pinout.md)。`include/secrets.h` 不進 git。
 
 ---
 
@@ -108,7 +133,7 @@ python -m http.server 8765
 | 燒錄／序列 | 接標示 **UART** 的口 |
 | 保留 | **GPIO19 / GPIO20**（USB 資料線，勿當按鍵腳） |
 
-**按鍵數量：14。** 每顆開關一腳接 GPIO、一腳接 GND（內部上拉，按下為 LOW）。另外一顆維持型開關接 **GPIO15** 與 GND，合上才開 Wi-Fi 設定熱點，撥開就關。腳位與零件見 [`docs/pinout.md`](docs/pinout.md)、[`docs/bom.md`](docs/bom.md)。不要再照舊的 6×6 矩陣或二極體清單接線。[`docs/config-plan.md`](docs/config-plan.md) 開頭已標成過時的 32 鍵文件。
+**按鍵數量：14。** 每顆開關一腳接 GPIO、一腳接 GND（內部上拉，按下為 LOW）。另外一顆維持型開關接 **GPIO15** 與 GND，合上才開 Wi-Fi 設定熱點。腳位與零件見 [`docs/pinout.md`](docs/pinout.md)、[`docs/bom.md`](docs/bom.md)。
 
 ### 建置與燒錄（Windows）
 
@@ -144,19 +169,20 @@ pio device monitor
 
 ```
 platformio.ini
-src/main.cpp
-src/buttons.cpp       14 鍵直連／每鍵 kChordDebounceMs 消彈跳
-src/hid_keyboard.cpp  配方 → USB HID
-src/chords.cpp        max_chord；全放 kChordReleaseGuardMs 或首鍵放開就送；可改用 LittleFS 存檔
-src/config_server.cpp Wi-Fi 熱點與手機設定頁（GPIO15 合上才開）
-include/chord_map.inc 出廠表，由機器表產生，勿手改
-include/secrets.h     本機熱點密碼，不進 git
-include/*.h
-eps32jischordboard-premapping.csv
+src/main.cpp              把採樣、和弦、HID、熱點串成 loop
+src/buttons.cpp           14 鍵直連與消彈跳
+src/chord_core.cpp        純邏輯，宿主測試也編譯這份
+src/chords.cpp            活表、送出模式、比對後送鍵
+src/hid_keyboard.cpp      配方 → USB HID
+src/config_server.cpp     GPIO15 熱點與手機設定頁
+include/chord_map.inc     出廠表，由機器表產生，勿手改
+include/secrets.h         本機熱點密碼，不進 git
+esp32-jis-chordboard-premapping.csv
 data/chord_map.machine.csv
 tools/build_chord_map_machine.py
-tools/prebuild_chord_map.py  編譯前自動重建機器表
-web/index.html                一般鍵盤試打，讀機器表
+tools/prebuild_chord_map.py
+test/test_chord_core      pio test -e native
+web/index.html            一般鍵盤試打，讀機器表
 docs/chord-map-machine.md
 docs/pinout.md
 docs/bom.md

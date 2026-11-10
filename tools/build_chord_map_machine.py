@@ -10,7 +10,7 @@ from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "eps32jischordboard-premapping.csv"
+SRC = ROOT / "esp32-jis-chordboard-premapping.csv"
 OUT = ROOT / "data" / "chord_map.machine.csv"
 INC = ROOT / "include" / "chord_map.inc"
 
