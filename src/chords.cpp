@@ -386,7 +386,9 @@ ChordStageStatus chords_stage_json(const char *json, size_t len, char *err, size
   JsonDocument internal_doc;
   JsonDocument &doc = psramFound() ? psram_doc : internal_doc;
   const DeserializationError error = deserializeJson(doc, json, len);
-  if (error == DeserializationError::NoMemory) return set_err(err, err_len, "內容太大");
+  if (error == DeserializationError::NoMemory) {
+    return set_err(err, err_len, "記憶體不足", ChordStageStatus::NoMemory);
+  }
   if (error) return set_err(err, err_len, "JSON 格式不對");
 
   JsonArray arr = doc["chords"].as<JsonArray>();

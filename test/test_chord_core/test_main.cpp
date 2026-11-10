@@ -576,6 +576,35 @@ extern "C" void test_skip_overflow_is_flagged(void) {
   TEST_ASSERT_FALSE(got.overflow_skips);
 }
 
+extern "C" void test_recipe_that_does_not_fit_fails(void) {
+  char recipe[160];
+  size_t n = 0;
+  for (int i = 0; i < 33; ++i) {
+    if (i > 0) recipe[n++] = ' ';
+    recipe[n++] = 'a';
+    recipe[n++] = 'a';
+  }
+  recipe[n] = '\0';
+
+  ChordRecipe got;
+  TEST_ASSERT_TRUE(chord_parse_recipe(recipe, &got));
+  TEST_ASSERT_TRUE(got.failed);
+  TEST_ASSERT_EQUAL_INT(0, static_cast<int>(got.skip_count));
+
+  n = 0;
+  for (int i = 0; i < 47; ++i) {
+    if (i > 0) recipe[n++] = ' ';
+    recipe[n++] = 'a';
+  }
+  recipe[n++] = ' ';
+  const char *combo = "Shift+a";
+  memcpy(recipe + n, combo, 7);
+  n += 7;
+  recipe[n] = '\0';
+  TEST_ASSERT_TRUE(chord_parse_recipe(recipe, &got));
+  TEST_ASSERT_TRUE(got.failed);
+}
+
 extern "C" void test_each_csv_output_parses(void) {
   TEST_ASSERT_TRUE_MESSAGE(g_count > 0, g_error);
   for (size_t i = 0; i < g_count; ++i) {
@@ -601,6 +630,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_switch_to_first_during_guard_sends);
   RUN_TEST(test_recipe_shapes);
   RUN_TEST(test_skip_overflow_is_flagged);
+  RUN_TEST(test_recipe_that_does_not_fit_fails);
   RUN_TEST(test_csv_bits_match_firmware_table);
   RUN_TEST(test_each_csv_row_matches_spec);
   RUN_TEST(test_each_csv_output_parses);

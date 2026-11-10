@@ -320,7 +320,7 @@ static bool take_combo(ChordRecipe *out, const char *token) {
   const size_t presses = static_cast<size_t>(n - 1) + 1;
   const size_t room = kChordRecipeCap - out->count;
   if (presses + 1 > room) {
-    add_skip(out, token, len, false);
+    out->failed = true;
     return true;
   }
   for (int i = 0; i < n - 1; ++i) {
@@ -359,8 +359,8 @@ static bool take_token(ChordRecipe *out, const char *token, bool *abort_recipe) 
 
   const size_t len = strlen(token);
   if (len + 1 > room) {
-    add_skip(out, token, len, false);
-    return true;
+    *abort_recipe = true;
+    return false;
   }
   for (size_t i = 0; i < len; ++i) {
     if (!is_plain_char(static_cast<unsigned char>(token[i]))) {
