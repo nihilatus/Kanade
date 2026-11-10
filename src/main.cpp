@@ -16,7 +16,7 @@ void setup() {
   delay(200);
   Serial.println();
   Serial.println(F("esp32-jis-keyboard"));
-  Serial.println(F("14 direct keys, active-low, 15 ms debounce"));
+  Serial.println(F("14 direct keys, active-low, 8 ms debounce"));
   Serial.print(F("pins"));
   for (uint8_t i = 0; i < BTN_COUNT; ++i) {
     Serial.print(' ');
@@ -25,7 +25,7 @@ void setup() {
     Serial.print(kButtons[i].pin);
   }
   Serial.println();
-  Serial.println(F("chord fires after all keys stay up for 25 ms"));
+  Serial.println(F("chord fires after all keys stay up for 10 ms"));
 #endif
 
   buttons_begin();

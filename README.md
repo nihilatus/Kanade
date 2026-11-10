@@ -16,7 +16,7 @@
 | 板子 | ESP32-S3-DevKitC-1 **N16R8** |
 | 輸入 | **14 顆**離散按鍵（無類比 stick） |
 | 輸出 | 羅馬字／快捷鍵配方 → 主機日文 IME |
-| 現況 | 14 鍵直連採樣、15 ms 消彈跳、全放 25 ms 後依 machine 表送 HID 配方 |
+| 現況 | 14 鍵直連採樣、8 ms 消彈跳、全放 10 ms 後依 machine 表送 HID 配方 |
 
 ---
 
@@ -74,7 +74,7 @@ python tools/build_chord_map_machine.py
 
 ## 用一般鍵盤試打
 
-[`web/index.html`](web/index.html) 用電腦鍵盤模擬 14 顆和弦鍵，不必接開發板，也不送 USB HID。判讀規則與韌體相同（最大同時集合、全放 25 ms、`required`／`optional`、較具體的列優先）。電腦鍵盤的按下／放開已經是穩定邊緣，所以不做韌體那 15 ms GPIO 消彈跳。
+[`web/index.html`](web/index.html) 用電腦鍵盤模擬 14 顆和弦鍵，不必接開發板，也不送 USB HID。判讀規則與韌體相同（最大同時集合、全放 10 ms、`required`／`optional`、較具體的列優先）。電腦鍵盤的按下／放開已經是穩定邊緣，所以不做韌體那 8 ms GPIO 消彈跳。
 
 頁面用相對路徑讀 [`data/chord_map.machine.csv`](data/chord_map.machine.csv)，要從專案根目錄開一個本機伺服器，直接用檔案開啟讀不到表：
 
@@ -131,8 +131,8 @@ pio device monitor
 | 已有 | 尚未 |
 | --- | --- |
 | PlatformIO + Arduino + TinyUSB HID 鍵盤 | VID/PID 仍是原型值 |
-| 14 鍵直連、每鍵 15 ms 穩定消彈跳 | 自訂 JIS HID report／國碼 |
-| 全放 25 ms 確認後比對；手機熱點可改表並存進 LittleFS | 連發 |
+| 14 鍵直連、每鍵 8 ms 穩定消彈跳 | 自訂 JIS HID report／國碼 |
+| 全放 10 ms 確認後比對；手機熱點可改表並存進 LittleFS | 連發 |
 | 配方送出（羅馬字、`Shift+1`、`Backspace`、`Ctrl+i` 等）；一般鍵盤試打頁 | 外殼／PCB |
 
 出廠表仍由 `include/chord_map.inc` 編譯進去。改人表後，下一次 `pio run` 會重建機器表，燒錄才會更新出廠內容；手機上儲存的表會蓋過它，直到在網頁還原出廠。
@@ -142,9 +142,9 @@ pio device monitor
 ```
 platformio.ini
 src/main.cpp
-src/buttons.cpp       14 鍵直連／每鍵 15 ms 消彈跳
+src/buttons.cpp       14 鍵直連／每鍵 8 ms 消彈跳
 src/hid_keyboard.cpp  配方 → USB HID
-src/chords.cpp        max_chord，全放 25 ms 後比對；可改用 LittleFS 存檔
+src/chords.cpp        max_chord，全放 10 ms 後比對；可改用 LittleFS 存檔
 src/config_server.cpp Wi-Fi 熱點與手機設定頁
 include/chord_map.inc 出廠表，由機器表產生，勿手改
 include/secrets.h     本機熱點密碼，不進 git

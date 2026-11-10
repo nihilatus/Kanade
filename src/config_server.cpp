@@ -67,31 +67,31 @@ static void handle_get() {
 }
 
 static bool write_chords_file(const uint8_t *data, size_t len) {
-  static constexpr char kTmp[] = "/chords.json.tmp";
-  static constexpr char kBak[] = "/chords.json.bak";
-
-  LittleFS.remove(kTmp);
-  File file = LittleFS.open(kTmp, "w");
+  // .tmp is closed before chords.json moves aside. A power cut between
+  // renaming chords.json to .bak and renaming .tmp to chords.json leaves
+  // those two files only; try_load_saved() adopts .tmp, then .bak.
+  LittleFS.remove(kChordsTmpPath);
+  File file = LittleFS.open(kChordsTmpPath, "w");
   if (!file) return false;
   const size_t wrote = file.write(data, len);
   file.close();
   if (wrote != len) {
-    LittleFS.remove(kTmp);
+    LittleFS.remove(kChordsTmpPath);
     return false;
   }
 
-  LittleFS.remove(kBak);
+  LittleFS.remove(kChordsBakPath);
   const bool had = LittleFS.exists(kChordsPath);
-  if (had && !LittleFS.rename(kChordsPath, kBak)) {
-    LittleFS.remove(kTmp);
+  if (had && !LittleFS.rename(kChordsPath, kChordsBakPath)) {
+    LittleFS.remove(kChordsTmpPath);
     return false;
   }
-  if (!LittleFS.rename(kTmp, kChordsPath)) {
-    if (had) LittleFS.rename(kBak, kChordsPath);
-    LittleFS.remove(kTmp);
+  if (!LittleFS.rename(kChordsTmpPath, kChordsPath)) {
+    if (had) LittleFS.rename(kChordsBakPath, kChordsPath);
+    LittleFS.remove(kChordsTmpPath);
     return false;
   }
-  LittleFS.remove(kBak);
+  LittleFS.remove(kChordsBakPath);
   return true;
 }
 
@@ -142,8 +142,8 @@ static void handle_reset() {
     }
   }
   if (chords_fs_ready()) {
-    LittleFS.remove("/chords.json.tmp");
-    LittleFS.remove("/chords.json.bak");
+    LittleFS.remove(kChordsTmpPath);
+    LittleFS.remove(kChordsBakPath);
   }
   chords_load_factory();
 

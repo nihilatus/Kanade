@@ -10,9 +10,11 @@ const ButtonDef kButtons[BTN_COUNT] = {
     {12, "RD"}, {13, "RT0"}, {14, "RT1"}, {21, "RT2"},
 };
 
-// Both edges. Cheap tactiles usually finish bouncing inside 10 ms;
-// 15 ms keeps a short chord without treating a noisy edge as a new press.
-static constexpr uint8_t kDebounceMs = 15;
+// Both edges. Cheap tactiles usually finish bouncing inside 10 ms.
+// 8 ms is a trial: the chord engine waits again after this mask is empty,
+// so a longer debounce mostly adds release latency. Raise if a noisy edge
+// splits a chord or repeats a key.
+static constexpr uint8_t kDebounceMs = 8;
 
 static bool raw_down[BTN_COUNT];
 static bool stable_down[BTN_COUNT];

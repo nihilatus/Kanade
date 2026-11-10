@@ -4,10 +4,13 @@
 #include <stdint.h>
 
 // Chord engine. Tracks the largest simultaneous set while any key is down,
-// confirms full release for 25 ms, then matches the live table once.
+// confirms full release for 10 ms, then matches the live table once.
 //
-// Boot loads /chords.json from LittleFS when the file is valid. Otherwise the
-// live table is a copy of the compiled factory rows in include/chord_map.inc.
+// Boot loads /chords.json from LittleFS when the file is valid. If that file
+// is missing, a complete /chords.json.tmp is checked first, then
+// /chords.json.bak; a file that validates is renamed back to /chords.json.
+// Otherwise the live table is a copy of the compiled factory rows in
+// include/chord_map.inc.
 // Matching is unchanged: required ⊆ mask ⊆ required ∪ optional, then more
 // required bits, fewer optional bits, smaller id.
 
@@ -17,6 +20,8 @@ void chords_poll();  // call after buttons_poll()
 static constexpr size_t kChordsMaxRows = 256;
 static constexpr size_t kChordsJsonMax = 48 * 1024;
 static constexpr char kChordsPath[] = "/chords.json";
+static constexpr char kChordsTmpPath[] = "/chords.json.tmp";
+static constexpr char kChordsBakPath[] = "/chords.json.bak";
 
 struct ChordView {
   uint16_t id;

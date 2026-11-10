@@ -36,9 +36,13 @@ static_assert(kFactoryCount > 0, "factory chord table is empty");
 static_assert(kFactoryCount <= kChordsMaxRows, "factory chord table exceeds kChordsMaxRows");
 static_assert(BTN_COUNT <= 16, "buttons_mask is uint16_t");
 
-static ChordRule g_live[kChordsMaxRows];
+// Rule rows and the string pool their kana/output pointers reference.
+// chords_begin() takes both from PSRAM (about 4 KB + 30 KB). Matching only
+// reads them, which is fine at PSRAM speed, and this leaves internal RAM for
+// the WiFi stack. The JSON DOM allocator below does the same.
+static ChordRule *g_live = nullptr;
 static size_t g_live_count = 0;
-static char g_pool[kPoolSize];
+static char *g_pool = nullptr;
 static bool g_from_file = false;
 static bool g_fs = false;
 
@@ -48,9 +52,10 @@ static size_t g_stage_count = 0;
 static size_t g_stage_pool_used = 0;
 static bool g_staged = false;
 
-// After the debounced mask is empty, wait this long before firing so a
-// release bounce cannot split the chord or send it twice.
-static constexpr uint32_t kReleaseGuardMs = 25;
+// Debounce has already required the raw level to hold before this mask
+// goes empty. This second wait only covers a bounce that returns after
+// that stable release. 10 ms is a trial; raise it if a chord splits.
+static constexpr uint32_t kReleaseGuardMs = 10;
 
 enum class Phase : uint8_t { Idle, Holding, ReleaseGuard };
 
@@ -86,6 +91,22 @@ static bool set_row_err(char *err, size_t err_len, unsigned row, const char *msg
     snprintf(err, err_len, "第 %u 列%s", row, msg);
   }
   return false;
+}
+
+static void *alloc_spiram_first(size_t size) {
+  void *p = ps_malloc(size);
+  if (p == nullptr) p = malloc(size);
+  return p;
+}
+
+static bool ensure_live_bufs() {
+  if (g_live == nullptr) {
+    g_live = static_cast<ChordRule *>(alloc_spiram_first(sizeof(ChordRule) * kChordsMaxRows));
+  }
+  if (g_pool == nullptr) {
+    g_pool = static_cast<char *>(alloc_spiram_first(kPoolSize));
+  }
+  return g_live != nullptr && g_pool != nullptr;
 }
 
 static bool ensure_stage_bufs() {
@@ -217,6 +238,7 @@ static void log_chord(const char *kind, uint16_t id, uint16_t mask, const char *
 }
 
 static int find_rule(uint16_t mask) {
+  if (g_live == nullptr) return -1;
   int best = -1;
   int best_req = -1;
   int best_opt = 255;
@@ -282,6 +304,11 @@ void chords_drop_staged() {
 
 void chords_load_factory() {
   chords_drop_staged();
+  if (!ensure_live_bufs()) {
+    g_live_count = 0;
+    g_from_file = false;
+    return;
+  }
   for (size_t i = 0; i < kFactoryCount; ++i) g_live[i] = kFactory[i];
   for (size_t i = kFactoryCount; i < kChordsMaxRows; ++i) {
     g_live[i].id = 0;
@@ -381,6 +408,7 @@ bool chords_stage_json(const char *json, size_t len, char *err, size_t err_len) 
 
 void chords_commit_staged() {
   if (!g_staged || g_stage_rules == nullptr || g_stage_pool == nullptr) return;
+  if (!ensure_live_bufs()) return;
   memcpy(g_live, g_stage_rules, g_stage_count * sizeof(ChordRule));
   memcpy(g_pool, g_stage_pool, g_stage_pool_used);
   for (size_t i = 0; i < g_stage_count; ++i) {
@@ -441,53 +469,120 @@ static void log_factory(const char *why) {
   console_println(line);
 }
 
-static void try_load_saved() {
-  if (!g_fs) {
-    log_factory("no filesystem");
-    return;
-  }
-  if (!LittleFS.exists(kChordsPath)) {
-    log_factory("");
-    return;
-  }
+enum class LoadResult : uint8_t { Ok, Rejected, NoMemory };
 
-  File file = LittleFS.open(kChordsPath, "r");
+static void log_loaded() {
+  char line[80];
+  snprintf(line, sizeof(line), "chords: loaded %u rows from %s", static_cast<unsigned>(g_live_count),
+           kChordsPath);
+  console_println(line);
+}
+
+// On Ok the JSON is staged. Caller drops the stage on every other result.
+static LoadResult stage_saved(const char *path, char *err, size_t err_len) {
+  File file = LittleFS.open(path, "r");
   if (!file) {
-    log_factory("could not open saved table");
-    return;
+    set_err(err, err_len, "could not open saved table");
+    return LoadResult::Rejected;
   }
   const size_t n = file.size();
   if (n == 0 || n > kChordsJsonMax) {
     file.close();
-    log_factory("saved table rejected (too large)");
-    return;
+    set_err(err, err_len, "saved table rejected (too large)");
+    return LoadResult::Rejected;
   }
 
   char *buf = static_cast<char *>(ps_malloc(n + 1));
   if (buf == nullptr) buf = static_cast<char *>(malloc(n + 1));
   if (buf == nullptr) {
     file.close();
-    log_factory("saved table rejected (no memory)");
-    return;
+    set_err(err, err_len, "saved table rejected (no memory)");
+    return LoadResult::NoMemory;
   }
   const size_t got = file.read(reinterpret_cast<uint8_t *>(buf), n);
   file.close();
   buf[got] = '\0';
 
-  char err[160];
-  err[0] = '\0';
-  const bool ok = got == n && chords_stage_json(buf, got, err, sizeof(err));
+  const bool ok = got == n && chords_stage_json(buf, got, err, err_len);
   free(buf);
   if (!ok) {
+    if (err[0] == '\0') set_err(err, err_len, "saved table rejected");
+    if (strcmp(err, "記憶體不足") == 0) return LoadResult::NoMemory;
+    return LoadResult::Rejected;
+  }
+  return LoadResult::Ok;
+}
+
+// Power loss can leave a finished .tmp (and the previous .bak) with no
+// chords.json. Validate before renaming so a bad file is never installed.
+// *halt: stop looking — this file may be the newer copy and could not be judged.
+static bool restore_orphan(const char *path, bool *halt, char *err, size_t err_len) {
+  *halt = false;
+  if (!LittleFS.exists(path)) return false;
+
+  const LoadResult result = stage_saved(path, err, err_len);
+  if (result == LoadResult::NoMemory) {
+    chords_drop_staged();
+    *halt = true;
+    log_factory(err[0] != '\0' ? err : "saved table rejected (no memory)");
+    return false;
+  }
+  if (result != LoadResult::Ok) {
+    chords_drop_staged();
+    return false;
+  }
+  if (!LittleFS.rename(path, kChordsPath)) {
+    chords_drop_staged();
+    *halt = true;
+    log_factory("could not restore saved table");
+    return false;
+  }
+  chords_commit_staged();
+  if (!g_from_file) {
+    chords_drop_staged();
+    *halt = true;
+    log_factory("no memory for live table");
+    return false;
+  }
+  char line[96];
+  snprintf(line, sizeof(line), "chords: restored %s", path);
+  console_println(line);
+  log_loaded();
+  return true;
+}
+
+static void try_load_saved() {
+  if (!g_fs) {
+    log_factory("no filesystem");
+    return;
+  }
+
+  char err[160];
+  err[0] = '\0';
+  if (!LittleFS.exists(kChordsPath)) {
+    bool halt = false;
+    if (restore_orphan(kChordsTmpPath, &halt, err, sizeof(err))) return;
+    if (halt) return;
+    if (restore_orphan(kChordsBakPath, &halt, err, sizeof(err))) return;
+    if (halt) return;
+    const bool saw = LittleFS.exists(kChordsTmpPath) || LittleFS.exists(kChordsBakPath);
+    log_factory(saw ? (err[0] != '\0' ? err : "saved table rejected") : "");
+    return;
+  }
+
+  const LoadResult result = stage_saved(kChordsPath, err, sizeof(err));
+  if (result != LoadResult::Ok) {
     chords_drop_staged();
     log_factory(err[0] != '\0' ? err : "saved table rejected");
     return;
   }
   chords_commit_staged();
-  char line[80];
-  snprintf(line, sizeof(line), "chords: loaded %u rows from %s", static_cast<unsigned>(g_live_count),
-           kChordsPath);
-  console_println(line);
+  if (!g_from_file) {
+    chords_drop_staged();
+    log_factory("no memory for live table");
+    return;
+  }
+  log_loaded();
 }
 
 void chords_begin() {

@@ -43,7 +43,7 @@ Bare `RT0` (no parentheses) is a normal required key (e.g. あ → `keys_require
 
 1. Track keys while the chord is held.
 2. Let `max_chord` be the **maximum simultaneous** down-set observed during the hold (largest `|pressed|` snapshot; if tied, use the latest such snapshot).
-3. Fire **once** on **full release** (transition to no keys down). Firmware confirms release only after the debounced mask stays empty for **25 ms**, so contact bounce on the way up does not split the chord or send it twice. Each key becomes stable only after its raw level holds for **15 ms**.
+3. Fire **once** on **full release** (transition to no keys down). Firmware confirms release only after the debounced mask stays empty for **10 ms**, so a bounce that returns after the stable release does not split the chord or send it twice. Each key becomes stable only after its raw level holds for **8 ms**.
 4. Skip if `max_chord` is empty or the matched row’s `output` is empty (empty outputs are not present in this CSV). A mask that matches no row is not sent.
 
 ## Matching rule
