@@ -20,6 +20,7 @@ void hid_type_romaji(const char *text);
 // Space-separated recipe from the chord table:
 //   "nn" "kome"     each character as a key
 //   "Shift+1"       modifiers plus one key, then release
+//   "+"             the plus character; "Shift++" is Shift and plus
 //   "Backspace"     named HID key (also Space, Enter, Esc, [ESC], arrows)
 // An unrecognized token is logged and skipped.
 // If a previous recipe is still playing, this one is appended after a

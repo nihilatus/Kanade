@@ -176,6 +176,8 @@ static bool queue_busy() {
 // returns true and logs a skip.
 static bool queue_modifier_combo(const char *token, HidEvent *out, size_t cap, size_t *count) {
   if (strchr(token, '+') == nullptr) return false;
+  // A lone "+" is the plus character, not a modifier chord.
+  if (token[0] == '+' && token[1] == '\0') return false;
 
   char buf[24];
   const size_t len = strlen(token);
@@ -193,10 +195,13 @@ static bool queue_modifier_combo(const char *token, HidEvent *out, size_t cap, s
     parts[n++] = cursor;
     char *plus = strchr(cursor, '+');
     if (plus == nullptr) break;
+    // The last component may itself be "+": "Shift++" is Shift and plus.
+    if (plus[1] == '\0') break;
     *plus = '\0';
     cursor = plus + 1;
   }
-  if (n < 2 || strchr(cursor, '+') != nullptr || n - 1 > 4) {
+  const bool last_is_plus = cursor[0] == '+' && cursor[1] == '\0';
+  if (n < 2 || (strchr(cursor, '+') != nullptr && !last_is_plus) || n - 1 > 4) {
     log_skip(token);
     *count = 0;
     return true;
