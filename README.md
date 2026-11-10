@@ -16,7 +16,7 @@
 | 板子 | ESP32-S3-DevKitC-1 **N16R8** |
 | 輸入 | **14 顆**離散按鍵（無類比 stick） |
 | 輸出 | 羅馬字／快捷鍵配方 → 主機日文 IME |
-| 現況 | 14 鍵直連採樣、`kChordDebounceMs` 消彈跳；預設全放 `kChordReleaseGuardMs` 後送出，可改成首鍵放開就送 |
+| 現況 | 14 鍵直連採樣、`kChordDebounceMs` 消彈跳；[送出時機](#輸入邏輯) |
 
 ---
 
@@ -85,14 +85,14 @@
 | 檔案 | 用途 |
 | --- | --- |
 | [`esp32-jis-chordboard-premapping.csv`](esp32-jis-chordboard-premapping.csv) | **人編**和弦表，唯一可手改的來源 |
-| [`data/chord_map.machine.csv`](data/chord_map.machine.csv) | **機器**表，由下一支腳本產生；韌體與試打頁讀這份 |
+| [`data/chord_map.machine.csv`](data/chord_map.machine.csv) | **機器**表，由下列腳本產生；韌體與試打頁讀這份 |
 | [`docs/chord-map-machine.md`](docs/chord-map-machine.md) | 欄位、RT0、觸發與比對 |
-| [`tools/build_chord_map_machine.py`](tools/build_chord_map_machine.py) | 人表 → 機器表 |
+| [`tools/build_chord_map_machine.py`](tools/build_chord_map_machine.py) | 人表 → 機器表與 [`include/chord_map.inc`](include/chord_map.inc) |
+| [`tools/prebuild_chord_map.py`](tools/prebuild_chord_map.py) | PlatformIO 編譯前掛鉤，只呼叫上一支 |
 
-`pio run` 與 `pio run -t upload` 會在編譯前自動重建機器表與韌體用的 [`include/chord_map.inc`](include/chord_map.inc)。人表有未知鍵名，或同一組鍵對到不同輸出時，建置會失敗。只想更新 CSV、還不編譯時：
+`build_chord_map_machine.py` 做轉換；`prebuild_chord_map.py` 不做轉換，只在 `pio run` 編譯前轉呼叫它。`pio run` 與 `pio run -t upload` 會因此重建機器表與韌體用的 include。人表有未知鍵名，或同一組鍵對到不同輸出時，建置會失敗。只想更新 CSV、還不編譯時，在專案根目錄執行：
 
 ```bat
-cd /d "E:\cline play\esp32-jis-keyboard"
 python tools/build_chord_map_machine.py
 ```
 
@@ -104,10 +104,9 @@ python tools/build_chord_map_machine.py
 
 [`web/index.html`](web/index.html) 用電腦鍵盤模擬 14 顆和弦鍵，不必接開發板，也不送 USB HID。判讀規則與韌體相同（最大同時集合、全放 `kChordReleaseGuardMs` 或首鍵放開就送、`required`／`optional`、較具體的列優先）。電腦鍵盤的按下／放開已經是穩定邊緣，所以不做韌體的 `kChordDebounceMs` GPIO 消彈跳。頁首「全放再送／首鍵放開就送」只存在這個瀏覽器，用來對照手感。
 
-頁面用相對路徑讀 [`data/chord_map.machine.csv`](data/chord_map.machine.csv)，要從專案根目錄開一個本機伺服器，直接用檔案開啟讀不到表：
+頁面用相對路徑讀 [`data/chord_map.machine.csv`](data/chord_map.machine.csv)。在專案根目錄開一個本機伺服器，直接用檔案開啟讀不到表：
 
 ```bat
-cd /d "E:\cline play\esp32-jis-keyboard"
 python -m http.server 8765
 ```
 
@@ -137,10 +136,9 @@ python -m http.server 8765
 
 ### 建置與燒錄（Windows）
 
-需 [PlatformIO Core](https://platformio.org/install/cli) 或 VS Code／Cursor 的 PlatformIO 擴充。
+需 [PlatformIO Core](https://platformio.org/install/cli) 或 VS Code／Cursor 的 PlatformIO 擴充。在專案根目錄執行：
 
 ```bat
-cd /d "E:\cline play\esp32-jis-keyboard"
 pio run
 pio run -t upload
 pio device monitor
@@ -160,7 +158,7 @@ pio device monitor
 | --- | --- |
 | PlatformIO + Arduino + TinyUSB HID 鍵盤 | VID/PID 仍是原型值 |
 | 14 鍵直連、每鍵 `kChordDebounceMs` 穩定消彈跳 | 自訂 JIS HID report／國碼 |
-| 全放 `kChordReleaseGuardMs` 或首鍵放開就送，可切換並存進 NVS；沒有存檔時用 `CHORD_FIRE_DEFAULT_FIRST`；手機熱點可改表並存進 LittleFS | 連發 |
+| [送出時機](#輸入邏輯)；手機熱點可改表並存進 LittleFS | 連發 |
 | 配方送出（羅馬字、`Shift+1`、`Backspace`、`Ctrl+i` 等）；一般鍵盤試打頁 | 外殼／PCB |
 
 出廠表仍由 `include/chord_map.inc` 編譯進去。改人表後，下一次 `pio run` 會重建機器表，燒錄才會更新出廠內容；手機上儲存的表會蓋過它，直到在網頁還原出廠。
