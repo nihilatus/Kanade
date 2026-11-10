@@ -4,7 +4,12 @@
 #include <stdint.h>
 
 // Chord engine. Tracks the largest simultaneous set while any key is down,
-// confirms full release for 10 ms, then matches the live table once.
+// then matches the live table once.
+//
+// Two send timings, stored in NVS and switchable at runtime:
+//   "release" — wait until every key is up, then 10 ms, then send.
+//   "first"   — after the peak, send when the first peak key goes up, then
+//               drain until every key is up before a new chord can start.
 //
 // Boot loads /chords.json from LittleFS when the file is valid. If that file
 // is missing, a complete /chords.json.tmp is checked first, then
@@ -16,6 +21,10 @@
 
 void chords_begin();
 void chords_poll();  // call after buttons_poll()
+
+// "release" or "first". Setter returns false for any other name.
+const char *chords_fire_mode_name();
+bool chords_set_fire_mode_name(const char *name);
 
 static constexpr size_t kChordsMaxRows = 256;
 static constexpr size_t kChordsJsonMax = 48 * 1024;

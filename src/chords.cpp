@@ -5,6 +5,7 @@
 
 #include <ArduinoJson.h>
 #include <LittleFS.h>
+#include <Preferences.h>
 #include <esp_heap_caps.h>
 
 #include "buttons.h"
@@ -55,11 +56,17 @@ static bool g_staged = false;
 // Debounce has already required the raw level to hold before this mask
 // goes empty. This second wait only covers a bounce that returns after
 // that stable release. 10 ms is a trial; raise it if a chord splits.
+// ReleaseAll waits this long before sending. FirstUp sends on the first
+// peak-key release and does not use this wait.
 static constexpr uint32_t kReleaseGuardMs = 10;
+static constexpr char kPrefsNs[] = "jis";
+static constexpr char kPrefsFire[] = "fire";
 
-enum class Phase : uint8_t { Idle, Holding, ReleaseGuard };
+enum class Phase : uint8_t { Idle, Holding, ReleaseGuard, Draining };
+enum class FireMode : uint8_t { ReleaseAll = 0, FirstUp = 1 };
 
 static Phase g_phase = Phase::Idle;
+static FireMode g_fire_mode = FireMode::ReleaseAll;
 static uint16_t g_max_chord = 0;
 static uint8_t g_max_count = 0;
 static uint32_t g_guard_since = 0;
@@ -190,6 +197,21 @@ static void note_snapshot(uint16_t mask) {
   }
 }
 
+static bool peak_broken(uint16_t mask) {
+  return g_max_count > 0 && (mask & g_max_chord) != g_max_chord;
+}
+
+static void clear_peak() {
+  g_max_chord = 0;
+  g_max_count = 0;
+}
+
+static void begin_hold(uint16_t mask) {
+  g_phase = Phase::Holding;
+  clear_peak();
+  note_snapshot(mask);
+}
+
 static void format_mask(uint16_t mask, char *buf, size_t buflen) {
   if (buflen == 0) return;
   buf[0] = '\0';
@@ -262,6 +284,68 @@ static int find_rule(uint16_t mask) {
     best_id = row.id;
   }
   return best;
+}
+
+static void fire(uint16_t mask);  // defined below; send path uses the live table
+
+static void fire_peak() {
+  const uint16_t chord = g_max_chord;
+  clear_peak();
+  fire(chord);
+}
+
+static const char *fire_mode_name(FireMode mode) {
+  return mode == FireMode::FirstUp ? "first" : "release";
+}
+
+static void log_fire_mode() {
+  char line[120];
+  if (g_fire_mode == FireMode::FirstUp) {
+    snprintf(line, sizeof(line),
+             "送出模式：首鍵放開就送（高峰後第一顆放開即送，其餘放開前不接新和弦）");
+  } else {
+    snprintf(line, sizeof(line), "送出模式：全放再送（全部放開並維持 %u ms）",
+             static_cast<unsigned>(kReleaseGuardMs));
+  }
+  console_println(line);
+}
+
+static void load_fire_mode() {
+  Preferences prefs;
+  if (!prefs.begin(kPrefsNs, true)) return;
+  const uint8_t stored = prefs.getUChar(kPrefsFire, 0);
+  prefs.end();
+  g_fire_mode = stored == 1 ? FireMode::FirstUp : FireMode::ReleaseAll;
+}
+
+static void save_fire_mode() {
+  Preferences prefs;
+  if (!prefs.begin(kPrefsNs, false)) {
+    console_println("送出模式這次沒寫進記憶體，重開機會回到上次成功的設定");
+    return;
+  }
+  prefs.putUChar(kPrefsFire, g_fire_mode == FireMode::FirstUp ? 1 : 0);
+  prefs.end();
+}
+
+const char *chords_fire_mode_name() { return fire_mode_name(g_fire_mode); }
+
+bool chords_set_fire_mode_name(const char *name) {
+  if (name == nullptr) return false;
+  FireMode next;
+  if (strcmp(name, "release") == 0) next = FireMode::ReleaseAll;
+  else if (strcmp(name, "first") == 0) next = FireMode::FirstUp;
+  else return false;
+
+  if (next != g_fire_mode && next == FireMode::FirstUp && g_phase == Phase::ReleaseGuard) {
+    // The chord is already fully up; don't keep waiting out the empty guard.
+    fire_peak();
+    g_phase = Phase::Idle;
+  }
+  g_fire_mode = next;
+  save_fire_mode();
+  log_fire_mode();
+  return true;
 }
 
 static void fire(uint16_t mask) {
@@ -587,11 +671,13 @@ static void try_load_saved() {
 
 void chords_begin() {
   g_phase = Phase::Idle;
-  g_max_chord = 0;
-  g_max_count = 0;
+  clear_peak();
   g_guard_since = 0;
 
   console_ensure();
+  load_fire_mode();
+  log_fire_mode();
+  console_println("序列指令：fire release | fire first");
   g_fs = LittleFS.begin(true);
   chords_load_factory();
   try_load_saved();
@@ -603,16 +689,20 @@ void chords_poll() {
 
   switch (g_phase) {
     case Phase::Idle:
-      if (mask != 0) {
-        g_phase = Phase::Holding;
-        g_max_chord = 0;
-        g_max_count = 0;
-        note_snapshot(mask);
-      }
+      if (mask != 0) begin_hold(mask);
       break;
 
     case Phase::Holding:
-      if (mask == 0) {
+      if (g_fire_mode == FireMode::FirstUp) {
+        if (peak_broken(mask)) {
+          // A key that belonged to the peak went up. Send that peak now.
+          // Keys still down are the tail, not the start of the next chord.
+          fire_peak();
+          g_phase = mask == 0 ? Phase::Idle : Phase::Draining;
+        } else {
+          note_snapshot(mask);
+        }
+      } else if (mask == 0) {
         g_phase = Phase::ReleaseGuard;
         g_guard_since = now;
       } else {
@@ -626,12 +716,15 @@ void chords_poll() {
         g_phase = Phase::Holding;
         note_snapshot(mask);
       } else if ((now - g_guard_since) >= kReleaseGuardMs) {
-        const uint16_t chord = g_max_chord;
         g_phase = Phase::Idle;
-        g_max_chord = 0;
-        g_max_count = 0;
-        fire(chord);
+        fire_peak();
       }
+      break;
+
+    case Phase::Draining:
+      // FirstUp already sent. Ignore presses until the board is clear,
+      // otherwise the tail and the next chord merge into one mask.
+      if (mask == 0) g_phase = Phase::Idle;
       break;
   }
 }
