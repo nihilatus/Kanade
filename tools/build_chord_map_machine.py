@@ -1,0 +1,210 @@
+#!/usr/bin/env python3
+"""Convert Augustine human premapping CSV → machine-readable chord map."""
+
+from __future__ import annotations
+
+import csv
+import re
+from collections import defaultdict
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "eps32jischordboard-premapping.csv"
+OUT = ROOT / "data" / "chord_map.machine.csv"
+
+KEY_ORDER = [
+    "LL",
+    "LU",
+    "LR",
+    "LD",
+    "LT0",
+    "LT1",
+    "LT2",
+    "RL",
+    "RU",
+    "RR",
+    "RD",
+    "RT0",
+    "RT1",
+    "RT2",
+]
+KEY_RANK = {k: i for i, k in enumerate(KEY_ORDER)}
+
+
+def sort_keys(keys: set[str]) -> list[str]:
+    return sorted(keys, key=lambda k: KEY_RANK.get(k, 1000 + hash(k)))
+
+
+def clean_category(raw: str) -> str | None:
+    """Return a short tag, '' to clear, or None to keep previous category.
+
+    Pure rank/percentage summaries (e.g. \"8\\n5.4%\") are ignored so they
+    do not pollute following rows. Named section headers update the tag.
+    """
+    if not raw:
+        return None
+    lines = [ln.strip() for ln in raw.replace("\r", "").split("\n") if ln.strip()]
+    if not lines:
+        return None
+    preferred = []
+    for ln in lines:
+        ln2 = ln
+        # Peel leading rank / percent crumbs: "12 2.9%單Y" → "單Y"
+        while True:
+            nxt = re.sub(r"^\d+(\.\d+)?%\s*", "", ln2)
+            nxt = re.sub(r"^\d+\s+", "", nxt).strip()
+            if nxt == ln2:
+                break
+            ln2 = nxt
+        if not ln2 or ln2 == "+":
+            continue
+        if re.fullmatch(r"\d+(\.\d+)?%?", ln2):
+            continue
+        preferred.append(ln2)
+    if not preferred:
+        # Rank-only cell: keep previous category
+        return None
+    # Prefer the first clearly descriptive label
+    text = preferred[0]
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def parse_key_field(field: str) -> tuple[set[str], set[str]]:
+    """Return (required, optional) key tokens from one CSV cell."""
+    required: set[str] = set()
+    optional: set[str] = set()
+    if not field or not field.strip():
+        return required, optional
+    for part in field.split("+"):
+        tok = part.strip()
+        if not tok:
+            continue
+        optional_flag = tok.startswith("(") and tok.endswith(")")
+        if optional_flag:
+            inner = tok[1:-1].strip()
+            if inner not in KEY_RANK:
+                raise ValueError(f"Unknown optional key token: {tok!r}")
+            optional.add(inner)
+            continue
+        if tok not in KEY_RANK:
+            raise ValueError(f"Unknown key token: {tok!r} in field {field!r}")
+        required.add(tok)
+    return required, optional
+
+
+def main() -> None:
+    rows_out: list[dict[str, str]] = []
+    current_category = ""
+    omitted_empty = 0
+    parse_errors: list[str] = []
+
+    with SRC.open(encoding="utf-8-sig", newline="") as f:
+        reader = csv.reader(f)
+        header = next(reader)
+        # Expect 7 logical columns; tolerate trailing empties.
+        for lineno, raw in enumerate(reader, start=2):
+            # Pad/truncate to 7
+            cells = (raw + [""] * 7)[:7]
+            summary, kana, output, left_f, right_f, left_t, right_t = [
+                c.strip() for c in cells
+            ]
+            if summary:
+                cat = clean_category(summary)
+                if cat is not None:
+                    current_category = cat
+
+            if not kana and not output:
+                omitted_empty += 1
+                continue
+
+            req: set[str] = set()
+            opt: set[str] = set()
+            try:
+                for field in (left_f, right_f, left_t, right_t):
+                    r, o = parse_key_field(field)
+                    req |= r
+                    opt |= o
+            except ValueError as e:
+                parse_errors.append(f"line {lineno}: {e}")
+                continue
+
+            # Optional must not also be required
+            opt -= req
+
+            rows_out.append(
+                {
+                    "id": str(len(rows_out) + 1),
+                    "kana": kana,
+                    "output": output,
+                    "keys_required": "+".join(sort_keys(req)),
+                    "keys_optional": "+".join(sort_keys(opt)),
+                    "category": current_category,
+                }
+            )
+
+    # Conflict report: identical (required, optional) with different outputs
+    by_keys: dict[tuple[str, str], list[dict[str, str]]] = defaultdict(list)
+    for r in rows_out:
+        by_keys[(r["keys_required"], r["keys_optional"])].append(r)
+
+    conflicts: list[str] = []
+    soft_dups: list[str] = []
+    for (req, opt), group in sorted(by_keys.items(), key=lambda x: int(x[1][0]["id"])):
+        outputs = {g["output"] for g in group}
+        if len(group) > 1 and len(outputs) > 1:
+            conflicts.append(
+                f"CONFLICT keys_required={req!r} keys_optional={opt!r}: "
+                + "; ".join(f"id={g['id']} kana={g['kana']!r} output={g['output']!r}" for g in group)
+            )
+        elif len(group) > 1:
+            soft_dups.append(
+                f"DUP-SAME-OUTPUT keys_required={req!r} keys_optional={opt!r}: "
+                + ", ".join(f"id={g['id']}" for g in group)
+                + f" output={group[0]['output']!r}"
+            )
+
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    with OUT.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=[
+                "id",
+                "kana",
+                "output",
+                "keys_required",
+                "keys_optional",
+                "category",
+            ],
+        )
+        writer.writeheader()
+        writer.writerows(rows_out)
+
+    report = ROOT / "data" / "chord_map.machine.report.txt"
+    with report.open("w", encoding="utf-8") as f:
+        f.write(f"source: {SRC.name}\n")
+        f.write(f"rows_written: {len(rows_out)}\n")
+        f.write(f"omitted_empty_kana_and_output: {omitted_empty}\n")
+        f.write(f"key_codes ({len(KEY_ORDER)}): {', '.join(KEY_ORDER)}\n")
+        f.write(f"parse_errors: {len(parse_errors)}\n")
+        for e in parse_errors:
+            f.write(f"  {e}\n")
+        f.write(f"true_conflicts: {len(conflicts)}\n")
+        for c in conflicts:
+            f.write(f"  {c}\n")
+        f.write(f"same_keys_same_output_dups: {len(soft_dups)}\n")
+        for d in soft_dups:
+            f.write(f"  {d}\n")
+
+    print(f"Wrote {OUT} ({len(rows_out)} rows)")
+    print(f"Omitted empty: {omitted_empty}")
+    print(f"Conflicts: {len(conflicts)}")
+    print(f"Same-output dups: {len(soft_dups)}")
+    print(f"Parse errors: {len(parse_errors)}")
+    for c in conflicts:
+        print(c)
+    for e in parse_errors:
+        print(e)
+
+
+if __name__ == "__main__":
+    main()

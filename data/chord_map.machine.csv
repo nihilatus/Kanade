@@ -1,0 +1,225 @@
+id,kana,output,keys_required,keys_optional,category
+1,ん,nn,LT1,,
+2,っ,ltu,RT1,,
+3,-,-,LT1+RT1,,
+4,,Up,LT0+RU,,
+5,,Down,LT0+RD,,
+6,,Left,LT0+RL,,
+7,,Right,LT0+RR,,
+8,「,[,LL+RT0+RT2,,符號
+9,」,],LR+RT0+RT2,,符號
+10,！,Shift+1,LU+RT0+RT2,,符號
+11,？,Shift+/,LD+RT0+RT2,,符號
+12,『,z [,LL+LU+RT0+RT2,,符號
+13,』,z ],LU+LR+RT0+RT2,,符號
+14,・,/,LL+LD+RT0+RT2,,符號
+15,……,z . z .,LR+LD+RT0+RT2,,符號
+16,（,Shift+8,LT0+LT2+RL,,符號
+17,）,Shift+9,LT0+LT2+RR,,符號
+18,※,kome,LT0+LT2+RU,,符號
+19,○,maru,LT0+LT2+RD,,符號
+20,★ ☆,hosi,LT0+LT2+RL+RU,,符號
+21,―,dassyu,LT0+LT2+RU+RR,,符號
+22,,kigou,LT0+LT2+RL+RD,,符號
+23,→,yajirushi,LT0+LT2+RR+RD,,符號
+24,、,",",LL+LR+LD,,符號
+25,。,.,RL+RR+RD,,符號
+26,退格,Backspace,LT2,,操作功能
+27,空白（變換）,Space,RT2,,操作功能
+28,變片假名,Ctrl+i,LT0+LT2+RT2,,操作功能
+29,變平假名,Ctrl+u,LT2+RL+RR+RT0+RT2,,操作功能
+30,,[ESC],LU+LR+LT0,,操作功能
+31,,Enter,LL+LR+LD+RL+RR+RD,,操作功能
+32,あ,a,RT0,,單母音
+33,い,i,RL,,單母音
+34,う,u,RU,,單母音
+35,え,e,RR,,單母音
+36,お,o,RD,,單母音
+37,や,ya,RU+RR,,單母音
+38,ゆ,yu,RL+RU,,單母音
+39,よ,yo,RL+RD,,單母音
+40,いぇ,ye,RR+RD,,消失又重出的Ye
+41,ぁ,la,LT1+RT0,,小字 單母音+半母音
+42,ぃ,li,LT1+RL,,小字 單母音+半母音
+43,ぅ,lu,LT1+RU,,小字 單母音+半母音
+44,ぇ,le,LT1+RR,,小字 單母音+半母音
+45,ぉ,lo,LT1+RD,,小字 單母音+半母音
+46,ゃ,lya,LT1+RU+RR,,小字 單母音+半母音
+47,ゅ,lyu,LT1+RL+RU,,小字 單母音+半母音
+48,ょ,lyo,LT1+RL+RD,,小字 單母音+半母音
+49,ゎ,lwa,LT1+RR+RD,,小字ゎ
+50,た,ta,LD,RT0,傳統 た 行
+51,ち,ti,LD+RL,,傳統 た 行
+52,つ,tu,LD+RU,,傳統 た 行
+53,て,te,LD+RR,,傳統 た 行
+54,と,to,LD+RD,,傳統 た 行
+55,ちゃ,tya,LD+RU+RR,,傳統 た 行
+56,ちゅ,tyu,LD+RL+RU,,傳統 た 行
+57,ちょ,tyo,LD+RL+RD,,傳統 た 行
+58,か,ka,LU,RT0,傳統 か 行
+59,き,ki,LU+RL,,傳統 か 行
+60,く,ku,LU+RU,,傳統 か 行
+61,け,ke,LU+RR,,傳統 か 行
+62,こ,ko,LU+RD,,傳統 か 行
+63,きゃ,kya,LU+RU+RR,,傳統 か 行
+64,きゅ,kyu,LU+RL+RU,,傳統 か 行
+65,きょ,kyo,LU+RL+RD,,傳統 か 行
+66,な,na,LL,RT0,傳統 な 行
+67,に,ni,LL+RL,,傳統 な 行
+68,ぬ,nu,LL+RU,,傳統 な 行
+69,ね,ne,LL+RR,,傳統 な 行
+70,の,no,LL+RD,,傳統 な 行
+71,にゃ,nya,LL+RU+RR,,傳統 な 行
+72,にゅ,nyu,LL+RL+RU,,傳統 な 行
+73,にょ,nyo,LL+RL+RD,,傳統 な 行
+74,さ,sa,LR,RT0,傳統 さ 行
+75,し,si,LR+RL,,傳統 さ 行
+76,す,su,LR+RU,,傳統 さ 行
+77,せ,se,LR+RR,,傳統 さ 行
+78,そ,so,LR+RD,,傳統 さ 行
+79,しゃ,sya,LR+RU+RR,,傳統 さ 行
+80,しゅ,syu,LR+RL+RU,,傳統 さ 行
+81,しょ,syo,LR+RL+RD,,傳統 さ 行
+82,ら,ra,LL+LD,RT0,傳統 ら 行
+83,り,ri,LL+LD+RL,,傳統 ら 行
+84,る,ru,LL+LD+RU,,傳統 ら 行
+85,れ,re,LL+LD+RR,,傳統 ら 行
+86,ろ,ro,LL+LD+RD,,傳統 ら 行
+87,りゃ,rya,LL+LD+RU+RR,,傳統 ら 行
+88,りゅ,ryu,LL+LD+RL+RU,,傳統 ら 行
+89,りょ,ryo,LL+LD+RL+RD,,傳統 ら 行
+90,ま,ma,LR+LD,RT0,傳統 ま 行
+91,み,mi,LR+LD+RL,,傳統 ま 行
+92,む,mu,LR+LD+RU,,傳統 ま 行
+93,め,me,LR+LD+RR,,傳統 ま 行
+94,も,mo,LR+LD+RD,,傳統 ま 行
+95,みゃ,mya,LR+LD+RU+RR,,傳統 ま 行
+96,みゅ,myu,LR+LD+RL+RU,,傳統 ま 行
+97,みょ,myo,LR+LD+RL+RD,,傳統 ま 行
+98,わ,wa,LL+LU,RT0,外來語 w
+99,うぃ,whi,LL+LU+RL,,外來語 w
+100,う,whu,LL+LU+RU,,外來語 w
+101,うぇ,whe,LL+LU+RR,,外來語 w
+102,を,wo,LL+LU+RD,,外來語 w
+103,うぉ,who,LL+LU+RU+RR,,外來語 w
+104,うぁ,wha,LL+LU+RL+RD,,外來語 w
+105,は,ha,LU+LR,RT0,傳統 は 行
+106,ひ,hi,LU+LR+RL,,傳統 は 行
+107,ふ,hu,LU+LR+RU,,傳統 は 行
+108,へ,he,LU+LR+RR,,傳統 は 行
+109,ほ,ho,LU+LR+RD,,傳統 は 行
+110,ひゃ,hya,LU+LR+RU+RR,,傳統 は 行
+111,ひゅ,hyu,LU+LR+RL+RU,,傳統 は 行
+112,ひょ,hyo,LU+LR+RL+RD,,傳統 は 行
+113,だ,da,LD+RT1,RT0,傳統 だ 行
+114,ぢ,di,LD+RL+RT1,,傳統 だ 行
+115,づ,du,LD+RU+RT1,,傳統 だ 行
+116,で,de,LD+RR+RT1,,傳統 だ 行
+117,ど,do,LD+RD+RT1,,傳統 だ 行
+118,ぢゃ,dya,LD+RU+RR+RT1,,傳統 だ 行
+119,ぢゅ,dyu,LD+RL+RU+RT1,,傳統 だ 行
+120,ぢょ,dyo,LD+RL+RD+RT1,,傳統 だ 行
+121,が,ga,LU+RT1,RT0,傳統 が 行
+122,ぎ,gi,LU+RL+RT1,,傳統 が 行
+123,ぐ,gu,LU+RU+RT1,,傳統 が 行
+124,げ,ge,LU+RR+RT1,,傳統 が 行
+125,ご,go,LU+RD+RT1,,傳統 が 行
+126,ぎゃ,gya,LU+RU+RR+RT1,,傳統 が 行
+127,ぎゅ,gyu,LU+RL+RU+RT1,,傳統 が 行
+128,ぎょ,gyo,LU+RL+RD+RT1,,傳統 が 行
+129,ざ,za,LR+RT1,RT0,傳統 ざ 行
+130,じ,zi,LR+RL+RT1,,傳統 ざ 行
+131,ず,zu,LR+RU+RT1,,傳統 ざ 行
+132,ぜ,ze,LR+RR+RT1,,傳統 ざ 行
+133,ぞ,zo,LR+RD+RT1,,傳統 ざ 行
+134,じゃ,zya,LR+RU+RR+RT1,,傳統 ざ 行
+135,じゅ,zyu,LR+RL+RU+RT1,,傳統 ざ 行
+136,じょ,zyo,LR+RL+RD+RT1,,傳統 ざ 行
+137,ば,ba,LU+LR+RT1,RT0,傳統 ば 行
+138,び,bi,LU+LR+RL+RT1,,傳統 ば 行
+139,ぶ,bu,LU+LR+RU+RT1,,傳統 ば 行
+140,べ,be,LU+LR+RR+RT1,,傳統 ば 行
+141,ぼ,bo,LU+LR+RD+RT1,,傳統 ば 行
+142,びゃ,bya,LU+LR+RU+RR+RT1,,傳統 ば 行
+143,びゅ,byu,LU+LR+RL+RU+RT1,,傳統 ば 行
+144,びょ,byo,LU+LR+RL+RD+RT1,,傳統 ば 行
+145,ぱ,pa,LU+LR+LT1,RT0,傳統 ぱ 行
+146,ぴ,pi,LU+LR+LT1+RL,,傳統 ぱ 行
+147,ぷ,pu,LU+LR+LT1+RU,,傳統 ぱ 行
+148,ぺ,pe,LU+LR+LT1+RR,,傳統 ぱ 行
+149,ぽ,po,LU+LR+LT1+RD,,傳統 ぱ 行
+150,ぴゃ,pya,LU+LR+LT1+RU+RR,,傳統 ぱ 行
+151,ぴゅ,pyu,LU+LR+LT1+RL+RU,,傳統 ぱ 行
+152,ぴょ,pyo,LU+LR+LT1+RL+RD,,傳統 ぱ 行
+153,ふぁ,fa,LL+LU+LT1,RT0,外來語 f
+154,ふぃ,fi,LL+LU+LT1+RL,,外來語 f
+155,ふ,fu,LL+LU+LT1+RU,,外來語 f
+156,ふぇ,fe,LL+LU+LT1+RR,,外來語 f
+157,ふぉ,fo,LL+LU+LT1+RD,,外來語 f
+158,ふゃ,fya,LL+LU+LT1+RU+RR,,外來語 f
+159,ふゅ,fyu,LL+LU+LT1+RL+RU,,外來語 f
+160,ふょ,fyo,LL+LU+LT1+RL+RD,,外來語 f
+161,ゔぁ,va,LL+LU+LT1+RT1,RT0,外來語 v
+162,ゔぃ,vi,LL+LU+LT1+RL+RT1,,外來語 v
+163,ゔ,vu,LL+LU+LT1+RU+RT1,,外來語 v
+164,ゔぇ,ve,LL+LU+LT1+RR+RT1,,外來語 v
+165,ゔぉ,vo,LL+LU+LT1+RD+RT1,,外來語 v
+166,ゔゃ,vya,LL+LU+LT1+RU+RR+RT1,,外來語 v
+167,ゔゅ,vyu,LL+LU+LT1+RL+RU+RT1,,外來語 v
+168,ゔょ,vyo,LL+LU+LT1+RL+RD+RT1,,外來語 v
+169,くぁ,qa,LU+LT1,RT0,外來語 kw
+170,くぃ,qi,LU+LT1+RL,,外來語 kw
+171,く,qu,LU+LT1+RU,,外來語 kw
+172,くぇ,qe,LU+LT1+RR,,外來語 kw
+173,くぉ,qo,LU+LT1+RD,,外來語 kw
+174,ぐぁ,gwa,LU+LT1+RT1,RT0,外來語 gw
+175,ぐぃ,gwi,LU+LT1+RL+RT1,,外來語 gw
+176,ぐぅ,gwu,LU+LT1+RU+RT1,,外來語 gw
+177,ぐぇ,gwe,LU+LT1+RR+RT1,,外來語 gw
+178,ぐぉ,gwo,LU+LT1+RD+RT1,,外來語 gw
+179,しゃ,sya,LR+LT1,RT0,外來語 sh
+180,しぃ,syi,LR+LT1+RL,,外來語 sh
+181,しゅ,syu,LR+LT1+RU,,外來語 sh
+182,しぇ,sye,LR+LT1+RR,,外來語 sh
+183,しょ,syo,LR+LT1+RD,,外來語 sh
+184,しゃ,sya,LR+LT1+RU+RR,,外來語 sh
+185,しゅ,syu,LR+LT1+RL+RU,,外來語 sh
+186,しょ,syo,LR+LT1+RL+RD,,外來語 sh
+187,じゃ,ja,LR+LT1+RT1,RT0,外來語 j
+188,じ,ji,LR+LT1+RL+RT1,,外來語 j
+189,じゅ,ju,LR+LT1+RU+RT1,,外來語 j
+190,じぇ,je,LR+LT1+RR+RT1,,外來語 j
+191,じょ,jo,LR+LT1+RD+RT1,,外來語 j
+192,じゃ,jya,LR+LT1+RU+RR+RT1,,外來語 j
+193,じゅ,jyu,LR+LT1+RL+RU+RT1,,外來語 j
+194,じょ,jyo,LR+LT1+RL+RD+RT1,,外來語 j
+195,ちゃ,cha,LL+LT1,RT0,外來語 ch
+196,ち,chi,LL+LT1+RL,,外來語 ch
+197,ちぇ,che,LL+LT1+RR,,外來語 ch
+198,ちょ,cho,LL+LT1+RD,,外來語 ch
+199,ちゅ,chu,LL+LT1+RL+RU,,外來語 ch
+200,つぁ,tsa,LD+LT1,RT0,外來語 ts
+201,つぃ,tsi,LD+LT1+RL,,外來語 ts
+202,つ,tsu,LD+LT1+RU,,外來語 ts
+203,つぇ,tse,LD+LT1+RR,,外來語 ts
+204,つぉ,tso,LD+LT1+RD,,外來語 ts
+205,てゃ,tha,LR+LD+LT1,RT0,外來語 ti
+206,てぃ,thi,LR+LD+LT1+RL,,外來語 ti
+207,てぇ,the,LR+LD+LT1+RR,,外來語 ti
+208,てょ,tho,LR+LD+LT1+RD,,外來語 ti
+209,てゅ,thu,LR+LD+LT1+RL+RU,,外來語 ti
+210,でゃ,dha,LR+LD+LT1+RT1,RT0,外來語 di
+211,でぃ,dhi,LR+LD+LT1+RL+RT1,,外來語 di
+212,でぇ,dhe,LR+LD+LT1+RR+RT1,,外來語 di
+213,でょ,dho,LR+LD+LT1+RD+RT1,,外來語 di
+214,でゅ,dhu,LR+LD+LT1+RL+RU+RT1,,外來語 di
+215,とぁ,twa,LL+LD+LT1,RT0,外來語 tu
+216,とぃ,twi,LL+LD+LT1+RL,,外來語 tu
+217,とぅ,twu,LL+LD+LT1+RU,,外來語 tu
+218,とぇ,twe,LL+LD+LT1+RR,,外來語 tu
+219,とぉ,two,LL+LD+LT1+RD,,外來語 tu
+220,どぁ,dwa,LL+LD+LT1+RT1,RT0,外來語 du
+221,どぃ,dwi,LL+LD+LT1+RL+RT1,,外來語 du
+222,どぅ,dwu,LL+LD+LT1+RU+RT1,,外來語 du
+223,どぇ,dwe,LL+LD+LT1+RR+RT1,,外來語 du
+224,どぉ,dwo,LL+LD+LT1+RD+RT1,,外來語 du
