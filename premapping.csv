@@ -1,0 +1,33 @@
+手把原先操作,前置輸入代號,matrix_row,matrix_col,實體鍵名
+左蘑菇頭 上,01,0,0,Left N
+左蘑菇頭 下,02,0,4,Left S
+左蘑菇頭 左,03,1,0,Left W
+左蘑菇頭 右,04,0,2,Left E
+左蘑菇頭 左上,05,1,1,Left NW
+左蘑菇頭 右上,06,0,1,Left NE
+左蘑菇頭 左下,07,0,5,Left SW
+左蘑菇頭 右下,08,0,3,Left SE
+左蘑菇頭 置中 按下,09,1,2,Left Center
+L1 按下,31,4,2,L1
+L2 按下,39,4,3,L2
+按鍵 上,38,3,0,D-pad Up
+按鍵 下,32,3,1,D-pad Down
+按鍵 左,34,3,2,D-pad Left
+按鍵 右,36,3,3,D-pad Right
+Select,00,5,1,Select
+右蘑菇頭 上,11,1,3,Right N
+右蘑菇頭 下,12,2,1,Right S
+右蘑菇頭 左,13,2,3,Right W
+右蘑菇頭 右,14,1,5,Right E
+右蘑菇頭 左上,15,2,4,Right NW
+右蘑菇頭 右上,16,1,4,Right NE
+右蘑菇頭 左下,17,2,2,Right SW
+右蘑菇頭 右下,18,2,0,Right SE
+右蘑菇頭 置中 按下,19,2,5,Right Center
+R1 按下,41,4,4,R1
+R2 按下,49,4,5,R2
+Y,48,4,1,Y
+A,42,3,4,A
+X,44,4,0,X
+B,46,3,5,B
+Start,10,5,0,Start

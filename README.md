@@ -19,7 +19,8 @@ Device looks like a USB keyboard (not a gamepad). Chord → romaji runs on the M
 | Reserved | **GPIO19 / GPIO20** — USB data; do not wire matrix lines |
 
 **Input hardware:** **6×6 diode key matrix** (12 GPIOs: rows 1–6, cols 7–12).  
-Pin / cell map: [`docs/pinout.md`](docs/pinout.md) · Parts: [`docs/bom.md`](docs/bom.md)
+Pin / cell map: [`docs/pinout.md`](docs/pinout.md) · Parts: [`docs/bom.md`](docs/bom.md)  
+Config / CSV layout: [`docs/config-plan.md`](docs/config-plan.md) · Premapping (32 unique IDs): [`docs/esp32-jis-chordboard-premapping.csv`](docs/esp32-jis-chordboard-premapping.csv) · Chord table copy: [`data/mapping_table.csv`](data/mapping_table.csv)
 
 ---
 
@@ -91,6 +92,11 @@ src/buttons.cpp       6×6 matrix map + stub mask + scan/debounce
 src/hid_keyboard.cpp  USB HID keyboard sender
 src/chords.cpp        tiny chord → romaji table
 include/*.h
+premapping.csv / docs/esp32-jis-chordboard-premapping.csv
+                      32 unique pre-input IDs + matrix cells
+data/mapping_table.csv   chord/output table (from joystick writer)
+data/parameter_list.csv  timing defaults (from joystick writer)
+docs/config-plan.md   how CSVs map to flash vs compile-time headers
 docs/pinout.md        row/col GPIOs, cell map, diode orientation
 docs/bom.md           parts Augustine must buy/prepare
 ```
@@ -100,7 +106,7 @@ docs/bom.md           parts Augustine must buy/prepare
 ## Remaining gaps / 之後要做
 
 1. Enable all 32 matrix cells in `stub_enabled()` once wired.
-2. Port chord engine + CSV from `E:\cline play\joystick writer`.
+2. Port chord engine using `data/mapping_table.csv` + premapping IDs (see [`docs/config-plan.md`](docs/config-plan.md)).
 3. Decide final USB VID/PID / product strings; optional true JIS layout report.
 4. Physical enclosure / PCB — out of scope for this scaffold.
 
