@@ -2,7 +2,7 @@
 
 實體離散按鍵 → ESP32 和弦引擎 → USB HID JIS 鍵盤 → PC 日文 IME。
 
-硬體適配器：把 14 顆實體鍵解讀成和弦，在 MCU 上產出羅馬字／鍵位，PC 端只要開日文 IME。與同系列 Python 專案 `joystick writer` 分開。韌體依 14 鍵和弦表送出羅馬字與快捷鍵配方。
+硬體適配器：把 14 顆實體鍵解讀成和弦，在 MCU 上產出羅馬字／鍵位。主機必須把鍵盤類型設成日文 106/109，再啟用日文 IME（羅馬字）。與同系列 Python 專案 `joystick writer` 分開。韌體依 14 鍵和弦表送出羅馬字與快捷鍵配方。
 
 遠端倉庫（private）：https://github.com/nihilatus/esp32-jis-keyboard
 
@@ -15,7 +15,7 @@
 | 角色 | USB HID **鍵盤**（不是手把／不是類比搖桿） |
 | 板子 | ESP32-S3-DevKitC-1 **N16R8** |
 | 輸入 | **14 顆**離散按鍵（無類比 stick） |
-| 輸出 | 羅馬字／快捷鍵配方 → 主機日文 IME |
+| 輸出 | 羅馬字／快捷鍵配方。主機鍵盤類型必須是日文 106/109，再交日文 IME |
 | 現況 | 14 鍵直連採樣、`kChordDebounceMs` 消彈跳；[送出時機](#輸入邏輯) |
 
 ---
@@ -42,7 +42,7 @@
     → config_server  合上才開熱點；只在熱點開著時處理網頁與 JSON
 ```
 
-遮罩的 bit0..13 固定是 `LL LU LR LD LT0 LT1 LT2 RL RU RR RD RT0 RT1 RT2`。PC 收到的是一般鍵盤的羅馬字與少數特殊鍵，日文轉換交給 IME，韌體不做假名轉換。字元走 JIS 鍵位：`a`–`z` 與數字的用途碼和美式相同，出廠表裡不同的是 `[`（0x30）和 `]`（0x31）。`Shift+8`／`Shift+9` 要主機鍵盤類型是日文才會是（）。USB 國碼不設定；Windows 的 106/109 版面看的是鍵盤類型這項設定。
+遮罩的 bit0..13 固定是 `LL LU LR LD LT0 LT1 LT2 RL RU RR RD RT0 RT1 RT2`。PC 收到的是一般鍵盤的羅馬字與少數特殊鍵，日文轉換交給 IME，韌體不做假名轉換。主機鍵盤類型必須設成日文 106/109。字元走 JIS 鍵位：`a`–`z` 與數字的用途碼和美式相同，出廠表裡不同的是 `[`（0x30）和 `]`（0x31）。`Shift+8`／`Shift+9` 在這個版面上才是（）。`Hankaku`、`Muhenkan`、`Henkan`、`Kana` 也要這個版面，Windows 才會當成半角/全角、無変換、変換、ひらがな。USB 國碼不設定，Windows 不會靠它切換版面。
 
 | 模組 | 做什麼 |
 | --- | --- |
@@ -144,7 +144,7 @@ pio run -t upload
 pio device monitor
 ```
 
-燒錄走 **UART**。燒完把資料線改接 **USB（OTG）**，讓 Windows 列舉 HID 鍵盤。把鍵盤類型設成日文（106/109），開記事本、啟用日文 IME（羅馬字），再測按鍵。只切換輸入法、鍵盤類型仍是美式時，`[`、`]` 和 `Shift+8`／`Shift+9` 會對到美式符號。`Hankaku`、`Muhenkan`、`Henkan`、`Kana` 也要這個鍵盤類型，Windows 才會當成半角/全角、無変換、変換、ひらがな。沒反應時先看鍵盤類型。`Eisuu`（0x91，LANG2）是 macOS 的英数，Windows 常常沒有反應。
+燒錄走 **UART**。燒完把資料線改接 **USB（OTG）**，讓 Windows 列舉 HID 鍵盤。主機必須把鍵盤類型設成日文 106/109，再開記事本、啟用日文 IME（羅馬字），然後測按鍵。鍵盤類型仍是美式時，`[`、`]` 和 `Shift+8`／`Shift+9` 會對到美式符號，`Hankaku`、`Muhenkan`、`Henkan`、`Kana` 也不會被當成半角/全角、無変換、変換、ひらがな。沒反應時先看這項設定。`Eisuu`（0x91，LANG2）是 macOS 的英数，Windows 常常沒有反應。
 
 若 OTG HID 佔住埠導致上傳失敗：按住 **BOOT** → 點 **EN/RST** → 放開 BOOT，再於 UART 重試。
 
