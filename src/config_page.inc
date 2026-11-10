@@ -46,6 +46,7 @@ R"HTML(
   #save { background: #1d6b3a; border-color: #1d6b3a; }
   #reset { background: transparent; color: #ffb4b4; border-color: #8a4040; }
   button:disabled { opacity: 0.5; }
+  button.on { background: #1d4e86; border-color: #6cb6ff; }
   #status { display: block; min-height: 1.3em; margin-top: 8px; font-size: 14px; }
   #status.bad { color: #ff8d8d; }
   #status.ok { color: #8ee0a8; }
@@ -76,6 +77,11 @@ R"HTML(
   <header>
     <h1>JIS 和弦</h1>
     <p class="hint">必＝一定要按。可＝可有可無。同一顆不能兩個都勾。假名只供辨識。output 空白表示這列不送鍵。</p>
+    <div class="actions">
+      <button id="fire-release" type="button">全放再送</button>
+      <button id="fire-first" type="button">首鍵放開就送</button>
+    </div>
+    <p class="hint">全放再送：這組全部放開並再確認空檔才送出。下一組若在前一組還沒放完就按下，兩組會併成一個對不到的集合。首鍵放開就送：高峰後第一顆放開就送出，其餘鍵要全部放開才接下一個。請同時按下、再放開。</p>
     <input id="q" type="search" placeholder="搜尋假名或 output" autocomplete="off">
     <div class="actions">
       <button id="save" type="button">儲存</button>
@@ -94,6 +100,9 @@ const none = document.getElementById("none");
 const statusEl = document.getElementById("status");
 const saveBtn = document.getElementById("save");
 const resetBtn = document.getElementById("reset");
+const fireReleaseBtn = document.getElementById("fire-release");
+const fireFirstBtn = document.getElementById("fire-first");
+let fireMode = "release";
 let rows = [];
 let source = "factory";
 let busy = false;
@@ -245,6 +254,17 @@ async function readBody(res) {
   return data;
 }
 
+function paintFire() {
+  fireReleaseBtn.classList.toggle("on", fireMode === "release");
+  fireFirstBtn.classList.toggle("on", fireMode === "first");
+}
+
+async function loadFire() {
+  const data = await readBody(await fetch("/api/fire"));
+  fireMode = data.mode === "first" ? "first" : "release";
+  paintFire();
+}
+
 async function load() {
   const data = await readBody(await fetch("/api/chords"));
   rows = (data.chords || []).map(norm);
@@ -314,6 +334,22 @@ saveBtn.addEventListener("click", () => withBusy(async () => {
   setStatus("已儲存，下一組和弦就用新表（" + (data.count != null ? data.count : rows.length) + " 列）", "ok");
 }));
 
+function chooseFire(mode) {
+  return withBusy(async () => {
+    const data = await readBody(await fetch("/api/fire", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: mode })
+    }));
+    fireMode = data.mode === "first" ? "first" : "release";
+    paintFire();
+    setStatus(fireMode === "first" ? "已改成首鍵放開就送" : "已改成全放再送", "ok");
+  });
+}
+
+fireReleaseBtn.addEventListener("click", () => chooseFire("release"));
+fireFirstBtn.addEventListener("click", () => chooseFire("first"));
+
 resetBtn.addEventListener("click", () => withBusy(async () => {
   if (!window.confirm("還原成燒錄時的出廠表？手機上存過的組合會刪掉。")) return;
   const data = await readBody(await fetch("/api/chords/reset", { method: "POST" }));
@@ -323,7 +359,9 @@ resetBtn.addEventListener("click", () => withBusy(async () => {
   setStatus("已還原成出廠表", "ok");
 }));
 
+paintFire();
 load().catch((err) => setStatus(err && err.message ? err.message : "讀不到和弦表", "bad"));
+loadFire().catch((err) => setStatus(err && err.message ? err.message : "讀不到送出模式", "bad"));
 </script>
 </body>
 </html>

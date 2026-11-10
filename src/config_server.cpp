@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <Arduino.h>
 #include <LittleFS.h>
 #include <WebServer.h>
 #include <WiFi.h>
@@ -24,7 +25,18 @@
 static const char kApSsid[] = WIFI_AP_SSID;
 static const char kApPassword[] = WIFI_AP_PASSWORD;
 static constexpr char kApPlaceholder[] = "replace-with-8-or-more-chars";
+
+// Not one of the 14 chord keys. Closed to GND enables the AP.
+static constexpr int kWifiEnablePin = 15;
+// Longer than the 8 ms key debounce so a bounce does not flap the radio.
+static constexpr uint32_t kWifiSwitchDebounceMs = 50;
+
 static bool g_http = false;
+static bool g_routes = false;
+static bool g_switch_raw = false;
+static bool g_switch_stable = false;
+static uint32_t g_switch_change_ms = 0;
+static bool g_start_failed = false;
 
 static bool ap_password_ok() {
   const size_t n = strlen(kApPassword);
@@ -156,6 +168,45 @@ static void handle_reset() {
   free(json);
 }
 
+static bool json_mode_value(const char *body, char *out, size_t out_len) {
+  if (body == nullptr || out_len == 0) return false;
+  const char *key = strstr(body, "\"mode\"");
+  if (key == nullptr) return false;
+  const char *colon = strchr(key, ':');
+  if (colon == nullptr) return false;
+  const char *open = strchr(colon, '"');
+  if (open == nullptr) return false;
+  const char *close = strchr(open + 1, '"');
+  if (close == nullptr) return false;
+  const size_t n = static_cast<size_t>(close - (open + 1));
+  if (n == 0 || n + 1 > out_len) return false;
+  memcpy(out, open + 1, n);
+  out[n] = '\0';
+  return true;
+}
+
+static void handle_fire_get() {
+  char body[32];
+  snprintf(body, sizeof(body), "{\"mode\":\"%s\"}", chords_fire_mode_name());
+  send_json(200, body);
+}
+
+static void handle_fire_post() {
+  if (!server.hasArg("plain")) {
+    send_error(400, "沒有內容");
+    return;
+  }
+  char mode[16];
+  if (!json_mode_value(server.arg("plain").c_str(), mode, sizeof(mode)) ||
+      !chords_set_fire_mode_name(mode)) {
+    send_error(400, "模式只能是 release 或 first");
+    return;
+  }
+  char body[48];
+  snprintf(body, sizeof(body), "{\"ok\":true,\"mode\":\"%s\"}", chords_fire_mode_name());
+  send_json(200, body);
+}
+
 static void handle_404() { server.send(404, "text/plain; charset=utf-8", "not found"); }
 
 void config_server_begin() {
@@ -188,6 +239,8 @@ void config_server_begin() {
   server.on("/api/chords", HTTP_GET, handle_get);
   server.on("/api/chords", HTTP_POST, handle_post);
   server.on("/api/chords/reset", HTTP_POST, handle_reset);
+  server.on("/api/fire", HTTP_GET, handle_fire_get);
+  server.on("/api/fire", HTTP_POST, handle_fire_post);
   server.onNotFound(handle_404);
   server.begin();
   g_http = true;
