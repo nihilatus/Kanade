@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "buttons.h"
+#include "chord_core.h"
 #include "chords.h"
 #include "config_server.h"
 #include "console_log.h"
@@ -19,7 +20,9 @@ void setup() {
   delay(200);
   Serial.println();
   Serial.println(F("esp32-jis-keyboard"));
-  Serial.println(F("14 direct keys, active-low, 8 ms debounce"));
+  Serial.print(F("14 direct keys, active-low, "));
+  Serial.print(kChordDebounceMs);
+  Serial.println(F(" ms debounce"));
   Serial.print(F("pins"));
   for (uint8_t i = 0; i < BTN_COUNT; ++i) {
     Serial.print(' ');

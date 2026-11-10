@@ -49,6 +49,10 @@ static bool g_staged = false;
 // Debounce has already required the raw level to hold before this mask
 // goes empty. ReleaseAll waits kChordReleaseGuardMs after that. FirstUp
 // sends on the first peak-key release and does not use this wait.
+// 0 = release-all when NVS has no stored mode. 1 = first-up.
+#ifndef CHORD_FIRE_DEFAULT_FIRST
+#define CHORD_FIRE_DEFAULT_FIRST 0
+#endif
 static constexpr char kPrefsNs[] = "jis";
 static constexpr char kPrefsFire[] = "fire";
 
@@ -232,9 +236,22 @@ static void log_fire_mode() {
   console_println(line);
 }
 
+static ChordFireMode fire_mode_from_flag() {
+  return CHORD_FIRE_DEFAULT_FIRST ? ChordFireMode::FirstUp : ChordFireMode::ReleaseAll;
+}
+
 static void load_fire_mode() {
+  const ChordFireMode fallback = fire_mode_from_flag();
   Preferences prefs;
-  if (!prefs.begin(kPrefsNs, true)) return;
+  if (!prefs.begin(kPrefsNs, true)) {
+    g_engine.mode = fallback;
+    return;
+  }
+  if (!prefs.isKey(kPrefsFire)) {
+    g_engine.mode = fallback;
+    prefs.end();
+    return;
+  }
   const uint8_t stored = prefs.getUChar(kPrefsFire, 0);
   prefs.end();
   g_engine.mode = stored == 1 ? ChordFireMode::FirstUp : ChordFireMode::ReleaseAll;

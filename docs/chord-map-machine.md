@@ -43,10 +43,10 @@ Bare `RT0` (no parentheses) is a normal required key (e.g. あ → `keys_require
 
 1. Track keys while the chord is held.
 2. Let `max_chord` be the **maximum simultaneous** down-set observed during the hold (largest `|pressed|` snapshot; if tied, use the latest such snapshot).
-3. Fire **once**. Each key becomes stable only after its raw level holds for **8 ms**. Two timings, switchable at runtime (phone page or `fire release` / `fire first` on serial; stored in NVS). Default is `release`.
+3. Fire **once**. Each key becomes stable only after its raw level holds for `kChordDebounceMs` (`include/chord_core.h`). Two timings, switchable at runtime (phone page or `fire release` / `fire first` on serial; stored in NVS). With no stored key, boot follows `CHORD_FIRE_DEFAULT_FIRST` in `platformio.ini` (unset means `release`). A stored value overrides that flag.
 
-   - **`release`:** fire on **full release**. Firmware confirms only after the debounced mask stays empty for **10 ms**, so a bounce that returns after the stable release does not split the chord or send it twice. A new chord pressed before that empty window is merged into the same `max_chord`.
-   - **`first`:** after the peak, fire when the **first key that belonged to that peak goes up**. Remaining keys enter a drain: presses are ignored until the mask is empty again, then a new chord may start. This does not wait out the 10 ms guard. It assumes the keys of one chord go down together and then come up; a key that lifts while the chord is still landing sends early.
+   - **`release`:** fire on **full release**. Firmware confirms only after the debounced mask stays empty for `kChordReleaseGuardMs`, so a bounce that returns after the stable release does not split the chord or send it twice. A new chord pressed before that empty window is merged into the same `max_chord`.
+   - **`first`:** after the peak, fire when the **first key that belonged to that peak goes up**. Remaining keys enter a drain: presses are ignored until the mask is empty again, then a new chord may start. This does not wait out `kChordReleaseGuardMs`. It assumes the keys of one chord go down together and then come up; a key that lifts while the chord is still landing sends early.
 4. Skip if `max_chord` is empty or the matched row’s `output` is empty (empty outputs are not present in this CSV). A mask that matches no row is not sent.
 
 ## Matching rule

@@ -6,10 +6,14 @@
 // Chord engine. Tracks the largest simultaneous set while any key is down,
 // then matches the live table once.
 //
-// Two send timings, stored in NVS and switchable at runtime:
-//   "release" — wait until every key is up, then 10 ms, then send.
+// Two send timings, stored in NVS and switchable at runtime.
+// With no stored key, boot uses CHORD_FIRE_DEFAULT_FIRST (0 = release).
+// A stored value overrides that flag. Timings:
+//   "release" — wait until every key is up, then kChordReleaseGuardMs, then send.
 //   "first"   — after the peak, send when the first peak key goes up, then
 //               drain until every key is up before a new chord can start.
+// Each key is stable only after kChordDebounceMs. Both constants live in
+// chord_core.h.
 //
 // Boot loads /chords.json from LittleFS when the file is valid. If that file
 // is missing, a complete /chords.json.tmp is checked first, then

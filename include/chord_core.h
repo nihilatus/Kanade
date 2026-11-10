@@ -8,6 +8,9 @@
 // the firmware both call this.
 
 static constexpr int kChordKeyCount = 14;
+// Raw GPIO must hold this long before the chord mask changes.
+static constexpr uint8_t kChordDebounceMs = 8;
+// ReleaseAll waits this long after the debounced mask stays empty.
 static constexpr uint32_t kChordReleaseGuardMs = 10;
 static constexpr uint8_t kChordTapGapMs = 12;
 static constexpr uint8_t kChordGapNone = 0;

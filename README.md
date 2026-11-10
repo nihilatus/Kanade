@@ -16,7 +16,7 @@
 | 板子 | ESP32-S3-DevKitC-1 **N16R8** |
 | 輸入 | **14 顆**離散按鍵（無類比 stick） |
 | 輸出 | 羅馬字／快捷鍵配方 → 主機日文 IME |
-| 現況 | 14 鍵直連採樣、8 ms 消彈跳；預設全放 10 ms 後送出，可改成首鍵放開就送 |
+| 現況 | 14 鍵直連採樣、`kChordDebounceMs` 消彈跳；預設全放 `kChordReleaseGuardMs` 後送出，可改成首鍵放開就送 |
 
 ---
 
@@ -37,10 +37,10 @@
 
 1. 按住期間持續追蹤按下集合。
 2. `max_chord` = 這次按住期間**同時按下數量最大**的那一組（同大小取較晚的快照）。
-3. 送出時機可切換，開機後沿用上次選擇（預設是全放）：
-   - **全放再送**：全部放開，並再維持 10 ms 空檔，才比對與送出一次。下一組若在 mask 回到 0 之前就按下，會被併進同一組。
-   - **首鍵放開就送**：高峰後第一顆屬於高峰的鍵放開就送出，然後進入收尾，等全部放開才開始新的和弦。手感前提是同一組先一起按下、再放開。
-   手機熱點頁的兩個按鈕，或序列埠的 `fire release` / `fire first`，都會寫進 NVS。試打頁頁首的同一個開關只影響瀏覽器。
+3. 送出時機可切換。NVS 有紀錄時沿用上次選擇；沒有紀錄時用編譯旗標 `CHORD_FIRE_DEFAULT_FIRST`（沒設就是全放）：
+   - **全放再送**：全部放開，並再維持 `kChordReleaseGuardMs`（`include/chord_core.h`）空檔，才比對與送出一次。下一組若在 mask 回到 0 之前就按下，會被併進同一組。
+   - **首鍵放開就送**：高峰後第一顆屬於高峰的鍵放開就送出，然後進入收尾，等全部放開才開始新的和弦。手感前提是同一組先一起按下、再放開。不等 `kChordReleaseGuardMs`。
+   手機熱點頁的兩個按鈕，或序列埠的 `fire release` / `fire first`，都會寫進 NVS，並蓋過編譯旗標。試打頁頁首的同一個開關只影響瀏覽器。每鍵要先穩定 `kChordDebounceMs` 才算按下或放開。
 4. 比對規則（詳見 [`docs/chord-map-machine.md`](docs/chord-map-machine.md)）：
 
    ```text
@@ -77,7 +77,7 @@ python tools/build_chord_map_machine.py
 
 ## 用一般鍵盤試打
 
-[`web/index.html`](web/index.html) 用電腦鍵盤模擬 14 顆和弦鍵，不必接開發板，也不送 USB HID。判讀規則與韌體相同（最大同時集合、全放 10 ms 或首鍵放開就送、`required`／`optional`、較具體的列優先）。電腦鍵盤的按下／放開已經是穩定邊緣，所以不做韌體那 8 ms GPIO 消彈跳。頁首「全放再送／首鍵放開就送」只存在這個瀏覽器，用來對照手感。
+[`web/index.html`](web/index.html) 用電腦鍵盤模擬 14 顆和弦鍵，不必接開發板，也不送 USB HID。判讀規則與韌體相同（最大同時集合、全放 `kChordReleaseGuardMs` 或首鍵放開就送、`required`／`optional`、較具體的列優先）。電腦鍵盤的按下／放開已經是穩定邊緣，所以不做韌體的 `kChordDebounceMs` GPIO 消彈跳。頁首「全放再送／首鍵放開就送」只存在這個瀏覽器，用來對照手感。
 
 頁面用相對路徑讀 [`data/chord_map.machine.csv`](data/chord_map.machine.csv)，要從專案根目錄開一個本機伺服器，直接用檔案開啟讀不到表：
 
@@ -134,8 +134,8 @@ pio device monitor
 | 已有 | 尚未 |
 | --- | --- |
 | PlatformIO + Arduino + TinyUSB HID 鍵盤 | VID/PID 仍是原型值 |
-| 14 鍵直連、每鍵 8 ms 穩定消彈跳 | 自訂 JIS HID report／國碼 |
-| 全放 10 ms 或首鍵放開就送，可切換並存進 NVS；手機熱點可改表並存進 LittleFS | 連發 |
+| 14 鍵直連、每鍵 `kChordDebounceMs` 穩定消彈跳 | 自訂 JIS HID report／國碼 |
+| 全放 `kChordReleaseGuardMs` 或首鍵放開就送，可切換並存進 NVS；沒有存檔時用 `CHORD_FIRE_DEFAULT_FIRST`；手機熱點可改表並存進 LittleFS | 連發 |
 | 配方送出（羅馬字、`Shift+1`、`Backspace`、`Ctrl+i` 等）；一般鍵盤試打頁 | 外殼／PCB |
 
 出廠表仍由 `include/chord_map.inc` 編譯進去。改人表後，下一次 `pio run` 會重建機器表，燒錄才會更新出廠內容；手機上儲存的表會蓋過它，直到在網頁還原出廠。
@@ -145,9 +145,9 @@ pio device monitor
 ```
 platformio.ini
 src/main.cpp
-src/buttons.cpp       14 鍵直連／每鍵 8 ms 消彈跳
+src/buttons.cpp       14 鍵直連／每鍵 kChordDebounceMs 消彈跳
 src/hid_keyboard.cpp  配方 → USB HID
-src/chords.cpp        max_chord；全放 10 ms 或首鍵放開就送；可改用 LittleFS 存檔
+src/chords.cpp        max_chord；全放 kChordReleaseGuardMs 或首鍵放開就送；可改用 LittleFS 存檔
 src/config_server.cpp Wi-Fi 熱點與手機設定頁（GPIO15 合上才開）
 include/chord_map.inc 出廠表，由機器表產生，勿手改
 include/secrets.h     本機熱點密碼，不進 git

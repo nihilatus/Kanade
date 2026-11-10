@@ -17,10 +17,9 @@ const ButtonDef kButtons[BTN_COUNT] = {
 };
 
 // Both edges. Cheap tactiles usually finish bouncing inside 10 ms.
-// 8 ms is a trial: the chord engine waits again after this mask is empty,
-// so a longer debounce mostly adds release latency. Raise if a noisy edge
-// splits a chord or repeats a key.
-static constexpr uint8_t kDebounceMs = 8;
+// kChordDebounceMs is a trial: the chord engine waits again after this mask
+// is empty, so a longer debounce mostly adds release latency. Raise
+// kChordDebounceMs in chord_core.h if a noisy edge splits a chord or repeats a key.
 
 static bool raw_down[BTN_COUNT];
 static bool stable_down[BTN_COUNT];
@@ -55,7 +54,7 @@ void buttons_poll() {
       last_change_ms[i] = now;
     }
 
-    if ((now - last_change_ms[i]) >= kDebounceMs && stable_down[i] != raw_down[i]) {
+    if ((now - last_change_ms[i]) >= kChordDebounceMs && stable_down[i] != raw_down[i]) {
       stable_down[i] = raw_down[i];
     }
 
