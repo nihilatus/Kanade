@@ -19,7 +19,9 @@
 #include <lwip/sockets.h>
 
 #include "chords.h"
+#include "config_files.h"
 #include "config_http.h"
+#include "config_job.h"
 #include "console_log.h"
 
 #undef write
@@ -59,15 +61,6 @@ static constexpr size_t kFireBodyMax = 256;
 
 static constexpr char kJsonType[] = "application/json; charset=utf-8";
 static constexpr char kFallbackJson[] = "{\"ok\":false,\"error\":\"失敗\"}";
-
-static constexpr uint8_t kJobIdle = 0;
-static constexpr uint8_t kJobQueued = 1;
-static constexpr uint8_t kJobNeedMain = 2;
-static constexpr uint8_t kJobResume = 3;
-static constexpr uint8_t kJobDone = 4;
-static constexpr uint8_t kKindGet = 1;
-static constexpr uint8_t kKindPost = 2;
-static constexpr uint8_t kKindReset = 3;
 
 static bool g_http = false;
 static bool g_switch_raw = false;
@@ -110,8 +103,8 @@ struct Outgoing {
 
 static Outgoing g_out = {};
 
-static std::atomic<uint8_t> g_job_phase{kJobIdle};
-static uint8_t g_job_kind = 0;
+static std::atomic<uint8_t> g_job_phase{static_cast<uint8_t>(ConfigJobPhase::Idle)};
+static ConfigJobKind g_job_kind = ConfigJobKind::None;
 static char *g_job_body = nullptr;
 static size_t g_job_len = 0;
 static int g_job_code = 500;
@@ -157,6 +150,7 @@ static const char *status_text(int code) {
     case 413: return "Payload Too Large";
     case 431: return "Request Header Fields Too Large";
     case 500: return "Internal Server Error";
+    case 503: return "Service Unavailable";
     default: return "Error";
   }
 }
@@ -286,53 +280,74 @@ static bool remove_present(const char *path) {
   return LittleFS.remove(path);
 }
 
+static bool lfs_exists(void *, const char *path) { return LittleFS.exists(path); }
+
+static bool lfs_remove(void *, const char *path) { return LittleFS.remove(path); }
+
+static bool lfs_rename(void *, const char *from, const char *to) { return LittleFS.rename(from, to); }
+
 // flush() is fflush plus fsync. close() alone can leave the new bytes in a
 // buffer, and the next step renames the previous chords.json away.
-// The .bak stays until the live table accepts the new file.
-static bool write_chords_file(const uint8_t *data, size_t len) {
-  if (!remove_present(kChordsTmpPath)) return false;
-  File file = LittleFS.open(kChordsTmpPath, "w");
+static bool lfs_write(void *, const char *path, const uint8_t *data, size_t len) {
+  File file = LittleFS.open(path, "w");
   if (!file) return false;
   const size_t wrote = file.write(data, len);
   file.flush();
   file.close();
-  if (wrote != len) {
-    remove_present(kChordsTmpPath);
-    return false;
-  }
+  return wrote == len;
+}
 
-  if (!remove_present(kChordsBakPath)) {
-    remove_present(kChordsTmpPath);
-    return false;
-  }
-  const bool had = LittleFS.exists(kChordsPath);
-  if (had && !LittleFS.rename(kChordsPath, kChordsBakPath)) {
-    remove_present(kChordsTmpPath);
-    return false;
-  }
-  if (!LittleFS.rename(kChordsTmpPath, kChordsPath)) {
-    if (had) LittleFS.rename(kChordsBakPath, kChordsPath);
-    remove_present(kChordsTmpPath);
-    return false;
-  }
-  return true;
+static ChordFileOps lfs_ops() {
+  return ChordFileOps{nullptr, lfs_exists, lfs_remove, lfs_rename, lfs_write};
+}
+
+static bool write_chords_file(const uint8_t *data, size_t len) {
+  const ChordFileOps ops = lfs_ops();
+  return chord_files_replace(&ops, data, len, kChordsPath, kChordsTmpPath, kChordsBakPath);
 }
 
 static bool restore_previous_chords() {
-  if (!LittleFS.exists(kChordsBakPath)) return remove_present(kChordsPath);
-  if (!remove_present(kChordsPath)) return false;
-  return LittleFS.rename(kChordsBakPath, kChordsPath);
+  const ChordFileOps ops = lfs_ops();
+  return chord_files_restore(&ops, kChordsPath, kChordsBakPath);
+}
+
+// kind and main_ok are published before the phase store, and read only after
+// an acquire load of the phase. See config_job.h.
+static ConfigJobView load_job() {
+  ConfigJobView view;
+  view.phase = static_cast<ConfigJobPhase>(g_job_phase.load(std::memory_order_acquire));
+  view.kind = g_job_kind;
+  view.main_ok = g_job_main_ok;
+  return view;
+}
+
+static void publish_job(const ConfigJobView &view) {
+  g_job_kind = view.kind;
+  g_job_main_ok = view.main_ok;
+  g_job_phase.store(static_cast<uint8_t>(view.phase), std::memory_order_release);
+}
+
+static void mark_done() {
+  ConfigJobView view = load_job();
+  if (!config_job_finish(&view)) return;
+  publish_job(view);
+}
+
+static void mark_need_main() {
+  ConfigJobView view = load_job();
+  if (!config_job_need_main(&view)) return;
+  publish_job(view);
 }
 
 static void remember_error(int code, const char *msg) {
   g_job_code = code;
   chords_release(g_job_resp);
   g_job_resp = json_error(msg);
-  g_job_phase.store(kJobDone, std::memory_order_release);
+  mark_done();
 }
 
 static void run_queued() {
-  if (g_job_kind == kKindGet) {
+  if (g_job_kind == ConfigJobKind::Get) {
     char *json = chords_format_json();
     if (json == nullptr) {
       remember_error(500, "記憶體不足");
@@ -340,17 +355,17 @@ static void run_queued() {
     }
     g_job_resp = json;
     g_job_code = 200;
-    g_job_phase.store(kJobDone, std::memory_order_release);
+    mark_done();
     return;
   }
 
-  if (g_job_kind == kKindReset) {
+  if (g_job_kind == ConfigJobKind::Reset) {
     if (!chords_fs_ready() || !remove_present(kChordsBakPath) || !remove_present(kChordsTmpPath) ||
         !remove_present(kChordsPath)) {
       remember_error(500, chords_fs_ready() ? "存檔失敗" : "檔案系統還沒備好");
       return;
     }
-    g_job_phase.store(kJobNeedMain, std::memory_order_release);
+    mark_need_main();
     return;
   }
   remember_error(500, "失敗");
@@ -383,11 +398,11 @@ static void run_post() {
     remember_error(500, "存檔失敗");
     return;
   }
-  g_job_phase.store(kJobNeedMain, std::memory_order_release);
+  mark_need_main();
 }
 
 static void run_resume() {
-  if (g_job_kind == kKindPost) {
+  if (g_job_kind == ConfigJobKind::Post) {
     if (!g_job_main_ok) {
       restore_previous_chords();
       remember_error(500, "存檔失敗");
@@ -402,7 +417,7 @@ static void run_resume() {
     snprintf(buf, 80, "{\"ok\":true,\"source\":\"saved\",\"count\":%u}", g_job_count);
     g_job_resp = buf;
     g_job_code = 200;
-    g_job_phase.store(kJobDone, std::memory_order_release);
+    mark_done();
     return;
   }
   if (!g_job_main_ok) {
@@ -416,72 +431,87 @@ static void run_resume() {
   }
   g_job_resp = json;
   g_job_code = 200;
-  g_job_phase.store(kJobDone, std::memory_order_release);
+  mark_done();
 }
 
 static void worker_fn(void *) {
   for (;;) {
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-    const uint8_t phase = g_job_phase.load(std::memory_order_acquire);
-    if (phase == kJobQueued) {
-      if (g_job_kind == kKindPost) run_post();
-      else run_queued();
-    } else if (phase == kJobResume) {
-      run_resume();
+    switch (config_job_worker_action(load_job())) {
+      case ConfigJobAction::RunPost:
+        run_post();
+        break;
+      case ConfigJobAction::RunGet:
+      case ConfigJobAction::RunReset:
+        run_queued();
+        break;
+      case ConfigJobAction::RunResume:
+        run_resume();
+        break;
+      case ConfigJobAction::None:
+        break;
     }
   }
 }
 
 static void apply_main(bool wake) {
-  if (g_job_kind == kKindPost) {
-    g_job_main_ok = chords_commit_staged();
-    if (!g_job_main_ok) chords_drop_staged();
+  ConfigJobView view = load_job();
+  bool ok = false;
+  if (view.kind == ConfigJobKind::Post) {
+    ok = chords_commit_staged();
+    if (!ok) chords_drop_staged();
     else g_job_count = static_cast<unsigned>(chords_count());
   } else {
-    g_job_main_ok = chords_load_factory();
+    ok = chords_load_factory();
   }
-  g_job_phase.store(kJobResume, std::memory_order_release);
+  if (!config_job_applied(&view, ok)) return;
+  publish_job(view);
   if (wake && g_worker != nullptr) xTaskNotifyGive(g_worker);
 }
 
-static bool queue_job(uint8_t kind, char *body, size_t len) {
-  if (g_job_phase.load(std::memory_order_acquire) != kJobIdle) {
+static ConfigJobQueue queue_job(ConfigJobKind kind, char *body, size_t len) {
+  ConfigJobView view = load_job();
+  const ConfigJobQueue result = config_job_queue(&view, kind, g_worker != nullptr);
+  if (result != ConfigJobQueue::Ok) {
     chords_release(body);
-    return false;
+    return result;
   }
-  g_job_kind = kind;
   g_job_body = body;
   g_job_len = len;
   g_job_resp = nullptr;
   g_job_code = 500;
-  g_job_main_ok = false;
-  g_job_phase.store(kJobQueued, std::memory_order_release);
+  publish_job(view);
   g_conn = Conn::Wait;
   g_io_ms = millis();
-  if (g_worker != nullptr) {
-    xTaskNotifyGive(g_worker);
-    return true;
+  xTaskNotifyGive(g_worker);
+  return ConfigJobQueue::Ok;
+}
+
+static void queue_or_error(ConfigJobKind kind, char *body, size_t len) {
+  switch (queue_job(kind, body, len)) {
+    case ConfigJobQueue::Ok:
+      return;
+    case ConfigJobQueue::NoWorker:
+      begin_error(503, "設定服務還沒備好", g_cors);
+      return;
+    case ConfigJobQueue::Busy:
+      begin_error(500, "失敗", g_cors);
+      return;
   }
-  if (kind == kKindPost) run_post();
-  else run_queued();
-  while (g_job_phase.load(std::memory_order_acquire) == kJobNeedMain) {
-    apply_main(false);
-    run_resume();
-  }
-  return true;
 }
 
 static void service_job() {
-  const uint8_t phase = g_job_phase.load(std::memory_order_acquire);
-  if (phase == kJobNeedMain) {
+  const ConfigJobPhase phase = load_job().phase;
+  if (phase == ConfigJobPhase::NeedMain) {
     apply_main(true);
     return;
   }
-  if (phase != kJobDone) return;
+  if (phase != ConfigJobPhase::Done) return;
   char *resp = g_job_resp;
   g_job_resp = nullptr;
   const int code = g_job_code;
-  g_job_phase.store(kJobIdle, std::memory_order_release);
+  ConfigJobView view = load_job();
+  if (config_job_release(&view)) publish_job(view);
   if (g_drop_result || g_conn != Conn::Wait) {
     chords_release(resp);
     g_drop_result = false;
@@ -536,7 +566,7 @@ static void finish_body() {
     return;
   }
   if (g_route == Route::Chords) {
-    if (!queue_job(kKindPost, body, len)) begin_error(500, "失敗", g_cors);
+    queue_or_error(ConfigJobKind::Post, body, len);
     return;
   }
   chords_release(body);
@@ -549,7 +579,7 @@ static void complete_drain() {
     return;
   }
   if (g_after == After::Reset) {
-    if (!queue_job(kKindReset, nullptr, 0)) begin_error(500, "失敗", g_cors);
+    queue_or_error(ConfigJobKind::Reset, nullptr, 0);
     return;
   }
   begin_error(g_after_code, g_after_msg, g_cors);
@@ -650,7 +680,7 @@ static void on_headers(size_t end) {
       arm_drain(After::Error, 400, "請求格式不對", g_cors, already, req.content_length);
       return;
     }
-    if (!queue_job(kKindGet, nullptr, 0)) begin_error(500, "失敗", g_cors);
+    queue_or_error(ConfigJobKind::Get, nullptr, 0);
     return;
   }
   if (!post_chords && !post_fire) {
@@ -792,7 +822,7 @@ static void make_nonblock(WiFiClient &client) {
 
 static void accept_client() {
   if (g_conn != Conn::Idle) return;
-  if (g_job_phase.load(std::memory_order_acquire) != kJobIdle) return;
+  if (load_job().phase != ConfigJobPhase::Idle) return;
   WiFiClient client = g_server.accept();
   if (!client) return;
   make_nonblock(client);
@@ -874,8 +904,8 @@ static void start_ap() {
 static void stop_ap() {
   if (!g_http) return;
   g_http = false;
-  const uint8_t phase = g_job_phase.load(std::memory_order_acquire);
-  g_drop_result = g_conn == Conn::Wait || phase != kJobIdle;
+  const ConfigJobPhase phase = load_job().phase;
+  g_drop_result = g_conn == Conn::Wait || phase != ConfigJobPhase::Idle;
   if (g_conn != Conn::Wait) drop_conn();
   else g_client.stop();
   g_server.stop();
@@ -895,7 +925,7 @@ void config_server_begin() {
         xTaskCreatePinnedToCore(worker_fn, "cfghttp", 16384, nullptr, 1, &g_worker, 0);
     if (ok != pdPASS) {
       g_worker = nullptr;
-      console_println("HTTP worker failed; saves run on the key scan");
+      console_println("HTTP worker failed; chord save and load stay off");
     }
   }
   console_println("WiFi switch GPIO15, closed to GND");
