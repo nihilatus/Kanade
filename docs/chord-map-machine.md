@@ -6,7 +6,7 @@ Generated machine table: [`../data/chord_map.machine.csv`](../data/chord_map.mac
 
 Rebuild: `python tools/build_chord_map_machine.py`
 
-That command rewrites the machine CSV and [`../include/chord_map.inc`](../include/chord_map.inc). Firmware matches the generated include; it does not parse CSV at boot.
+That command rewrites the machine CSV and [`../include/chord_map.inc`](../include/chord_map.inc). Firmware uses the generated include as the factory table. A chord table saved from the phone is stored in LittleFS as `chords.json` and overrides the factory table until the page’s reset action deletes it.
 
 ## Columns
 

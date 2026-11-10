@@ -57,3 +57,9 @@ GPIO3 刻意空下（strapping）。順序與和弦表的鍵名順序相同：`L
 3. 14 顆都這樣接。不需要二極體，也不需要共行／共列。
 
 零件：[`docs/bom.md`](bom.md)。和弦規則：[`docs/chord-map-machine.md`](chord-map-machine.md)。
+
+## 手機改和弦
+
+板子會自己開 Wi-Fi 熱點。手機連上後開 `http://192.168.4.1/`。
+
+熱點名稱與密碼寫在本機的 `include/secrets.h`。該檔已列入 `.gitignore`，不要提交。範本是 `include/secrets.h.example`；密碼至少 8 碼，而且不能沿用範本裡的占位字。序列埠只印熱點名稱與網址，不印密碼。

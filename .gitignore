@@ -11,3 +11,6 @@ __pycache__/
 Thumbs.db
 *.bak
 *.swp
+
+# Wi-Fi password for the chord editor. Copy include/secrets.h.example.
+include/secrets.h

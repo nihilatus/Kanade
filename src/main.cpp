@@ -2,6 +2,7 @@
 
 #include "buttons.h"
 #include "chords.h"
+#include "config_server.h"
 #include "hid_keyboard.h"
 
 // ESP32-S3-DevKitC-1 N16R8 — USB HID chord keyboard.
@@ -29,10 +30,12 @@ void setup() {
   buttons_begin();
   hid_keyboard_begin();
   chords_begin();
+  config_server_begin();
 }
 
 void loop() {
   buttons_poll();
   chords_poll();
+  config_server_poll();
   delay(1);
 }

@@ -65,6 +65,8 @@ cd /d "E:\cline play\esp32-jis-keyboard"
 python tools/build_chord_map_machine.py
 ```
 
+手機改表：複製 [`include/secrets.h.example`](include/secrets.h.example) 成 `include/secrets.h`，把熱點密碼改成至少 8 碼。`include/secrets.h` 在 `.gitignore` 裡，不要提交、也不要寫進文件。板子開熱點後，手機瀏覽 `http://192.168.4.1/`。存檔寫進板子的 LittleFS，蓋過編譯進去的出廠表；網頁上的「還原出廠表」會刪掉那份存檔。
+
 `data/mapping_table.csv`、`data/parameter_list.csv` 仍是舊 joystick-writer 移植殘件；新路徑以 `chord_map.machine.csv` 為準。  
 舊的 [`docs/esp32-jis-chordboard-premapping.csv`](docs/esp32-jis-chordboard-premapping.csv)／[`premapping.csv`](premapping.csv) 若仍寫 32 ID，視為待清理。
 
@@ -106,7 +108,7 @@ pio device monitor
 | --- | --- |
 | PlatformIO + Arduino + TinyUSB HID 鍵盤 | VID/PID 仍是原型值 |
 | 14 鍵直連、每鍵 15 ms 穩定消彈跳 | 自訂 JIS HID report／國碼 |
-| 全放 25 ms 確認後依 `chord_map.inc` 比對 | 連發、LittleFS 熱更新 |
+| 全放 25 ms 確認後比對；手機熱點可改表並存進 LittleFS | 連發 |
 | 配方送出（羅馬字、`Shift+1`、`Backspace`、`Ctrl+i` 等） | 外殼／PCB |
 
 和弦引擎讀編譯期表，不再是少數 combo 的 demo。改人表後要重建機器表與 `include/chord_map.inc` 再燒錄。
@@ -118,8 +120,10 @@ platformio.ini
 src/main.cpp
 src/buttons.cpp       14 鍵直連／每鍵 15 ms 消彈跳
 src/hid_keyboard.cpp  配方 → USB HID
-src/chords.cpp        max_chord，全放 25 ms 後比對
-include/chord_map.inc 由機器表產生，勿手改
+src/chords.cpp        max_chord，全放 25 ms 後比對；可改用 LittleFS 存檔
+src/config_server.cpp Wi-Fi 熱點與手機設定頁
+include/chord_map.inc 出廠表，由機器表產生，勿手改
+include/secrets.h     本機熱點密碼，不進 git
 include/*.h
 eps32jischordboard-premapping.csv
 data/chord_map.machine.csv
