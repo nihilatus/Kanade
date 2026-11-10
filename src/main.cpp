@@ -10,6 +10,14 @@
 #include "console_log.h"
 #include "hid_keyboard.h"
 
+// Set to 0 (or -DCHORD_MEASURE_LOOP=0) to leave loop timing out of the scan.
+#ifndef CHORD_MEASURE_LOOP
+#define CHORD_MEASURE_LOOP 1
+#endif
+#if CHORD_MEASURE_LOOP
+#include <WiFi.h>
+#endif
+
 // ESP32-S3-DevKitC-1 N16R8 — USB HID chord keyboard.
 // Plug the PC into the board port labeled USB (OTG), not UART.
 // Each switch: GPIO to one side, GND to the other. Pressed = LOW.
@@ -142,7 +150,39 @@ static CmdPort g_uart{&Serial0, {}, 0, false};
 static CmdPort g_usb{&Serial, {}, 0, false};
 #endif
 
+#if CHORD_MEASURE_LOOP
+// First 2000 loop() bodies in each WiFi mode. delay(1) is included.
+static constexpr uint32_t kLoopMeasureSamples = 2000;
+
+static uint32_t g_loop_max_off_us = 0;
+static uint32_t g_loop_max_on_us = 0;
+static uint32_t g_loop_n_off = 0;
+static uint32_t g_loop_n_on = 0;
+static bool g_loop_done_off = false;
+static bool g_loop_done_on = false;
+
+static bool loop_measure_done() { return g_loop_done_off && g_loop_done_on; }
+
+static void loop_measure_note(uint32_t elapsed_us, bool ap_on) {
+  uint32_t *max_us = ap_on ? &g_loop_max_on_us : &g_loop_max_off_us;
+  uint32_t *count = ap_on ? &g_loop_n_on : &g_loop_n_off;
+  bool *done = ap_on ? &g_loop_done_on : &g_loop_done_off;
+  if (*done) return;
+  if (elapsed_us > *max_us) *max_us = elapsed_us;
+  if (++(*count) < kLoopMeasureSamples) return;
+  *done = true;
+  char line[48];
+  snprintf(line, sizeof(line), "loop max AP %s %u us", ap_on ? "on" : "off",
+           static_cast<unsigned>(*max_us));
+  console_println(line);
+}
+#endif
+
 void loop() {
+#if CHORD_MEASURE_LOOP
+  const bool timing = !loop_measure_done();
+  const uint32_t loop_t0 = timing ? micros() : 0;
+#endif
   buttons_poll();
   trace_keys_if_changed();
   chords_poll();
@@ -153,4 +193,7 @@ void loop() {
   poll_fire_cmd(g_usb);
 #endif
   delay(1);
+#if CHORD_MEASURE_LOOP
+  if (timing) loop_measure_note(micros() - loop_t0, WiFi.getMode() == WIFI_AP);
+#endif
 }
