@@ -28,8 +28,11 @@ void chords_begin();
 void chords_poll();  // call after buttons_poll()
 
 // "release" or "first". Setter returns false for any other name.
+// dispatch runs the engine mode change. Switching to first-up that way sends a
+// chord already waiting in the release guard. Pass false to store the mode
+// only, which is what the config page does.
 const char *chords_fire_mode_name();
-bool chords_set_fire_mode_name(const char *name);
+bool chords_set_fire_mode_name(const char *name, bool dispatch = true);
 
 static constexpr size_t kChordsMaxRows = 256;
 static constexpr size_t kChordsJsonMax = 48 * 1024;
@@ -56,9 +59,12 @@ enum class ChordStageStatus : uint8_t { Ok = 0, Rejected, NoMemory };
 // err receives a short Traditional Chinese reason when this is not Ok.
 // NoMemory is only the stage-buffer allocation failure.
 ChordStageStatus chords_stage_json(const char *json, size_t len, char *err, size_t err_len);
-void chords_commit_staged();
+// Copies the staged table over the live one. False leaves the live table as it
+// was and keeps the staged copy for the caller to drop.
+bool chords_commit_staged();
 void chords_drop_staged();
-void chords_load_factory();
+// False only when the live buffers cannot be allocated. The table is then empty.
+bool chords_load_factory();
 
 // {"source":"factory"|"saved","count":N,"chords":[...]}
 // Key masks are arrays of LL..RT2 names. Caller frees with chords_release().

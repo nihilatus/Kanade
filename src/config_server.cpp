@@ -1,16 +1,31 @@
 #include "config_server.h"
 
+#include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
 
+#include <atomic>
+
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include <FS.h>
 #include <LittleFS.h>
-#include <WebServer.h>
+#include <Network.h>
 #include <WiFi.h>
+#include <esp_heap_caps.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <lwip/sockets.h>
 
 #include "chords.h"
+#include "config_http.h"
 #include "console_log.h"
+
+#undef write
+#undef read
+#undef send
+#undef recv
 
 #if __has_include("secrets.h")
 #include "secrets.h"
@@ -35,227 +50,777 @@ static constexpr char kApPlaceholder[] = "replace-with-8-or-more-chars";
 static constexpr int kWifiEnablePin = 15;
 // Longer than the 8 ms key debounce so a bounce does not flap the radio.
 static constexpr uint32_t kWifiSwitchDebounceMs = 50;
+// One slice per poll. The chord bounce window is 10 ms, so this stays a short copy.
+static constexpr size_t kHttpSlice = 512;
+static constexpr uint32_t kHttpStallMs = 5000;
+// Past this, answer and close instead of discarding. A normal save is under kChordsJsonMax.
+static constexpr long kDrainMax = 256 * 1024;
+static constexpr size_t kFireBodyMax = 256;
+
+static constexpr char kJsonType[] = "application/json; charset=utf-8";
+static constexpr char kFallbackJson[] = "{\"ok\":false,\"error\":\"失敗\"}";
+
+static constexpr uint8_t kJobIdle = 0;
+static constexpr uint8_t kJobQueued = 1;
+static constexpr uint8_t kJobNeedMain = 2;
+static constexpr uint8_t kJobResume = 3;
+static constexpr uint8_t kJobDone = 4;
+static constexpr uint8_t kKindGet = 1;
+static constexpr uint8_t kKindPost = 2;
+static constexpr uint8_t kKindReset = 3;
 
 static bool g_http = false;
-static bool g_routes = false;
 static bool g_switch_raw = false;
 static bool g_switch_stable = false;
 static uint32_t g_switch_change_ms = 0;
 static bool g_start_failed = false;
 
-static bool ap_password_ok() {
-  const size_t n = strlen(kApPassword);
-  if (n < 8 || n > 63) return false;
-  if (strcmp(kApPassword, kApPlaceholder) == 0) return false;
-  if (kApSsid[0] == '\0' || strlen(kApSsid) > 32) return false;
-  return true;
-}
+static WiFiServer g_server(80);
+static WiFiClient g_client;
 
-static WebServer server(80);
+enum class Conn : uint8_t { Idle, Header, Body, Drain, Wait, Send };
+
+static Conn g_conn = Conn::Idle;
+static uint32_t g_io_ms = 0;
+static char g_header[kHttpHeaderMax];
+static size_t g_header_len = 0;
+static char *g_body = nullptr;
+static size_t g_body_len = 0;
+static size_t g_body_got = 0;
+static bool g_cors = false;
+
+enum class Route : uint8_t { None, Page, Chords, Reset, Fire };
+static Route g_route = Route::None;
+
+enum class After : uint8_t { Error, Status, Reset };
+static After g_after = After::Error;
+static int g_after_code = 400;
+static const char *g_after_msg = "失敗";
+static size_t g_drain_left = 0;
+
+struct Outgoing {
+  char hdr[512];
+  size_t hdr_len;
+  size_t hdr_sent;
+  const char *body;
+  size_t body_len;
+  size_t body_sent;
+  char *owned;
+};
+
+static Outgoing g_out = {};
+
+static std::atomic<uint8_t> g_job_phase{kJobIdle};
+static uint8_t g_job_kind = 0;
+static char *g_job_body = nullptr;
+static size_t g_job_len = 0;
+static int g_job_code = 500;
+static char *g_job_resp = nullptr;
+static bool g_job_main_ok = false;
+static unsigned g_job_count = 0;
+static TaskHandle_t g_worker = nullptr;
+static bool g_drop_result = false;
 
 static const char kConfigPage[] PROGMEM =
 #include "config_page.inc"
     ;
 
-static void send_json(int code, const char *body) {
-  server.sendHeader("Cache-Control", "no-store");
-  server.sendHeader("Access-Control-Allow-Origin", "*");
-  server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  server.sendHeader("Access-Control-Allow-Headers", "Content-Type, X-Api-Token");
-  server.send(code, "application/json; charset=utf-8", body);
+static char *alloc_chars(size_t n) {
+  void *pointer = ps_malloc(n);
+  if (pointer == nullptr) pointer = malloc(n);
+  return static_cast<char *>(pointer);
 }
 
-static void handle_options() {
-  server.sendHeader("Access-Control-Allow-Origin", "*");
-  server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  server.sendHeader("Access-Control-Allow-Headers", "Content-Type, X-Api-Token");
-  server.send(204);
+static bool api_path(const char *path) { return strncmp(path, "/api/", 5) == 0; }
+
+static bool known_path(const char *path) {
+  return strcmp(path, "/") == 0 || strcmp(path, "/api/chords") == 0 ||
+         strcmp(path, "/api/chords/reset") == 0 || strcmp(path, "/api/fire") == 0;
 }
 
-static void send_error(int code, const char *msg) {
+static Route route_of(const char *path) {
+  if (strcmp(path, "/") == 0) return Route::Page;
+  if (strcmp(path, "/api/chords") == 0) return Route::Chords;
+  if (strcmp(path, "/api/chords/reset") == 0) return Route::Reset;
+  if (strcmp(path, "/api/fire") == 0) return Route::Fire;
+  return Route::None;
+}
+
+static const char *status_text(int code) {
+  switch (code) {
+    case 200: return "OK";
+    case 204: return "No Content";
+    case 400: return "Bad Request";
+    case 401: return "Unauthorized";
+    case 403: return "Forbidden";
+    case 404: return "Not Found";
+    case 413: return "Payload Too Large";
+    case 431: return "Request Header Fields Too Large";
+    case 500: return "Internal Server Error";
+    default: return "Error";
+  }
+}
+
+static char *json_error(const char *msg) {
   JsonDocument doc;
   doc["ok"] = false;
   doc["error"] = msg != nullptr ? msg : "失敗";
-  char buf[512];
-  const size_t n = serializeJson(doc, buf, sizeof(buf));
-  if (n == 0 || n >= sizeof(buf)) {
-    send_json(code, "{\"ok\":false,\"error\":\"失敗\"}");
+  const size_t need = measureJson(doc) + 1;
+  char *buf = alloc_chars(need);
+  if (buf == nullptr) return nullptr;
+  const size_t wrote = serializeJson(doc, buf, need);
+  if (wrote == 0 || wrote >= need) {
+    chords_release(buf);
+    return nullptr;
+  }
+  return buf;
+}
+
+static void release_out() {
+  chords_release(g_out.owned);
+  g_out.owned = nullptr;
+  g_out.body = nullptr;
+  g_out.body_len = 0;
+}
+
+static void begin_send(int code, const char *type, const char *body, size_t len, char *owned, bool cors) {
+  release_out();
+  g_out.body = body != nullptr ? body : "";
+  g_out.body_len = len;
+  g_out.body_sent = 0;
+  g_out.owned = owned;
+  g_out.hdr_sent = 0;
+  int wrote = snprintf(g_out.hdr, sizeof(g_out.hdr),
+                       "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %u\r\n"
+                       "Cache-Control: no-store\r\nConnection: close\r\n",
+                       code, status_text(code), type, static_cast<unsigned>(len));
+  if (cors && wrote > 0 && static_cast<size_t>(wrote) < sizeof(g_out.hdr)) {
+    const int extra = snprintf(
+        g_out.hdr + wrote, sizeof(g_out.hdr) - static_cast<size_t>(wrote),
+        "Access-Control-Allow-Origin: %s\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
+        "Access-Control-Allow-Headers: Content-Type, X-Api-Token\r\nVary: Origin\r\n",
+        kConfigOrigin);
+    if (extra > 0) wrote += extra;
+  }
+  if (wrote > 0 && static_cast<size_t>(wrote) + 2 < sizeof(g_out.hdr)) {
+    memcpy(g_out.hdr + wrote, "\r\n", 2);
+    wrote += 2;
+    g_out.hdr_len = static_cast<size_t>(wrote);
+  } else {
+    g_out.hdr_len = 0;
+  }
+  g_conn = Conn::Send;
+  g_io_ms = millis();
+}
+
+static void begin_error(int code, const char *msg, bool cors) {
+  char *body = json_error(msg);
+  if (body == nullptr) {
+    begin_send(code, kJsonType, kFallbackJson, sizeof(kFallbackJson) - 1, nullptr, cors);
     return;
   }
-  send_json(code, buf);
+  begin_send(code, kJsonType, body, strlen(body), body, cors);
 }
 
-static bool api_token_ok() {
-  if (kApiToken[0] == '\0') return true;
-  if (!server.hasHeader("X-Api-Token")) return false;
-  const String &got = server.header("X-Api-Token");
-  const size_t n = strlen(kApiToken);
-  if (got.length() != n) return false;
-  unsigned diff = 0;
-  for (size_t i = 0; i < n; ++i) {
-    diff |= static_cast<unsigned char>(got[i]) ^ static_cast<unsigned char>(kApiToken[i]);
+static int nb_send(int fd, const void *data, size_t len) {
+  if (fd < 0) return -1;
+  if (len > kHttpSlice) len = kHttpSlice;
+  const int n = lwip_send(fd, data, len, MSG_DONTWAIT);
+  if (n < 0) {
+    if (errno == EAGAIN || errno == EWOULDBLOCK) return 0;
+    return -1;
   }
-  return diff == 0;
+  return n;
 }
 
-static bool reject_unauthorized() {
-  if (api_token_ok()) return false;
-  send_error(401, "請輸入 API token");
-  return true;
+static bool peer_closed(int fd) {
+  if (fd < 0) return true;
+  char dummy;
+  const int n = lwip_recv(fd, &dummy, 1, MSG_DONTWAIT | MSG_PEEK);
+  if (n == 0) return true;
+  if (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK) return true;
+  return false;
 }
 
-static void handle_root() {
-  server.sendHeader("Cache-Control", "no-store");
-  server.send_P(200, "text/html; charset=utf-8", kConfigPage);
+static int nb_read(uint8_t *dst, size_t cap) {
+  if (cap > kHttpSlice) cap = kHttpSlice;
+  const int avail = g_client.available();
+  if (avail <= 0) return 0;
+  size_t n = static_cast<size_t>(avail);
+  if (n > cap) n = cap;
+  return g_client.read(dst, n);
 }
 
-static void handle_get() {
-  if (reject_unauthorized()) return;
-  char *json = chords_format_json();
-  if (json == nullptr) {
-    send_error(500, "記憶體不足");
+static void drop_conn() {
+  release_out();
+  chords_release(g_body);
+  g_body = nullptr;
+  g_client.stop();
+  g_conn = Conn::Idle;
+}
+
+static void complete_drain();
+
+static void arm_drain(After after, int code, const char *msg, bool cors, size_t already, long content_length) {
+  g_after = after;
+  g_after_code = code;
+  g_after_msg = msg != nullptr ? msg : "失敗";
+  g_cors = cors;
+  size_t left = 0;
+  if (content_length > 0 && content_length <= kDrainMax &&
+      static_cast<size_t>(content_length) > already) {
+    left = static_cast<size_t>(content_length) - already;
+  }
+  if (left == 0) {
+    g_drain_left = 0;
+    complete_drain();
     return;
   }
-  send_json(200, json);
-  chords_release(json);
+  g_drain_left = left;
+  g_conn = Conn::Drain;
+  g_io_ms = millis();
 }
 
+static bool remove_present(const char *path) {
+  if (!LittleFS.exists(path)) return true;
+  return LittleFS.remove(path);
+}
+
+// flush() is fflush plus fsync. close() alone can leave the new bytes in a
+// buffer, and the next step renames the previous chords.json away.
+// The .bak stays until the live table accepts the new file.
 static bool write_chords_file(const uint8_t *data, size_t len) {
-  // .tmp is closed before chords.json moves aside. A power cut between
-  // renaming chords.json to .bak and renaming .tmp to chords.json leaves
-  // those two files only; try_load_saved() adopts .tmp, then .bak.
-  LittleFS.remove(kChordsTmpPath);
+  if (!remove_present(kChordsTmpPath)) return false;
   File file = LittleFS.open(kChordsTmpPath, "w");
   if (!file) return false;
   const size_t wrote = file.write(data, len);
+  file.flush();
   file.close();
   if (wrote != len) {
-    LittleFS.remove(kChordsTmpPath);
+    remove_present(kChordsTmpPath);
     return false;
   }
 
-  LittleFS.remove(kChordsBakPath);
+  if (!remove_present(kChordsBakPath)) {
+    remove_present(kChordsTmpPath);
+    return false;
+  }
   const bool had = LittleFS.exists(kChordsPath);
   if (had && !LittleFS.rename(kChordsPath, kChordsBakPath)) {
-    LittleFS.remove(kChordsTmpPath);
+    remove_present(kChordsTmpPath);
     return false;
   }
   if (!LittleFS.rename(kChordsTmpPath, kChordsPath)) {
     if (had) LittleFS.rename(kChordsBakPath, kChordsPath);
-    LittleFS.remove(kChordsTmpPath);
+    remove_present(kChordsTmpPath);
     return false;
   }
-  LittleFS.remove(kChordsBakPath);
   return true;
 }
 
-static void handle_post() {
-  if (reject_unauthorized()) return;
-  if (!chords_fs_ready()) {
-    send_error(500, "檔案系統還沒備好");
-    return;
-  }
-  if (!server.hasArg("plain")) {
-    send_error(400, "沒有內容");
-    return;
-  }
-  const String &body = server.arg("plain");
-  if (body.length() == 0) {
-    send_error(400, "沒有內容");
-    return;
-  }
-  if (body.length() > kChordsJsonMax) {
-    send_error(413, "內容太大");
-    return;
-  }
-
-  char err[160];
-  err[0] = '\0';
-  if (chords_stage_json(body.c_str(), body.length(), err, sizeof(err)) != ChordStageStatus::Ok) {
-    chords_drop_staged();
-    send_error(400, err[0] != '\0' ? err : "JSON 格式不對");
-    return;
-  }
-  if (!write_chords_file(reinterpret_cast<const uint8_t *>(body.c_str()), body.length())) {
-    chords_drop_staged();
-    send_error(500, "存檔失敗");
-    return;
-  }
-  chords_commit_staged();
-
-  char ok[80];
-  snprintf(ok, sizeof(ok), "{\"ok\":true,\"source\":\"saved\",\"count\":%u}",
-           static_cast<unsigned>(chords_count()));
-  send_json(200, ok);
+static bool restore_previous_chords() {
+  if (!LittleFS.exists(kChordsBakPath)) return remove_present(kChordsPath);
+  if (!remove_present(kChordsPath)) return false;
+  return LittleFS.rename(kChordsBakPath, kChordsPath);
 }
 
-static void handle_reset() {
-  if (reject_unauthorized()) return;
-  if (chords_fs_ready() && LittleFS.exists(kChordsPath)) {
-    if (!LittleFS.remove(kChordsPath)) {
-      send_error(500, "存檔失敗");
+static void remember_error(int code, const char *msg) {
+  g_job_code = code;
+  chords_release(g_job_resp);
+  g_job_resp = json_error(msg);
+  g_job_phase.store(kJobDone, std::memory_order_release);
+}
+
+static void run_queued() {
+  if (g_job_kind == kKindGet) {
+    char *json = chords_format_json();
+    if (json == nullptr) {
+      remember_error(500, "記憶體不足");
       return;
     }
+    g_job_resp = json;
+    g_job_code = 200;
+    g_job_phase.store(kJobDone, std::memory_order_release);
+    return;
   }
-  if (chords_fs_ready()) {
-    LittleFS.remove(kChordsTmpPath);
-    LittleFS.remove(kChordsBakPath);
-  }
-  chords_load_factory();
 
+  if (g_job_kind == kKindReset) {
+    if (!chords_fs_ready() || !remove_present(kChordsBakPath) || !remove_present(kChordsTmpPath) ||
+        !remove_present(kChordsPath)) {
+      remember_error(500, chords_fs_ready() ? "存檔失敗" : "檔案系統還沒備好");
+      return;
+    }
+    g_job_phase.store(kJobNeedMain, std::memory_order_release);
+    return;
+  }
+  remember_error(500, "失敗");
+}
+
+static void run_post() {
+  if (!chords_fs_ready()) {
+    chords_release(g_job_body);
+    g_job_body = nullptr;
+    remember_error(500, "檔案系統還沒備好");
+    return;
+  }
+  char err[160];
+  err[0] = '\0';
+  const ChordStageStatus staged = chords_stage_json(g_job_body, g_job_len, err, sizeof(err));
+  if (staged != ChordStageStatus::Ok) {
+    chords_drop_staged();
+    chords_release(g_job_body);
+    g_job_body = nullptr;
+    remember_error(staged == ChordStageStatus::NoMemory ? 500 : 400,
+                   err[0] != '\0' ? err : "JSON 格式不對");
+    return;
+  }
+  const bool wrote =
+      write_chords_file(reinterpret_cast<const uint8_t *>(g_job_body), g_job_len);
+  chords_release(g_job_body);
+  g_job_body = nullptr;
+  if (!wrote) {
+    chords_drop_staged();
+    remember_error(500, "存檔失敗");
+    return;
+  }
+  g_job_phase.store(kJobNeedMain, std::memory_order_release);
+}
+
+static void run_resume() {
+  if (g_job_kind == kKindPost) {
+    if (!g_job_main_ok) {
+      restore_previous_chords();
+      remember_error(500, "存檔失敗");
+      return;
+    }
+    remove_present(kChordsBakPath);
+    char *buf = alloc_chars(80);
+    if (buf == nullptr) {
+      remember_error(500, "記憶體不足");
+      return;
+    }
+    snprintf(buf, 80, "{\"ok\":true,\"source\":\"saved\",\"count\":%u}", g_job_count);
+    g_job_resp = buf;
+    g_job_code = 200;
+    g_job_phase.store(kJobDone, std::memory_order_release);
+    return;
+  }
+  if (!g_job_main_ok) {
+    remember_error(500, "記憶體不足");
+    return;
+  }
   char *json = chords_format_json();
   if (json == nullptr) {
-    send_error(500, "記憶體不足");
+    remember_error(500, "記憶體不足");
     return;
   }
-  send_json(200, json);
-  chords_release(json);
+  g_job_resp = json;
+  g_job_code = 200;
+  g_job_phase.store(kJobDone, std::memory_order_release);
 }
 
-static void handle_fire_get() {
-  if (reject_unauthorized()) return;
-  char body[32];
-  snprintf(body, sizeof(body), "{\"mode\":\"%s\"}", chords_fire_mode_name());
-  send_json(200, body);
+static void worker_fn(void *) {
+  for (;;) {
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+    const uint8_t phase = g_job_phase.load(std::memory_order_acquire);
+    if (phase == kJobQueued) {
+      if (g_job_kind == kKindPost) run_post();
+      else run_queued();
+    } else if (phase == kJobResume) {
+      run_resume();
+    }
+  }
 }
 
-static void handle_fire_post() {
-  if (reject_unauthorized()) return;
-  if (!server.hasArg("plain")) {
-    send_error(400, "沒有內容");
+static void apply_main(bool wake) {
+  if (g_job_kind == kKindPost) {
+    g_job_main_ok = chords_commit_staged();
+    if (!g_job_main_ok) chords_drop_staged();
+    else g_job_count = static_cast<unsigned>(chords_count());
+  } else {
+    g_job_main_ok = chords_load_factory();
+  }
+  g_job_phase.store(kJobResume, std::memory_order_release);
+  if (wake && g_worker != nullptr) xTaskNotifyGive(g_worker);
+}
+
+static bool queue_job(uint8_t kind, char *body, size_t len) {
+  if (g_job_phase.load(std::memory_order_acquire) != kJobIdle) {
+    chords_release(body);
+    return false;
+  }
+  g_job_kind = kind;
+  g_job_body = body;
+  g_job_len = len;
+  g_job_resp = nullptr;
+  g_job_code = 500;
+  g_job_main_ok = false;
+  g_job_phase.store(kJobQueued, std::memory_order_release);
+  g_conn = Conn::Wait;
+  g_io_ms = millis();
+  if (g_worker != nullptr) {
+    xTaskNotifyGive(g_worker);
+    return true;
+  }
+  if (kind == kKindPost) run_post();
+  else run_queued();
+  while (g_job_phase.load(std::memory_order_acquire) == kJobNeedMain) {
+    apply_main(false);
+    run_resume();
+  }
+  return true;
+}
+
+static void service_job() {
+  const uint8_t phase = g_job_phase.load(std::memory_order_acquire);
+  if (phase == kJobNeedMain) {
+    apply_main(true);
     return;
   }
+  if (phase != kJobDone) return;
+  char *resp = g_job_resp;
+  g_job_resp = nullptr;
+  const int code = g_job_code;
+  g_job_phase.store(kJobIdle, std::memory_order_release);
+  if (g_drop_result || g_conn != Conn::Wait) {
+    chords_release(resp);
+    g_drop_result = false;
+    if (g_conn == Conn::Wait) {
+      g_client.stop();
+      g_conn = Conn::Idle;
+    }
+    return;
+  }
+  if (resp == nullptr) {
+    begin_error(code != 0 ? code : 500, "失敗", g_cors);
+    return;
+  }
+  begin_send(code, kJsonType, resp, strlen(resp), resp, g_cors);
+}
+
+static void handle_fire(char *body, size_t len) {
   JsonDocument doc;
-  const DeserializationError error = deserializeJson(doc, server.arg("plain"));
+  const DeserializationError error = deserializeJson(doc, body, len);
   const char *mode = nullptr;
   if (!error && doc["mode"].is<const char *>()) mode = doc["mode"].as<const char *>();
-  if (mode == nullptr || !chords_set_fire_mode_name(mode)) {
-    send_error(400, "模式只能是 release 或 first");
+  // Copy the mode off the document before releasing the body. The document
+  // borrows nothing from body when the input is a bounded buffer, but the
+  // pointer is only used after this check returns.
+  char mode_buf[8];
+  mode_buf[0] = '\0';
+  if (mode != nullptr) {
+    strncpy(mode_buf, mode, sizeof(mode_buf) - 1);
+    mode_buf[sizeof(mode_buf) - 1] = '\0';
+  }
+  chords_release(body);
+  if (mode_buf[0] == '\0' || !chords_set_fire_mode_name(mode_buf, false)) {
+    begin_error(400, "模式只能是 release 或 first", g_cors);
     return;
   }
-  char body[48];
-  snprintf(body, sizeof(body), "{\"ok\":true,\"mode\":\"%s\"}", chords_fire_mode_name());
-  send_json(200, body);
+  char *ok = alloc_chars(48);
+  if (ok == nullptr) {
+    begin_error(500, "記憶體不足", g_cors);
+    return;
+  }
+  snprintf(ok, 48, "{\"ok\":true,\"mode\":\"%s\"}", chords_fire_mode_name());
+  begin_send(200, kJsonType, ok, strlen(ok), ok, g_cors);
 }
 
-static void handle_404() { server.send(404, "text/plain; charset=utf-8", "not found"); }
+static void finish_body() {
+  char *body = g_body;
+  const size_t len = g_body_len;
+  g_body = nullptr;
+  if (body != nullptr && len <= g_body_len) body[len] = '\0';
+  if (g_route == Route::Fire) {
+    handle_fire(body, len);
+    return;
+  }
+  if (g_route == Route::Chords) {
+    if (!queue_job(kKindPost, body, len)) begin_error(500, "失敗", g_cors);
+    return;
+  }
+  chords_release(body);
+  begin_error(404, "not found", g_cors);
+}
 
-static void register_routes() {
-  if (g_routes) return;
-  static const char *kHeaders[] = {"X-Api-Token"};
-  server.collectHeaders(kHeaders, 1);
-  server.on("/", HTTP_GET, handle_root);
-  server.on("/", HTTP_OPTIONS, handle_options);
-  server.on("/api/chords", HTTP_GET, handle_get);
-  server.on("/api/chords", HTTP_POST, handle_post);
-  server.on("/api/chords", HTTP_OPTIONS, handle_options);
-  server.on("/api/chords/reset", HTTP_POST, handle_reset);
-  server.on("/api/chords/reset", HTTP_OPTIONS, handle_options);
-  server.on("/api/fire", HTTP_GET, handle_fire_get);
-  server.on("/api/fire", HTTP_POST, handle_fire_post);
-  server.on("/api/fire", HTTP_OPTIONS, handle_options);
-  server.onNotFound(handle_404);
-  g_routes = true;
+static void complete_drain() {
+  if (g_after == After::Status) {
+    begin_send(g_after_code, "text/plain; charset=utf-8", "", 0, nullptr, g_cors);
+    return;
+  }
+  if (g_after == After::Reset) {
+    if (!queue_job(kKindReset, nullptr, 0)) begin_error(500, "失敗", g_cors);
+    return;
+  }
+  begin_error(g_after_code, g_after_msg, g_cors);
+}
+
+static bool authorized(const HttpRequest &req) {
+  if (req.token_overflow) return false;
+  if (kApiToken[0] == '\0') return true;
+  if (!req.has_token) return false;
+  return token_matches(kApiToken, req.token);
+}
+
+static void on_headers(size_t end) {
+  HttpRequest req;
+  const size_t already = g_header_len - end;
+  if (!parse_http_request(g_header, end, &req)) {
+    arm_drain(After::Error, 400, "請求格式不對", false, already, -1);
+    return;
+  }
+  if (req.content_length >= 0 && already > static_cast<size_t>(req.content_length)) {
+    arm_drain(After::Error, 400, "請求格式不對", false, 0, -1);
+    return;
+  }
+
+  const bool api = api_path(req.path);
+  g_cors = api && req.has_origin && !req.origin_overflow && origin_allowed(req.origin, true);
+  g_route = route_of(req.path);
+
+  if (strcmp(req.method, "OPTIONS") == 0) {
+    if (!known_path(req.path)) {
+      arm_drain(After::Error, 404, "not found", g_cors, already, req.content_length);
+      return;
+    }
+    arm_drain(After::Status, 204, nullptr, g_cors, already, req.content_length);
+    return;
+  }
+  if (g_route == Route::None) {
+    arm_drain(After::Error, 404, "not found", false, already, req.content_length);
+    return;
+  }
+  if (api && (req.origin_overflow || !origin_allowed(req.origin, req.has_origin))) {
+    arm_drain(After::Error, 403, "來源不符", false, already, req.content_length);
+    return;
+  }
+  if (api && !authorized(req)) {
+    arm_drain(After::Error, 401, "請輸入 API token", g_cors, already, req.content_length);
+    return;
+  }
+  if (req.chunked) {
+    arm_drain(After::Error, 400, "不支援分段上傳", g_cors, already, req.content_length);
+    return;
+  }
+
+  if (g_route == Route::Page) {
+    if (strcmp(req.method, "GET") != 0) {
+      arm_drain(After::Error, 404, "not found", false, already, req.content_length);
+      return;
+    }
+    begin_send(200, "text/html; charset=utf-8", kConfigPage, sizeof(kConfigPage) - 1, nullptr, false);
+    return;
+  }
+
+  if (req.content_length < 0) req.content_length = 0;
+
+  if (g_route == Route::Reset) {
+    if (strcmp(req.method, "POST") != 0) {
+      arm_drain(After::Error, 404, "not found", g_cors, already, req.content_length);
+      return;
+    }
+    if (req.content_length > kDrainMax) {
+      arm_drain(After::Error, 413, "內容太大", g_cors, 0, -1);
+      return;
+    }
+    arm_drain(After::Reset, 0, nullptr, g_cors, already, req.content_length);
+    return;
+  }
+
+  if (g_route == Route::Fire && strcmp(req.method, "GET") == 0) {
+    if (req.content_length > 0) {
+      arm_drain(After::Error, 400, "請求格式不對", g_cors, already, req.content_length);
+      return;
+    }
+    char *body = alloc_chars(32);
+    if (body == nullptr) {
+      begin_error(500, "記憶體不足", g_cors);
+      return;
+    }
+    snprintf(body, 32, "{\"mode\":\"%s\"}", chords_fire_mode_name());
+    begin_send(200, kJsonType, body, strlen(body), body, g_cors);
+    return;
+  }
+
+  const bool post_chords = g_route == Route::Chords && strcmp(req.method, "POST") == 0;
+  const bool post_fire = g_route == Route::Fire && strcmp(req.method, "POST") == 0;
+  const bool get_chords = g_route == Route::Chords && strcmp(req.method, "GET") == 0;
+  if (get_chords) {
+    if (req.content_length > 0) {
+      arm_drain(After::Error, 400, "請求格式不對", g_cors, already, req.content_length);
+      return;
+    }
+    if (!queue_job(kKindGet, nullptr, 0)) begin_error(500, "失敗", g_cors);
+    return;
+  }
+  if (!post_chords && !post_fire) {
+    arm_drain(After::Error, 404, "not found", g_cors, already, req.content_length);
+    return;
+  }
+  if (req.content_length == 0) {
+    arm_drain(After::Error, 400, "沒有內容", g_cors, already, 0);
+    return;
+  }
+  const long cap = post_fire ? static_cast<long>(kFireBodyMax) : static_cast<long>(kChordsJsonMax);
+  if (req.content_length > cap) {
+    arm_drain(After::Error, 413, "內容太大", g_cors, already, req.content_length);
+    return;
+  }
+
+  g_body = alloc_chars(static_cast<size_t>(req.content_length) + 1);
+  if (g_body == nullptr) {
+    arm_drain(After::Error, 500, "記憶體不足", g_cors, already, req.content_length);
+    return;
+  }
+  g_body_len = static_cast<size_t>(req.content_length);
+  g_body_got = already;
+  if (already > 0) memcpy(g_body, g_header + end, already);
+  g_body[g_body_got] = '\0';
+  if (g_body_got == g_body_len) {
+    finish_body();
+    return;
+  }
+  g_conn = Conn::Body;
+  g_io_ms = millis();
+}
+
+static void pump_drain() {
+  uint8_t buf[kHttpSlice];
+  const size_t cap = g_drain_left < kHttpSlice ? g_drain_left : kHttpSlice;
+  const int n = nb_read(buf, cap);
+  if (n < 0) {
+    drop_conn();
+    return;
+  }
+  if (n == 0) {
+    if (peer_closed(g_client.fd()) || millis() - g_io_ms > kHttpStallMs) {
+      if (peer_closed(g_client.fd())) drop_conn();
+      else complete_drain();
+    }
+    return;
+  }
+  g_drain_left -= static_cast<size_t>(n);
+  g_io_ms = millis();
+  if (g_drain_left == 0) complete_drain();
+}
+
+static void pump_send() {
+  const int fd = g_client.fd();
+  if (fd < 0) {
+    drop_conn();
+    return;
+  }
+  const uint8_t *data = nullptr;
+  size_t left = 0;
+  size_t *cursor = nullptr;
+  if (g_out.hdr_sent < g_out.hdr_len) {
+    data = reinterpret_cast<const uint8_t *>(g_out.hdr) + g_out.hdr_sent;
+    left = g_out.hdr_len - g_out.hdr_sent;
+    cursor = &g_out.hdr_sent;
+  } else if (g_out.body_sent < g_out.body_len) {
+    data = reinterpret_cast<const uint8_t *>(g_out.body) + g_out.body_sent;
+    left = g_out.body_len - g_out.body_sent;
+    cursor = &g_out.body_sent;
+  } else {
+    release_out();
+    g_client.stop();
+    g_conn = Conn::Idle;
+    return;
+  }
+  const int n = nb_send(fd, data, left);
+  if (n < 0 || (n == 0 && (peer_closed(fd) || millis() - g_io_ms > kHttpStallMs))) {
+    drop_conn();
+    return;
+  }
+  if (n > 0) {
+    *cursor += static_cast<size_t>(n);
+    g_io_ms = millis();
+  }
+}
+
+static void read_header() {
+  if (g_header_len >= sizeof(g_header)) {
+    arm_drain(After::Error, 431, "請求標頭太大", false, 0, -1);
+    return;
+  }
+  const int n = nb_read(reinterpret_cast<uint8_t *>(g_header) + g_header_len,
+                        sizeof(g_header) - g_header_len);
+  if (n < 0) {
+    drop_conn();
+    return;
+  }
+  if (n == 0) {
+    if (peer_closed(g_client.fd()) || millis() - g_io_ms > kHttpStallMs) drop_conn();
+    return;
+  }
+  g_header_len += static_cast<size_t>(n);
+  g_io_ms = millis();
+  const size_t end = http_header_end(g_header, g_header_len);
+  if (end == 0) {
+    if (g_header_len >= sizeof(g_header)) arm_drain(After::Error, 431, "請求標頭太大", false, 0, -1);
+    return;
+  }
+  on_headers(end);
+}
+
+static void read_body() {
+  if (g_body == nullptr || g_body_got > g_body_len) {
+    drop_conn();
+    return;
+  }
+  const int n = nb_read(reinterpret_cast<uint8_t *>(g_body) + g_body_got, g_body_len - g_body_got);
+  if (n < 0) {
+    drop_conn();
+    return;
+  }
+  if (n == 0) {
+    if (peer_closed(g_client.fd()) || millis() - g_io_ms > kHttpStallMs) drop_conn();
+    return;
+  }
+  g_body_got += static_cast<size_t>(n);
+  g_body[g_body_got] = '\0';
+  g_io_ms = millis();
+  if (g_body_got == g_body_len) finish_body();
+}
+
+static void make_nonblock(WiFiClient &client) {
+  const int fd = client.fd();
+  if (fd < 0) return;
+  const int flags = fcntl(fd, F_GETFL, 0);
+  if (flags >= 0) fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+}
+
+static void accept_client() {
+  if (g_conn != Conn::Idle) return;
+  if (g_job_phase.load(std::memory_order_acquire) != kJobIdle) return;
+  WiFiClient client = g_server.accept();
+  if (!client) return;
+  make_nonblock(client);
+  g_client = client;
+  g_header_len = 0;
+  g_conn = Conn::Header;
+  g_io_ms = millis();
+}
+
+static void service_conn() {
+  if (g_conn == Conn::Idle) accept_client();
+  switch (g_conn) {
+    case Conn::Idle:
+    case Conn::Wait:
+      break;
+    case Conn::Header:
+      read_header();
+      break;
+    case Conn::Body:
+      read_body();
+      break;
+    case Conn::Drain:
+      pump_drain();
+      break;
+    case Conn::Send:
+      pump_send();
+      break;
+  }
 }
 
 static bool switch_closed_raw() { return digitalRead(kWifiEnablePin) == LOW; }
@@ -275,7 +840,7 @@ static void poll_switch() {
 
 static void start_ap() {
   if (g_http || g_start_failed) return;
-  if (!ap_password_ok()) {
+  if (!ap_credentials_ok(kApSsid, kApPassword, kApPlaceholder)) {
     console_println("AP stayed off: set WIFI_AP_PASSWORD in include/secrets.h");
     g_start_failed = true;
     return;
@@ -302,14 +867,18 @@ static void start_ap() {
   snprintf(line, sizeof(line), "AP %s", kApSsid);
   console_println(line);
   console_println("http://192.168.4.1/");
-  server.begin();
+  g_server.begin();
   g_http = true;
 }
 
 static void stop_ap() {
   if (!g_http) return;
   g_http = false;
-  server.stop();
+  const uint8_t phase = g_job_phase.load(std::memory_order_acquire);
+  g_drop_result = g_conn == Conn::Wait || phase != kJobIdle;
+  if (g_conn != Conn::Wait) drop_conn();
+  else g_client.stop();
+  g_server.stop();
   WiFi.softAPdisconnect(true);
   WiFi.mode(WIFI_OFF);
   console_println("AP off");
@@ -321,14 +890,23 @@ void config_server_begin() {
   g_switch_raw = switch_closed_raw();
   g_switch_stable = g_switch_raw;
   g_switch_change_ms = millis();
-  register_routes();
+  if (g_worker == nullptr) {
+    const BaseType_t ok =
+        xTaskCreatePinnedToCore(worker_fn, "cfghttp", 16384, nullptr, 1, &g_worker, 0);
+    if (ok != pdPASS) {
+      g_worker = nullptr;
+      console_println("HTTP worker failed; saves run on the key scan");
+    }
+  }
   console_println("WiFi switch GPIO15, closed to GND");
   if (g_switch_stable) start_ap();
 }
 
 void config_server_poll() {
   poll_switch();
+  service_job();
   if (g_switch_stable && !g_http) start_ap();
   else if (!g_switch_stable && g_http) stop_ap();
-  if (g_http) server.handleClient();
+  if (g_http) service_conn();
+  service_job();
 }

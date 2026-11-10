@@ -82,4 +82,4 @@ GPIO3 刻意空下（strapping）。順序與和弦表的鍵名順序相同：`L
 | 開關 | GPIO15 接到 GND 才開；沒接就關 |
 | 網頁 | http://192.168.4.1/ |
 
-複製 [`include/secrets.h.example`](../include/secrets.h.example) 成 `include/secrets.h`。密碼至少 8 碼，而且不能沿用範本裡的占位字；否則開關合上熱點也不會開。這是個人原型的設定頁，沒有 HTTPS。`WIFI_API_TOKEN` 留空時，連上熱點的人都能呼叫設定 API。填了非空字串之後，網頁會要求同一個 token，並以 `X-Api-Token` 送出；序列埠不印這組字。`include/secrets.h` 不可進 git，編譯前會檢查它有沒有被追蹤。序列埠印開關腳位、熱點名稱與 `192.168.4.1`；關掉時印 `AP off`。不印密碼。掛載 LittleFS 失敗時會先印一行再格式化一次，避免一開機就無聲清掉 `chords.json`。
+複製 [`include/secrets.h.example`](../include/secrets.h.example) 成 `include/secrets.h`。密碼至少 8 碼，而且不能沿用範本裡的占位字；否則開關合上熱點也不會開。這是個人原型的設定頁，沒有 HTTPS。`WIFI_API_TOKEN` 留空時，連上熱點的程式仍能呼叫設定 API。瀏覽器若從別的網站對這個位址送請求會被拒，`Origin` 必須是 `http://192.168.4.1` 或沒有這個標頭。填了非空字串之後，網頁會要求同一個 token，並以 `X-Api-Token` 送出；序列埠不印這組字。`include/secrets.h` 不可進 git，編譯前會檢查它有沒有被追蹤。序列埠印開關腳位、熱點名稱與 `192.168.4.1`；關掉時印 `AP off`。不印密碼。掛載 LittleFS 失敗時會先印一行再格式化一次，避免一開機就無聲清掉 `chords.json`。

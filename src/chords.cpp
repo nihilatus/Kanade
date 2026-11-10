@@ -294,16 +294,20 @@ static void save_fire_mode() {
 
 const char *chords_fire_mode_name() { return fire_mode_name(g_engine.mode); }
 
-bool chords_set_fire_mode_name(const char *name) {
+bool chords_set_fire_mode_name(const char *name, bool dispatch) {
   if (name == nullptr) return false;
   ChordFireMode next;
   if (strcmp(name, "release") == 0) next = ChordFireMode::ReleaseAll;
   else if (strcmp(name, "first") == 0) next = ChordFireMode::FirstUp;
   else return false;
 
-  const uint32_t now = millis();
-  const ChordStep step = chord_engine_set_mode(&g_engine, next);
-  dispatch_chord_step(step, now);
+  if (dispatch) {
+    const uint32_t now = millis();
+    const ChordStep step = chord_engine_set_mode(&g_engine, next);
+    dispatch_chord_step(step, now);
+  } else {
+    g_engine.mode = next;
+  }
   save_fire_mode();
   log_fire_mode();
   return true;
@@ -367,12 +371,12 @@ void chords_drop_staged() {
   g_stage_pool_used = 0;
 }
 
-void chords_load_factory() {
+bool chords_load_factory() {
   chords_drop_staged();
   if (!ensure_live_bufs()) {
     g_live_count = 0;
     g_from_file = false;
-    return;
+    return false;
   }
   for (size_t i = 0; i < kFactoryCount; ++i) g_live[i] = kFactory[i];
   for (size_t i = kFactoryCount; i < kChordsMaxRows; ++i) {
@@ -385,6 +389,7 @@ void chords_load_factory() {
   }
   g_live_count = kFactoryCount;
   g_from_file = false;
+  return true;
 }
 
 ChordStageStatus chords_stage_json(const char *json, size_t len, char *err, size_t err_len) {
@@ -490,9 +495,9 @@ ChordStageStatus chords_stage_json(const char *json, size_t len, char *err, size
   return ChordStageStatus::Ok;
 }
 
-void chords_commit_staged() {
-  if (!g_staged || g_stage_rules == nullptr || g_stage_pool == nullptr) return;
-  if (!ensure_live_bufs()) return;
+bool chords_commit_staged() {
+  if (!g_staged || g_stage_rules == nullptr || g_stage_pool == nullptr) return false;
+  if (!ensure_live_bufs()) return false;
   memcpy(g_live, g_stage_rules, g_stage_count * sizeof(ChordRule));
   memcpy(g_pool, g_stage_pool, g_stage_pool_used);
   for (size_t i = 0; i < g_stage_count; ++i) {
@@ -514,6 +519,7 @@ void chords_commit_staged() {
   g_live_count = g_stage_count;
   g_from_file = true;
   chords_drop_staged();
+  return true;
 }
 
 char *chords_format_json() {
@@ -626,8 +632,7 @@ static bool restore_orphan(const char *path, bool *halt, char *err, size_t err_l
     log_factory("could not restore saved table");
     return false;
   }
-  chords_commit_staged();
-  if (!g_from_file) {
+  if (!chords_commit_staged()) {
     chords_drop_staged();
     *halt = true;
     log_factory("no memory for live table");
@@ -665,8 +670,7 @@ static void try_load_saved() {
     log_factory(err[0] != '\0' ? err : "saved table rejected");
     return;
   }
-  chords_commit_staged();
-  if (!g_from_file) {
+  if (!chords_commit_staged()) {
     chords_drop_staged();
     log_factory("no memory for live table");
     return;
