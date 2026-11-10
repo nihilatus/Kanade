@@ -12,7 +12,7 @@ static bool g_begun = false;
 
 static constexpr uint16_t kTapGapMs = 12;
 
-enum class HidOp : uint8_t { ReleaseAll, Press, Write };
+enum class HidOp : uint8_t { ReleaseAll, Press };
 
 struct HidEvent {
   HidOp op;
@@ -75,9 +75,6 @@ static void send_event(const HidEvent &event) {
       break;
     case HidOp::Press:
       Keyboard.press(event.code);
-      break;
-    case HidOp::Write:
-      Keyboard.write(event.code);
       break;
   }
 }
@@ -183,21 +180,35 @@ void hid_type_recipe(const char *recipe) {
   }
 
   if (parsed.count == 0 && !release_first) return;
-  HidEvent batch[kChordRecipeCap];
+  // A plain letter is press then release, each held across a host poll.
+  // One Keyboard.write() would queue both reports before the ~10 ms poll.
+  size_t slots = release_first ? 1 : 0;
+  for (size_t i = 0; i < parsed.count; ++i) {
+    slots += parsed.events[i].op == ChordEvOp::Write ? 2 : 1;
+  }
+  if (g_count + slots > kQueueCap) {
+#if ARDUINO_USB_CDC_ON_BOOT
+    Serial.println(F("hid queue full, recipe skipped"));
+#endif
+    return;
+  }
+  if (release_first && !enqueue_release()) return;
   for (size_t i = 0; i < parsed.count; ++i) {
     const ChordEvent &event = parsed.events[i];
+    if (event.op == ChordEvOp::Write) {
+      const uint8_t gap = event.gap_after_ms == 0 ? kTapGapMs : event.gap_after_ms;
+      enqueue(HidOp::Press, event.code, gap);
+      enqueue(HidOp::ReleaseAll, 0, gap);
+      continue;
+    }
     HidOp op = HidOp::ReleaseAll;
     uint8_t code = 0;
-    if (event.op == ChordEvOp::Write) {
-      op = HidOp::Write;
-      code = event.code;
-    } else if (event.op == ChordEvOp::Press) {
+    if (event.op == ChordEvOp::Press) {
       op = HidOp::Press;
       code = press_code(event);
     }
-    batch[i] = HidEvent{op, code, event.gap_after_ms};
+    enqueue(op, code, event.gap_after_ms);
   }
-  push_events(batch, parsed.count, release_first);
 }
 
 void hid_type_romaji(const char *text) {
@@ -210,11 +221,20 @@ void hid_type_romaji(const char *text) {
 #endif
     return;
   }
-  HidEvent batch[81];
-  for (size_t i = 0; i < len; ++i) {
-    batch[i] = HidEvent{HidOp::Write, static_cast<uint8_t>(text[i]), kTapGapMs};
+  if (len == 0 && !release_first) return;
+  const size_t slots = len * 2 + (release_first ? 1 : 0);
+  if (g_count + slots > kQueueCap) {
+#if ARDUINO_USB_CDC_ON_BOOT
+    Serial.println(F("hid queue full, romaji skipped"));
+#endif
+    return;
   }
-  push_events(batch, len, release_first);
+  if (release_first && !enqueue_release()) return;
+  for (size_t i = 0; i < len; ++i) {
+    const uint8_t code = static_cast<uint8_t>(text[i]);
+    enqueue(HidOp::Press, code, kTapGapMs);
+    enqueue(HidOp::ReleaseAll, 0, kTapGapMs);
+  }
 }
 
 void hid_tap_key(uint8_t keycode) {

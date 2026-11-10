@@ -14,7 +14,9 @@ bool hid_keyboard_ready();
 void hid_keyboard_poll();
 
 // Type an ASCII/romaji string (a–z, space, punctuation the stock layout maps).
-// Queued; does not block the caller.
+// Each character is its own press report, a gap, then release. Keyboard.write()
+// would send both reports before a ~10 ms host poll, so a repeat such as "nn"
+// can collapse into one key. Queued; does not block the caller.
 void hid_type_romaji(const char *text);
 
 // Space-separated recipe from the chord table:
