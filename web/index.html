@@ -289,6 +289,7 @@
   <header>
     <h1>和弦打法測試</h1>
     <div class="tools">
+      <button id="fire-mode" type="button" aria-pressed="false">全放再送</button>
       <button id="quiz" type="button" aria-pressed="false">逐項驗證</button>
       <button id="voice" type="button" aria-pressed="true">語音開</button>
       <label class="file-btn">載入 CSV
@@ -337,6 +338,7 @@
     const RELEASE_MS = 10;
     const STORAGE_MAP = "chord-practice-keymap";
     const STORAGE_VOICE = "chord-practice-voice";
+    const STORAGE_FIRE = "chord-practice-fire";
     const DEFAULT_MAP = {
       LL: { code: "KeyA", label: "A" },
       LU: { code: "KeyW", label: "W" },
@@ -377,6 +379,7 @@
     const historyEl = document.getElementById("history");
     const keyListEl = document.getElementById("key-list");
     const voiceBtn = document.getElementById("voice");
+    const fireBtn = document.getElementById("fire-mode");
 
     let rules = [];
     let quizOn = false;
@@ -386,6 +389,7 @@
     let bindings = loadBindings();
     let captureId = null;
     let voiceOn = localStorage.getItem(STORAGE_VOICE) !== "0";
+    let fireMode = localStorage.getItem(STORAGE_FIRE) === "first" ? "first" : "release";
     let speakToken = 0;
     let downMask = 0;
     let phase = "idle";
@@ -536,7 +540,15 @@
       detailEl.textContent = detail;
     }
 
+    function idlePrompt() {
+      return fireMode === "first" ? "同時按下，再放開" : "按下和弦後放開";
+    }
+
     function renderStage() {
+      if (phase === "draining") {
+        detailEl.textContent = "收尾中，等全部放開 · 還按著 " + formatMask(downMask);
+        return;
+      }
       if (quizOn) {
         if (phase === "holding" || phase === "guard") {
           const shown = phase === "holding" ? downMask : maxChord;
@@ -552,7 +564,7 @@
         return;
       }
       if (resultEl.dataset.locked === "1") return;
-      setResult("按下和弦後放開", "idle", "");
+      setResult(idlePrompt(), "idle", "");
     }
 
     function remember(text, detail) {
@@ -620,7 +632,8 @@
       const required = maskNames(row.required).map(boundName);
       const parts = [];
       if (row.category) parts.push(row.category);
-      parts.push("同時按住 " + (required.join(" + ") || "（沒有必按鍵）") + "，然後全部放開");
+      parts.push("同時按住 " + (required.join(" + ") || "（沒有必按鍵）") +
+        (fireMode === "first" ? "，第一顆放開就送出" : "，然後全部放開"));
       if (row.optional) {
         parts.push(maskNames(row.optional).map(boundName).join("、") + " 可按可不按");
       }
@@ -726,7 +739,7 @@
       }
       resultEl.dataset.locked = "1";
       if (!mask) {
-        setResult("按下和弦後放開", "idle", "");
+        setResult(idlePrompt(), "idle", "");
         resultEl.dataset.locked = "";
         return;
       }
@@ -755,6 +768,11 @@
     function chordDown(bit) {
       if (downMask & bit) return;
       downMask |= bit;
+      if (phase === "draining") {
+        renderStage();
+        paintKeys();
+        return;
+      }
       if (phase === "idle") {
         phase = "holding";
         maxChord = 0;
@@ -764,7 +782,7 @@
         clearTimeout(guardTimer);
         phase = "holding";
       }
-      noteSnapshot(downMask);
+      if (phase === "holding") noteSnapshot(downMask);
       renderStage();
       paintKeys();
     }
@@ -772,6 +790,22 @@
     function chordUp(bit) {
       if ((downMask & bit) === 0) return;
       downMask = (downMask & ~bit) & 0x3fff;
+      if (fireMode === "first") {
+        if (phase === "holding" && maxCount > 0 && (downMask & maxChord) !== maxChord) {
+          const chord = maxChord;
+          maxChord = 0;
+          maxCount = 0;
+          phase = downMask === 0 ? "idle" : "draining";
+          fire(chord);
+        } else if (phase === "draining" && downMask === 0) {
+          phase = "idle";
+        } else if (phase === "holding") {
+          noteSnapshot(downMask);
+        }
+        renderStage();
+        paintKeys();
+        return;
+      }
       if (downMask === 0 && phase === "holding") {
         phase = "guard";
         guardTimer = setTimeout(finishGuard, RELEASE_MS);
@@ -801,6 +835,23 @@
     function releaseAll() {
       if (downMask === 0 && phase === "idle") return;
       downMask = 0;
+      if (fireMode === "first") {
+        clearTimeout(guardTimer);
+        if (phase === "holding" && maxCount > 0 && maxChord !== 0) {
+          const chord = maxChord;
+          maxChord = 0;
+          maxCount = 0;
+          phase = "idle";
+          fire(chord);
+        } else {
+          phase = "idle";
+          maxChord = 0;
+          maxCount = 0;
+        }
+        renderStage();
+        paintKeys();
+        return;
+      }
       if (phase === "holding") {
         phase = "guard";
         clearTimeout(guardTimer);
@@ -890,6 +941,35 @@
       paintKeys();
     }
 
+    function syncFireButton() {
+      const first = fireMode === "first";
+      fireBtn.setAttribute("aria-pressed", first ? "true" : "false");
+      fireBtn.textContent = first ? "首鍵放開就送" : "全放再送";
+    }
+
+    function applyFireMode(mode) {
+      fireMode = mode === "first" ? "first" : "release";
+      localStorage.setItem(STORAGE_FIRE, fireMode);
+      clearTimeout(guardTimer);
+      if (downMask === 0) {
+        phase = "idle";
+        maxChord = 0;
+        maxCount = 0;
+      } else {
+        phase = "holding";
+        maxChord = 0;
+        maxCount = 0;
+        noteSnapshot(downMask);
+        resultEl.dataset.locked = "";
+      }
+      syncFireButton();
+      renderStage();
+      paintKeys();
+      noticeEl.textContent = fireMode === "first"
+        ? "高峰後第一顆放開就送出。請同時按下、再放開；尾鍵還沒放完時按下的下一組會被略過。"
+        : "全部放開並停 " + RELEASE_MS + " ms 才送出。下一組若提前按下，會和這一組合在一起。";
+    }
+
     function syncVoiceButton() {
       voiceBtn.setAttribute("aria-pressed", voiceOn ? "true" : "false");
       voiceBtn.textContent = voiceOn ? "語音開" : "語音關";
@@ -900,7 +980,7 @@
       for (const name of KEYS) {
         if (bindings[name]) bindingsOut[name] = bindings[name];
       }
-      return { version: 1, voice: voiceOn, bindings: bindingsOut };
+      return { version: 1, voice: voiceOn, fire: fireMode, bindings: bindingsOut };
     }
 
     function applySettings(data) {
@@ -908,6 +988,11 @@
       const next = normalizeBindings(source);
       if (!next || Object.keys(next).length === 0) throw new Error("設定檔裡沒有按鍵對應");
       bindings = next;
+      if (data && (data.fire === "first" || data.fire === "release")) {
+        fireMode = data.fire;
+        localStorage.setItem(STORAGE_FIRE, fireMode);
+        syncFireButton();
+      }
       if (data && typeof data.voice === "boolean") {
         voiceOn = data.voice;
         localStorage.setItem(STORAGE_VOICE, voiceOn ? "1" : "0");
@@ -1032,7 +1117,7 @@
       if (quizOn) renderLesson("");
       else {
         clearTargets();
-        setResult("按下和弦後放開", "idle", "");
+        setResult(idlePrompt(), "idle", "");
       }
     });
 
@@ -1068,6 +1153,11 @@
       }
     });
 
+    fireBtn.addEventListener("click", () => {
+      applyFireMode(fireMode === "first" ? "release" : "first");
+    });
+
+    syncFireButton();
     syncVoiceButton();
     buildKeyList();
 
