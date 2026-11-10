@@ -43,6 +43,7 @@ struct CmdPort {
   Stream *in;
   char buf[24];
   uint8_t len;
+  bool overflow;
 };
 
 static void poll_fire_cmd(CmdPort &port) {
@@ -53,7 +54,18 @@ static void poll_fire_cmd(CmdPort &port) {
     const char c = static_cast<char>(raw);
     if (c == '\r') continue;
     if (c != '\n') {
+      if (port.overflow) continue;
       if (port.len + 1 < sizeof(port.buf)) port.buf[port.len++] = c;
+      else {
+        port.overflow = true;
+        port.len = 0;
+      }
+      continue;
+    }
+    if (port.overflow) {
+      port.overflow = false;
+      port.len = 0;
+      console_println("指令過長");
       continue;
     }
     port.buf[port.len] = '\0';
@@ -62,6 +74,7 @@ static void poll_fire_cmd(CmdPort &port) {
     char *arg = port.buf;
     while (*arg == ' ' || *arg == '\t') ++arg;
     if (strncmp(arg, "fire", 4) != 0) continue;
+    if (arg[4] != '\0' && arg[4] != ' ' && arg[4] != '\t') continue;
     arg += 4;
     while (*arg == ' ' || *arg == '\t') ++arg;
     size_t n = strlen(arg);
@@ -76,9 +89,9 @@ static void poll_fire_cmd(CmdPort &port) {
   }
 }
 
-static CmdPort g_uart{&Serial0, {}, 0};
+static CmdPort g_uart{&Serial0, {}, 0, false};
 #if ARDUINO_USB_CDC_ON_BOOT
-static CmdPort g_usb{&Serial, {}, 0};
+static CmdPort g_usb{&Serial, {}, 0, false};
 #endif
 
 void loop() {

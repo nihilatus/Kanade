@@ -49,14 +49,18 @@ bool chords_at(size_t index, ChordView *out);
 bool chords_using_saved();
 bool chords_fs_ready();
 
+enum class ChordStageStatus : uint8_t { Ok = 0, Rejected, NoMemory };
+
 // Parse into a side buffer. The live table stays put until commit.
-// err receives a short Traditional Chinese reason when this returns false.
-bool chords_stage_json(const char *json, size_t len, char *err, size_t err_len);
+// err receives a short Traditional Chinese reason when this is not Ok.
+// NoMemory is only the stage-buffer allocation failure.
+ChordStageStatus chords_stage_json(const char *json, size_t len, char *err, size_t err_len);
 void chords_commit_staged();
 void chords_drop_staged();
 void chords_load_factory();
 
 // {"source":"factory"|"saved","count":N,"chords":[...]}
-// Key masks are arrays of LL..RT2 names. Caller frees with free().
+// Key masks are arrays of LL..RT2 names. Caller frees with chords_release().
 // Null if the document cannot be built.
 char *chords_format_json();
+void chords_release(void *pointer);

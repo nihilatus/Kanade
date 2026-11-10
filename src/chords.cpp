@@ -69,18 +69,29 @@ struct PsramAllocator : ArduinoJson::Allocator {
   }
 };
 
-static bool set_err(char *err, size_t err_len, const char *msg) {
+static ChordStageStatus g_stage_status = ChordStageStatus::Rejected;
+
+static ChordStageStatus set_err(char *err, size_t err_len, const char *msg,
+                               ChordStageStatus status = ChordStageStatus::Rejected) {
+  g_stage_status = status;
   if (err != nullptr && err_len > 0) {
     snprintf(err, err_len, "%s", msg);
   }
-  return false;
+  return g_stage_status;
 }
 
-static bool set_row_err(char *err, size_t err_len, unsigned row, const char *msg) {
+static ChordStageStatus set_row_err(char *err, size_t err_len, unsigned row, const char *msg) {
+  g_stage_status = ChordStageStatus::Rejected;
   if (err != nullptr && err_len > 0) {
     snprintf(err, err_len, "第 %u 列%s", row, msg);
   }
-  return false;
+  return g_stage_status;
+}
+
+void chords_release(void *pointer) {
+  if (pointer == nullptr) return;
+  if (esp_ptr_external_ram(pointer)) heap_caps_free(pointer);
+  else free(pointer);
 }
 
 static void *alloc_spiram_first(size_t size) {
@@ -104,8 +115,8 @@ static bool ensure_stage_bufs() {
   g_stage_rules = static_cast<ChordRule *>(ps_malloc(sizeof(ChordRule) * kChordsMaxRows));
   g_stage_pool = static_cast<char *>(ps_malloc(kPoolSize));
   if (g_stage_rules == nullptr || g_stage_pool == nullptr) {
-    free(g_stage_rules);
-    free(g_stage_pool);
+    chords_release(g_stage_rules);
+    chords_release(g_stage_pool);
     g_stage_rules = static_cast<ChordRule *>(malloc(sizeof(ChordRule) * kChordsMaxRows));
     g_stage_pool = static_cast<char *>(malloc(kPoolSize));
   }
@@ -133,7 +144,10 @@ static bool text_ok(const char *s, bool ascii_only) {
 static bool mask_from_array(JsonArray arr, uint16_t *mask, char *err, size_t err_len, unsigned row) {
   uint16_t bits = 0;
   for (JsonVariant value : arr) {
-    if (!value.is<const char *>()) return set_row_err(err, err_len, row, "有不認識的鍵");
+    if (!value.is<const char *>()) {
+      set_row_err(err, err_len, row, "有不認識的鍵");
+      return false;
+    }
     const char *name = value.as<const char *>();
     int index = -1;
     for (uint8_t i = 0; i < BTN_COUNT; ++i) {
@@ -142,9 +156,15 @@ static bool mask_from_array(JsonArray arr, uint16_t *mask, char *err, size_t err
         break;
       }
     }
-    if (index < 0) return set_row_err(err, err_len, row, "有不認識的鍵");
+    if (index < 0) {
+      set_row_err(err, err_len, row, "有不認識的鍵");
+      return false;
+    }
     const uint16_t bit = static_cast<uint16_t>(1u << index);
-    if ((bits & bit) != 0) return set_row_err(err, err_len, row, "的鍵重複");
+    if ((bits & bit) != 0) {
+      set_row_err(err, err_len, row, "的鍵重複");
+      return false;
+    }
     bits = static_cast<uint16_t>(bits | bit);
   }
   *mask = bits;
@@ -158,7 +178,10 @@ static bool take_string(JsonObject obj, const char *key, const char **out, char 
     *out = "";
     return true;
   }
-  if (!value.is<const char *>()) return set_row_err(err, err_len, row, bad_msg);
+  if (!value.is<const char *>()) {
+    set_row_err(err, err_len, row, bad_msg);
+    return false;
+  }
   *out = value.as<const char *>();
   if (*out == nullptr) *out = "";
   return true;
@@ -340,7 +363,8 @@ void chords_load_factory() {
   g_from_file = false;
 }
 
-bool chords_stage_json(const char *json, size_t len, char *err, size_t err_len) {
+ChordStageStatus chords_stage_json(const char *json, size_t len, char *err, size_t err_len) {
+  g_stage_status = ChordStageStatus::Rejected;
   g_staged = false;
   g_stage_count = 0;
   g_stage_pool_used = 0;
@@ -352,7 +376,10 @@ bool chords_stage_json(const char *json, size_t len, char *err, size_t err_len) 
   }
   if (len == 0) return set_err(err, err_len, "沒有內容");
   if (len > kChordsJsonMax) return set_err(err, err_len, "內容太大");
-  if (!ensure_stage_bufs()) return set_err(err, err_len, "記憶體不足");
+  if (!ensure_stage_bufs()) {
+    set_err(err, err_len, "記憶體不足", ChordStageStatus::NoMemory);
+    return g_stage_status;
+  }
 
   PsramAllocator allocator;
   JsonDocument psram_doc(&allocator);
@@ -383,16 +410,20 @@ bool chords_stage_json(const char *json, size_t len, char *err, size_t err_len) 
 
     uint16_t required = 0;
     uint16_t optional = 0;
-    if (!mask_from_array(obj["required"].as<JsonArray>(), &required, err, err_len, row_no)) return false;
-    if (!mask_from_array(obj["optional"].as<JsonArray>(), &optional, err, err_len, row_no)) return false;
+    if (!mask_from_array(obj["required"].as<JsonArray>(), &required, err, err_len, row_no)) {
+      return g_stage_status;
+    }
+    if (!mask_from_array(obj["optional"].as<JsonArray>(), &optional, err, err_len, row_no)) {
+      return g_stage_status;
+    }
     if ((required & optional) != 0) {
       return set_row_err(err, err_len, row_no, "的同一顆鍵不能又必按又可選");
     }
 
     const char *kana = "";
     const char *output = "";
-    if (!take_string(obj, "kana", &kana, err, err_len, row_no, "的假名不對")) return false;
-    if (!take_string(obj, "output", &output, err, err_len, row_no, "的 output 不對")) return false;
+    if (!take_string(obj, "kana", &kana, err, err_len, row_no, "的假名不對")) return g_stage_status;
+    if (!take_string(obj, "output", &output, err, err_len, row_no, "的 output 不對")) return g_stage_status;
     if (strlen(kana) > kKanaMax) return set_row_err(err, err_len, row_no, "的假名太長");
     if (strlen(output) > kOutputMax) return set_row_err(err, err_len, row_no, "的 output 太長");
     if (!text_ok(kana, false)) return set_row_err(err, err_len, row_no, "的假名有無法顯示的字元");
@@ -422,7 +453,7 @@ bool chords_stage_json(const char *json, size_t len, char *err, size_t err_len) 
   g_stage_count = arr.size();
   g_stage_pool_used = pool_used;
   g_staged = true;
-  return true;
+  return ChordStageStatus::Ok;
 }
 
 void chords_commit_staged() {
@@ -474,7 +505,7 @@ char *chords_format_json() {
   if (buf == nullptr) return nullptr;
   const size_t wrote = serializeJson(doc, buf, need);
   if (wrote == 0 || wrote >= need) {
-    free(buf);
+    chords_release(buf);
     return nullptr;
   }
   return buf;
@@ -522,14 +553,17 @@ static LoadResult stage_saved(const char *path, char *err, size_t err_len) {
   file.close();
   buf[got] = '\0';
 
-  const bool ok = got == n && chords_stage_json(buf, got, err, err_len);
-  free(buf);
-  if (!ok) {
-    if (err[0] == '\0') set_err(err, err_len, "saved table rejected");
-    if (strcmp(err, "記憶體不足") == 0) return LoadResult::NoMemory;
+  if (got != n) {
+    chords_release(buf);
+    set_err(err, err_len, "saved table rejected");
     return LoadResult::Rejected;
   }
-  return LoadResult::Ok;
+  const ChordStageStatus staged = chords_stage_json(buf, got, err, err_len);
+  chords_release(buf);
+  if (staged == ChordStageStatus::Ok) return LoadResult::Ok;
+  if (err[0] == '\0') set_err(err, err_len, "saved table rejected");
+  if (staged == ChordStageStatus::NoMemory) return LoadResult::NoMemory;
+  return LoadResult::Rejected;
 }
 
 // Power loss can leave a finished .tmp (and the previous .bak) with no
@@ -611,7 +645,11 @@ void chords_begin() {
   load_fire_mode();
   log_fire_mode();
   console_println("序列指令：fire release | fire first");
-  g_fs = LittleFS.begin(true);
+  g_fs = LittleFS.begin(false);
+  if (!g_fs) {
+    console_println("LittleFS 掛載失敗，格式化一次");
+    g_fs = LittleFS.begin(true);
+  }
   chords_load_factory();
   try_load_saved();
 }

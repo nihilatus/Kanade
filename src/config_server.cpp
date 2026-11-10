@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include <Arduino.h>
+#include <ArduinoJson.h>
 #include <LittleFS.h>
 #include <WebServer.h>
 #include <WiFi.h>
@@ -21,9 +22,13 @@
 #ifndef WIFI_AP_PASSWORD
 #define WIFI_AP_PASSWORD "replace-with-8-or-more-chars"
 #endif
+#ifndef WIFI_API_TOKEN
+#define WIFI_API_TOKEN ""
+#endif
 
 static const char kApSsid[] = WIFI_AP_SSID;
 static const char kApPassword[] = WIFI_AP_PASSWORD;
+static const char kApiToken[] = WIFI_API_TOKEN;
 static constexpr char kApPlaceholder[] = "replace-with-8-or-more-chars";
 
 // Not one of the 14 chord keys. Closed to GND enables the AP.
@@ -58,9 +63,35 @@ static void send_json(int code, const char *body) {
 }
 
 static void send_error(int code, const char *msg) {
-  char buf[256];
-  snprintf(buf, sizeof(buf), "{\"ok\":false,\"error\":\"%s\"}", msg != nullptr ? msg : "失敗");
+  JsonDocument doc;
+  doc["ok"] = false;
+  doc["error"] = msg != nullptr ? msg : "失敗";
+  char buf[512];
+  const size_t n = serializeJson(doc, buf, sizeof(buf));
+  if (n == 0 || n >= sizeof(buf)) {
+    send_json(code, "{\"ok\":false,\"error\":\"失敗\"}");
+    return;
+  }
   send_json(code, buf);
+}
+
+static bool api_token_ok() {
+  if (kApiToken[0] == '\0') return true;
+  if (!server.hasHeader("X-Api-Token")) return false;
+  const String &got = server.header("X-Api-Token");
+  const size_t n = strlen(kApiToken);
+  if (got.length() != n) return false;
+  unsigned diff = 0;
+  for (size_t i = 0; i < n; ++i) {
+    diff |= static_cast<unsigned char>(got[i]) ^ static_cast<unsigned char>(kApiToken[i]);
+  }
+  return diff == 0;
+}
+
+static bool reject_unauthorized() {
+  if (api_token_ok()) return false;
+  send_error(401, "請輸入 API token");
+  return true;
 }
 
 static void handle_root() {
@@ -69,13 +100,14 @@ static void handle_root() {
 }
 
 static void handle_get() {
+  if (reject_unauthorized()) return;
   char *json = chords_format_json();
   if (json == nullptr) {
     send_error(500, "記憶體不足");
     return;
   }
   send_json(200, json);
-  free(json);
+  chords_release(json);
 }
 
 static bool write_chords_file(const uint8_t *data, size_t len) {
@@ -108,6 +140,7 @@ static bool write_chords_file(const uint8_t *data, size_t len) {
 }
 
 static void handle_post() {
+  if (reject_unauthorized()) return;
   if (!chords_fs_ready()) {
     send_error(500, "檔案系統還沒備好");
     return;
@@ -128,7 +161,7 @@ static void handle_post() {
 
   char err[160];
   err[0] = '\0';
-  if (!chords_stage_json(body.c_str(), body.length(), err, sizeof(err))) {
+  if (chords_stage_json(body.c_str(), body.length(), err, sizeof(err)) != ChordStageStatus::Ok) {
     chords_drop_staged();
     send_error(400, err[0] != '\0' ? err : "JSON 格式不對");
     return;
@@ -147,6 +180,7 @@ static void handle_post() {
 }
 
 static void handle_reset() {
+  if (reject_unauthorized()) return;
   if (chords_fs_ready() && LittleFS.exists(kChordsPath)) {
     if (!LittleFS.remove(kChordsPath)) {
       send_error(500, "存檔失敗");
@@ -165,40 +199,27 @@ static void handle_reset() {
     return;
   }
   send_json(200, json);
-  free(json);
-}
-
-static bool json_mode_value(const char *body, char *out, size_t out_len) {
-  if (body == nullptr || out_len == 0) return false;
-  const char *key = strstr(body, "\"mode\"");
-  if (key == nullptr) return false;
-  const char *colon = strchr(key, ':');
-  if (colon == nullptr) return false;
-  const char *open = strchr(colon, '"');
-  if (open == nullptr) return false;
-  const char *close = strchr(open + 1, '"');
-  if (close == nullptr) return false;
-  const size_t n = static_cast<size_t>(close - (open + 1));
-  if (n == 0 || n + 1 > out_len) return false;
-  memcpy(out, open + 1, n);
-  out[n] = '\0';
-  return true;
+  chords_release(json);
 }
 
 static void handle_fire_get() {
+  if (reject_unauthorized()) return;
   char body[32];
   snprintf(body, sizeof(body), "{\"mode\":\"%s\"}", chords_fire_mode_name());
   send_json(200, body);
 }
 
 static void handle_fire_post() {
+  if (reject_unauthorized()) return;
   if (!server.hasArg("plain")) {
     send_error(400, "沒有內容");
     return;
   }
-  char mode[16];
-  if (!json_mode_value(server.arg("plain").c_str(), mode, sizeof(mode)) ||
-      !chords_set_fire_mode_name(mode)) {
+  JsonDocument doc;
+  const DeserializationError error = deserializeJson(doc, server.arg("plain"));
+  const char *mode = nullptr;
+  if (!error && doc["mode"].is<const char *>()) mode = doc["mode"].as<const char *>();
+  if (mode == nullptr || !chords_set_fire_mode_name(mode)) {
     send_error(400, "模式只能是 release 或 first");
     return;
   }
@@ -211,6 +232,8 @@ static void handle_404() { server.send(404, "text/plain; charset=utf-8", "not fo
 
 static void register_routes() {
   if (g_routes) return;
+  static const char *kHeaders[] = {"X-Api-Token"};
+  server.collectHeaders(kHeaders, 1);
   server.on("/", HTTP_GET, handle_root);
   server.on("/api/chords", HTTP_GET, handle_get);
   server.on("/api/chords", HTTP_POST, handle_post);

@@ -68,7 +68,7 @@ cd /d "E:\cline play\esp32-jis-keyboard"
 python tools/build_chord_map_machine.py
 ```
 
-手機改表：複製 [`include/secrets.h.example`](include/secrets.h.example) 成 `include/secrets.h`，把熱點密碼改成至少 8 碼。`include/secrets.h` 在 `.gitignore` 裡，不要提交、也不要寫進文件。把 **GPIO15** 接到 GND（維持型開關合上）熱點才會出現；沒接或撥開就關，不用重開機，和弦與 USB 鍵盤照常。合上後手機瀏覽 `http://192.168.4.1/`。存檔寫進板子的 LittleFS，蓋過編譯進去的出廠表；網頁上的「還原出廠表」會刪掉那份存檔。
+手機改表：複製 [`include/secrets.h.example`](include/secrets.h.example) 成 `include/secrets.h`，把熱點密碼改成至少 8 碼。`include/secrets.h` 在 `.gitignore` 裡，不要提交、也不要寫進文件。`tools/check_secrets_untracked.py` 會在編譯前確認這份檔沒有被 git 追蹤。想要設定 API 帶 token 時，把 `WIFI_API_TOKEN` 設成非空字串；留空則維持熱點內開放。把 **GPIO15** 接到 GND（維持型開關合上）熱點才會出現；沒接或撥開就關，不用重開機，和弦與 USB 鍵盤照常。合上後手機瀏覽 `http://192.168.4.1/`。存檔寫進板子的 LittleFS，蓋過編譯進去的出廠表；網頁上的「還原出廠表」會刪掉那份存檔。LittleFS 第一次掛載失敗才會格式化，並在序列埠留下一行說明。
 
 `data/mapping_table.csv`、`data/parameter_list.csv` 仍是舊 joystick-writer 移植殘件；新路徑以 `chord_map.machine.csv` 為準。  
 舊的 [`docs/esp32-jis-chordboard-premapping.csv`](docs/esp32-jis-chordboard-premapping.csv)／[`premapping.csv`](premapping.csv) 若仍寫 32 ID，視為待清理。

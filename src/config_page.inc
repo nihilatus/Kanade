@@ -87,6 +87,7 @@ R"HTML(
       <button id="save" type="button">儲存</button>
       <button id="reset" type="button">還原出廠</button>
     </div>
+    <input id="api-token" class="hidden" type="password" placeholder="API token" autocomplete="off">
     <span id="status"></span>
   </header>
   <p id="none" class="hidden">沒有符合的列</p>
@@ -126,6 +127,10 @@ const qInput = document.getElementById("q");
 const list = document.getElementById("list");
 const none = document.getElementById("none");
 const statusEl = document.getElementById("status");
+const tokenInput = document.getElementById("api-token");
+let apiToken = "";
+try { apiToken = sessionStorage.getItem("jisApiToken") || ""; } catch (e) { apiToken = ""; }
+tokenInput.value = apiToken;
 const saveBtn = document.getElementById("save");
 const resetBtn = document.getElementById("reset");
 const fireReleaseBtn = document.getElementById("fire-release");
@@ -301,10 +306,23 @@ function clientError() {
   return "";
 }
 
+function apiFetch(url, opts) {
+  const next = opts ? Object.assign({}, opts) : {};
+  const headers = Object.assign({}, next.headers || {});
+  if (apiToken) headers["X-Api-Token"] = apiToken;
+  next.headers = headers;
+  return fetch(url, next);
+}
+
 async function readBody(res) {
   const text = await res.text();
   let data = {};
   try { data = JSON.parse(text); } catch (e) { data = {}; }
+  if (res.status === 401) {
+    tokenInput.classList.remove("hidden");
+    tokenInput.focus();
+    throw new Error(data.error || "請輸入 API token");
+  }
   if (!res.ok || data.ok === false) throw new Error(data.error || "要求失敗");
   return data;
 }
@@ -315,13 +333,13 @@ function paintFire() {
 }
 
 async function loadFire() {
-  const data = await readBody(await fetch("/api/fire"));
+  const data = await readBody(await apiFetch("/api/fire"));
   fireMode = data.mode === "first" ? "first" : "release";
   paintFire();
 }
 
 async function load() {
-  const data = await readBody(await fetch("/api/chords"));
+  const data = await readBody(await apiFetch("/api/chords"));
   rows = (data.chords || []).map(norm);
   source = data.source === "saved" ? "saved" : "factory";
   render();
@@ -387,7 +405,7 @@ qInput.addEventListener("input", () => {
 saveBtn.addEventListener("click", () => withBusy(async () => {
   const problem = clientError();
   if (problem) throw new Error(problem);
-  const data = await readBody(await fetch("/api/chords", {
+  const data = await readBody(await apiFetch("/api/chords", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload())
@@ -398,7 +416,7 @@ saveBtn.addEventListener("click", () => withBusy(async () => {
 
 function chooseFire(mode) {
   return withBusy(async () => {
-    const data = await readBody(await fetch("/api/fire", {
+    const data = await readBody(await apiFetch("/api/fire", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ mode: mode })
@@ -414,12 +432,21 @@ fireFirstBtn.addEventListener("click", () => chooseFire("first"));
 
 resetBtn.addEventListener("click", () => withBusy(async () => {
   if (!window.confirm("還原成燒錄時的出廠表？手機上存過的組合會刪掉。")) return;
-  const data = await readBody(await fetch("/api/chords/reset", { method: "POST" }));
+  const data = await readBody(await apiFetch("/api/chords/reset", { method: "POST" }));
   rows = (data.chords || []).map(norm);
   source = "factory";
   render();
   setStatus("已還原成出廠表", "ok");
 }));
+
+tokenInput.addEventListener("change", () => {
+  apiToken = tokenInput.value;
+  try { sessionStorage.setItem("jisApiToken", apiToken); } catch (e) {}
+  withBusy(async () => {
+    await load();
+    await loadFire();
+  });
+});
 
 paintFire();
 load().catch((err) => setStatus(err && err.message ? err.message : "讀不到和弦表", "bad"));

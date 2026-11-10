@@ -110,6 +110,7 @@ struct ChordRecipe {
   size_t count;
   ChordSkip skips[kChordSkipCap];
   size_t skip_count;
+  // Skip storage filled up and later tokens were dropped. Do not send.
   bool overflow_skips;
   // A token needed more room than the event buffer. Nothing should be sent.
   bool failed;

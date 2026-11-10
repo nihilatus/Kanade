@@ -287,6 +287,7 @@ static void expect_events(const char *label, const ChordEvent *want, size_t coun
   TEST_ASSERT_FALSE_MESSAGE(got.failed, label);
   TEST_ASSERT_EQUAL_INT_MESSAGE(0, static_cast<int>(got.skip_count), label);
   TEST_ASSERT_EQUAL_INT_MESSAGE(static_cast<int>(count), static_cast<int>(got.count), label);
+  TEST_ASSERT_FALSE_MESSAGE(got.overflow_skips, label);
   for (size_t i = 0; i < count; ++i) {
     char msg[80];
     snprintf(msg, sizeof(msg), "%s [%u]", label, static_cast<unsigned>(i));
@@ -549,6 +550,32 @@ extern "C" void test_recipe_shapes(void) {
   expect_events("Ctrl+F1", ctrl_f1, 3);
 }
 
+extern "C" void test_skip_overflow_is_flagged(void) {
+  char recipe[80];
+  size_t n = 0;
+  for (int i = 0; i < 33; ++i) {
+    if (i > 0) recipe[n++] = ' ';
+    recipe[n++] = '\x7f';
+  }
+  recipe[n] = '\0';
+
+  ChordRecipe got;
+  TEST_ASSERT_TRUE(chord_parse_recipe(recipe, &got));
+  TEST_ASSERT_FALSE(got.failed);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(kChordSkipCap), static_cast<int>(got.skip_count));
+  TEST_ASSERT_TRUE(got.overflow_skips);
+
+  n = 0;
+  for (int i = 0; i < static_cast<int>(kChordSkipCap); ++i) {
+    if (i > 0) recipe[n++] = ' ';
+    recipe[n++] = '\x7f';
+  }
+  recipe[n] = '\0';
+  TEST_ASSERT_TRUE(chord_parse_recipe(recipe, &got));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(kChordSkipCap), static_cast<int>(got.skip_count));
+  TEST_ASSERT_FALSE(got.overflow_skips);
+}
+
 extern "C" void test_each_csv_output_parses(void) {
   TEST_ASSERT_TRUE_MESSAGE(g_count > 0, g_error);
   for (size_t i = 0; i < g_count; ++i) {
@@ -573,6 +600,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_first_up_fires_then_drains);
   RUN_TEST(test_switch_to_first_during_guard_sends);
   RUN_TEST(test_recipe_shapes);
+  RUN_TEST(test_skip_overflow_is_flagged);
   RUN_TEST(test_csv_bits_match_firmware_table);
   RUN_TEST(test_each_csv_row_matches_spec);
   RUN_TEST(test_each_csv_output_parses);

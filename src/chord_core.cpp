@@ -252,13 +252,18 @@ static void add_skip(ChordRecipe *out, const char *token, size_t length, bool to
   }
 }
 
-static void put_event(ChordRecipe *out, ChordEvOp op, ChordKeyKind key, uint8_t code,
+static bool put_event(ChordRecipe *out, ChordEvOp op, ChordKeyKind key, uint8_t code,
                       uint8_t gap_after_ms) {
+  if (out->count >= kChordRecipeCap) {
+    out->failed = true;
+    return false;
+  }
   ChordEvent &event = out->events[out->count++];
   event.op = op;
   event.key = key;
   event.code = code;
   event.gap_after_ms = gap_after_ms;
+  return true;
 }
 
 // True when the token contains '+' and is not the lone plus character.
@@ -319,10 +324,10 @@ static bool take_combo(ChordRecipe *out, const char *token) {
     return true;
   }
   for (int i = 0; i < n - 1; ++i) {
-    put_event(out, ChordEvOp::Press, mods[i], 0, kChordGapNone);
+    if (!put_event(out, ChordEvOp::Press, mods[i], 0, kChordGapNone)) return true;
   }
-  put_event(out, ChordEvOp::Press, key_kind, key_code, kChordTapGapMs);
-  put_event(out, ChordEvOp::ReleaseAll, ChordKeyKind::Char, 0, kChordTapGapMs);
+  if (!put_event(out, ChordEvOp::Press, key_kind, key_code, kChordTapGapMs)) return true;
+  if (!put_event(out, ChordEvOp::ReleaseAll, ChordKeyKind::Char, 0, kChordTapGapMs)) return true;
   return true;
 }
 
@@ -339,12 +344,18 @@ static bool take_token(ChordRecipe *out, const char *token, bool *abort_recipe) 
       *abort_recipe = true;
       return false;
     }
-    put_event(out, ChordEvOp::Press, named, named_code, kChordTapGapMs);
-    put_event(out, ChordEvOp::ReleaseAll, ChordKeyKind::Char, 0, kChordTapGapMs);
+    if (!put_event(out, ChordEvOp::Press, named, named_code, kChordTapGapMs) ||
+        !put_event(out, ChordEvOp::ReleaseAll, ChordKeyKind::Char, 0, kChordTapGapMs)) {
+      *abort_recipe = true;
+      return false;
+    }
     return true;
   }
 
-  if (take_combo(out, token)) return true;
+  if (take_combo(out, token)) {
+    if (out->failed) *abort_recipe = true;
+    return !out->failed;
+  }
 
   const size_t len = strlen(token);
   if (len + 1 > room) {
@@ -358,10 +369,16 @@ static bool take_token(ChordRecipe *out, const char *token, bool *abort_recipe) 
     }
   }
   for (size_t i = 0; i < len; ++i) {
-    put_event(out, ChordEvOp::Write, ChordKeyKind::Char, static_cast<uint8_t>(token[i]),
-              kChordTapGapMs);
+    if (!put_event(out, ChordEvOp::Write, ChordKeyKind::Char, static_cast<uint8_t>(token[i]),
+                   kChordTapGapMs)) {
+      *abort_recipe = true;
+      return false;
+    }
   }
-  put_event(out, ChordEvOp::ReleaseAll, ChordKeyKind::Char, 0, kChordGapNone);
+  if (!put_event(out, ChordEvOp::ReleaseAll, ChordKeyKind::Char, 0, kChordGapNone)) {
+    *abort_recipe = true;
+    return false;
+  }
   return true;
 }
 

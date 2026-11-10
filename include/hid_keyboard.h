@@ -25,7 +25,8 @@ void hid_type_romaji(const char *text);
 //   "+"             the plus character; "Shift++" is Shift and plus
 //   "Backspace"     named HID key (also Space, Enter, Esc, [ESC], arrows)
 //   "Henkan"        raw HID usage (Hankaku, Muhenkan, Kana, Delete, F1–F12, …)
-// An unrecognized token is logged and skipped.
+// An unrecognized token is logged and skipped. Dropped skips abort the recipe.
+// Not reentrant: the parser buffer is owned by this module. Call only from loop().
 // If a previous recipe is still playing, this one is appended after a
 // release-all so a modifier cannot leak into the next chord.
 void hid_type_recipe(const char *recipe);
