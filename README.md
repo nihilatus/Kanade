@@ -72,6 +72,30 @@ python tools/build_chord_map_machine.py
 
 ---
 
+## 用一般鍵盤試打
+
+[`web/index.html`](web/index.html) 用電腦鍵盤模擬 14 顆和弦鍵，不必接開發板，也不送 USB HID。判讀規則與韌體相同（最大同時集合、全放 25 ms、`required`／`optional`、較具體的列優先）。電腦鍵盤的按下／放開已經是穩定邊緣，所以不做韌體那 15 ms GPIO 消彈跳。
+
+頁面用相對路徑讀 [`data/chord_map.machine.csv`](data/chord_map.machine.csv)，要從專案根目錄開一個本機伺服器，直接用檔案開啟讀不到表：
+
+```bat
+cd /d "E:\cline play\esp32-jis-keyboard"
+python -m http.server 8765
+```
+
+瀏覽器開 [http://127.0.0.1:8765/web/](http://127.0.0.1:8765/web/)。改完人表並重建機器表之後，重新整理就會用新表。
+
+| | |
+| --- | --- |
+| 預設對應 | 左 `A W D S Q E Z`＝`LL LU LR LD LT0 LT1 LT2`；右 `J I L K U O`＝`RL RU RR RD RT0 RT1`；空白鍵＝`RT2` |
+| 改綁 | 點某個和弦鍵再按實體鍵。指定中再點一次會清掉。同一顆實體鍵不能綁兩個和弦鍵 |
+| 語音 | 有假名就用日文念；方向鍵、Enter 這類沒有假名的列用中文念功能名。右上角可關 |
+| 逐項驗證 | 依機器表一列一列要求打出該輸出。打對才算通過，可跳過或重來一輪 |
+| 換表 | 「載入 CSV」暫時試另一份同格式的機器表；「改回機器表」回到專案裡那份 |
+| 記住 | 按鍵對應與語音開關存在這個瀏覽器。也可下載／載入 `chord-keymap.json` |
+
+---
+
 ## 硬體／燒錄
 
 | | |
@@ -109,7 +133,7 @@ pio device monitor
 | PlatformIO + Arduino + TinyUSB HID 鍵盤 | VID/PID 仍是原型值 |
 | 14 鍵直連、每鍵 15 ms 穩定消彈跳 | 自訂 JIS HID report／國碼 |
 | 全放 25 ms 確認後比對；手機熱點可改表並存進 LittleFS | 連發 |
-| 配方送出（羅馬字、`Shift+1`、`Backspace`、`Ctrl+i` 等） | 外殼／PCB |
+| 配方送出（羅馬字、`Shift+1`、`Backspace`、`Ctrl+i` 等）；一般鍵盤試打頁 | 外殼／PCB |
 
 出廠表仍由 `include/chord_map.inc` 編譯進去。改人表後，下一次 `pio run` 會重建機器表，燒錄才會更新出廠內容；手機上儲存的表會蓋過它，直到在網頁還原出廠。
 
@@ -128,6 +152,8 @@ include/*.h
 eps32jischordboard-premapping.csv
 data/chord_map.machine.csv
 tools/build_chord_map_machine.py
+tools/prebuild_chord_map.py  編譯前自動重建機器表
+web/index.html                一般鍵盤試打，讀機器表
 docs/chord-map-machine.md
 docs/pinout.md
 docs/bom.md

@@ -8,6 +8,8 @@ Generated machine table: [`../data/chord_map.machine.csv`](../data/chord_map.mac
 
 That command rewrites the machine CSV and [`../include/chord_map.inc`](../include/chord_map.inc). Unknown key tokens, or the same key set mapped to different outputs, make the script exit non-zero and fail the PlatformIO build. Firmware uses the generated include as the factory table. A chord table saved from the phone is stored in LittleFS as `chords.json` and overrides the factory table until the page’s reset action deletes it.
 
+The browser practice page [`../web/index.html`](../web/index.html) fetches this same CSV (serve the repo root; see the README). “載入 CSV” can try another file with these columns; “改回機器表” loads this one again.
+
 ## Columns
 
 | Column | Meaning |
