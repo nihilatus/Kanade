@@ -9,6 +9,8 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+import recipe
+
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "esp32-jis-chordboard-premapping.csv"
 OUT = ROOT / "data" / "chord_map.machine.csv"
@@ -187,6 +189,11 @@ def main() -> int:
                     r, o = parse_key_field(field)
                     req |= r
                     opt |= o
+                # Tokens chord_parse_recipe would add_skip still send the rest
+                # of the recipe on device. Reject them before they ship.
+                reason = recipe.recipe_build_error(output)
+                if reason:
+                    raise ValueError(reason)
             except ValueError as e:
                 parse_errors.append(f"line {lineno}: {e}")
                 continue

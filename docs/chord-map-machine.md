@@ -6,7 +6,7 @@ Generated machine table: [`../data/chord_map.machine.csv`](../data/chord_map.mac
 
 `pio run` rebuilds this table before compile. To regenerate the CSV without compiling: `python tools/build_chord_map_machine.py`
 
-That command rewrites the machine CSV and [`../include/chord_map.inc`](../include/chord_map.inc). Unknown key tokens, or the same key set mapped to different outputs, make the script exit non-zero and fail the PlatformIO build. Firmware uses the generated include as the factory table. A chord table saved from the phone is stored in LittleFS as `chords.json` and overrides the factory table until the page’s reset action deletes it.
+That command rewrites the machine CSV and [`../include/chord_map.inc`](../include/chord_map.inc). Unknown key tokens, the same key set mapped to different outputs, or an output the firmware would skip make the script exit non-zero and fail the PlatformIO build. A skipped token is a bad combo (`Shift+Nope`), a byte outside printable ASCII, or a token of 24 bytes or more. On the device that token is only logged; the rest of the recipe can still be sent. The factory table is not allowed to rely on that. A bare word that is not a key name, such as `Backspce`, is typed as letters. It is not a skip. `Shift+Backspce` is a skip, and the build rejects it. Firmware uses the generated include as the factory table. A chord table saved from the phone is stored in LittleFS as `chords.json` and overrides the factory table until the page’s reset action deletes it.
 
 The browser practice page [`../web/index.html`](../web/index.html) fetches this same CSV (serve the repo root; see the README). “載入 CSV” can try another file with these columns; “改回機器表” loads this one again.
 
@@ -77,4 +77,4 @@ Rule matching, the peak snapshot, both send timings, and recipe parsing live in 
 pio test -e native
 ```
 
-The test reads every row of [`../data/chord_map.machine.csv`](../data/chord_map.machine.csv) and rebuilds the expected match from that row.
+The test reads every row of [`../data/chord_map.machine.csv`](../data/chord_map.machine.csv) and rebuilds the expected match from that row. Recipe tokens are locked by [`../test/recipe_vectors.tsv`](../test/recipe_vectors.tsv): the native test and `python tools/test_recipe_vectors.py` both read that file. `pio test -e native` runs the Python check first.

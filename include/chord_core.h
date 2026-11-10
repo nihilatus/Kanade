@@ -123,4 +123,6 @@ struct ChordRecipe {
 // False when recipe or out is null, or when the recipe does not fit (failed,
 // count 0). An unknown token is a skip, not a failure. A token of 24 bytes or
 // more is a too_long skip. The rest of the recipe still parses.
+// tools/recipe.py matches this. test/recipe_vectors.tsv is the shared oracle,
+// and the chord-map build fails when a factory output would be skipped.
 bool chord_parse_recipe(const char *recipe, ChordRecipe *out);

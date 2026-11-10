@@ -883,6 +883,282 @@ extern "C" void test_recipe_token_and_cap_bounds(void) {
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordEvOp::ReleaseAll), static_cast<int>(got.events[1].op));
 }
 
+static int hex_nibble(char c) {
+  if (c >= '0' && c <= '9') return c - '0';
+  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+  if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+  return -1;
+}
+
+static bool unescape_field(const char *src, char *dest, size_t cap, size_t *out_len) {
+  size_t w = 0;
+  for (size_t i = 0; src[i] != '\0'; ++i) {
+    unsigned char c = static_cast<unsigned char>(src[i]);
+    if (c == '\\') {
+      const unsigned char mark = static_cast<unsigned char>(src[++i]);
+      if (mark == '\0') return false;
+      if (mark == '\\') {
+        c = '\\';
+      } else if (mark == 't') {
+        c = '\t';
+      } else if (mark == 'n') {
+        c = '\n';
+      } else if (mark == 'r') {
+        c = '\r';
+      } else if (mark == 'x') {
+        const int hi = hex_nibble(src[i + 1]);
+        const int lo = hex_nibble(src[i + 2]);
+        if (hi < 0 || lo < 0) return false;
+        c = static_cast<unsigned char>((hi << 4) | lo);
+        i += 2;
+      } else {
+        return false;
+      }
+    }
+    if (w + 1 >= cap) return false;
+    dest[w++] = static_cast<char>(c);
+  }
+  dest[w] = '\0';
+  *out_len = w;
+  return true;
+}
+
+static bool split_tabs(char *line, char **fields) {
+  fields[0] = line;
+  int n = 1;
+  for (char *p = line; *p != '\0'; ++p) {
+    if (*p != '\t') continue;
+    if (n >= 6) return false;
+    *p = '\0';
+    fields[n++] = p + 1;
+  }
+  return n == 6;
+}
+
+static bool split_limit(char *text, char delim, char **parts, int limit) {
+  parts[0] = text;
+  int got = 1;
+  for (char *p = text; *p != '\0'; ++p) {
+    if (*p != delim) continue;
+    *p = '\0';
+    parts[got++] = p + 1;
+    if (got == limit) return true;
+  }
+  return got == limit;
+}
+
+static bool parse_flag(const char *text, bool *out) {
+  if (strcmp(text, "0") == 0) {
+    *out = false;
+    return true;
+  }
+  if (strcmp(text, "1") == 0) {
+    *out = true;
+    return true;
+  }
+  return false;
+}
+
+static bool parse_int(const char *text, int *out, int min_value, int max_value) {
+  if (text[0] == '\0') return false;
+  char *end = nullptr;
+  const long value = strtol(text, &end, 10);
+  if (end == text || *end != '\0' || value < min_value || value > max_value) return false;
+  *out = static_cast<int>(value);
+  return true;
+}
+
+static bool kind_from_name(const char *name, ChordKeyKind *kind) {
+  static const struct {
+    const char *name;
+    ChordKeyKind kind;
+  } kKinds[] = {
+      {"Char", ChordKeyKind::Char},     {"Shift", ChordKeyKind::Shift},
+      {"Ctrl", ChordKeyKind::Ctrl},     {"Alt", ChordKeyKind::Alt},
+      {"Gui", ChordKeyKind::Gui},       {"Backspace", ChordKeyKind::Backspace},
+      {"Space", ChordKeyKind::Space},   {"Enter", ChordKeyKind::Enter},
+      {"Esc", ChordKeyKind::Esc},       {"Up", ChordKeyKind::Up},
+      {"Down", ChordKeyKind::Down},     {"Left", ChordKeyKind::Left},
+      {"Right", ChordKeyKind::Right},   {"Tab", ChordKeyKind::Tab},
+      {"Raw", ChordKeyKind::Raw},
+  };
+  for (const auto &item : kKinds) {
+    if (strcmp(name, item.name) == 0) {
+      *kind = item.kind;
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool parse_one_event(char *text, ChordEvent *event) {
+  char *parts[4];
+  if (!split_limit(text, ':', parts, 4)) return false;
+  if (strcmp(parts[0], "W") == 0) event->op = ChordEvOp::Write;
+  else if (strcmp(parts[0], "P") == 0) event->op = ChordEvOp::Press;
+  else if (strcmp(parts[0], "R") == 0) event->op = ChordEvOp::ReleaseAll;
+  else return false;
+  if (!kind_from_name(parts[1], &event->key)) return false;
+  int code = 0;
+  int gap = 0;
+  if (!parse_int(parts[2], &code, 0, 255) || !parse_int(parts[3], &gap, 0, 255)) return false;
+  event->code = static_cast<uint8_t>(code);
+  event->gap_after_ms = static_cast<uint8_t>(gap);
+  return true;
+}
+
+static bool vector_line_ok(char *line, int line_no) {
+  char *fields[6];
+  if (!split_tabs(line, fields)) {
+    snprintf(g_error, sizeof(g_error), "line %d: expected 6 fields", line_no);
+    return false;
+  }
+  const char *name = fields[0];
+  char recipe[512];
+  size_t recipe_len = 0;
+  if (!unescape_field(fields[1], recipe, sizeof(recipe), &recipe_len)) {
+    snprintf(g_error, sizeof(g_error), "line %d %s: bad recipe escape", line_no, name);
+    return false;
+  }
+  bool want_failed = false;
+  bool want_overflow = false;
+  if (!parse_flag(fields[2], &want_failed) || !parse_flag(fields[3], &want_overflow)) {
+    snprintf(g_error, sizeof(g_error), "line %d %s: bad flag", line_no, name);
+    return false;
+  }
+
+  ChordEvent want_events[kChordRecipeCap];
+  size_t want_count = 0;
+  if (fields[4][0] != '\0') {
+    char *cursor = fields[4];
+    while (cursor != nullptr) {
+      char *semi = strchr(cursor, ';');
+      if (semi != nullptr) *semi = '\0';
+      if (cursor[0] == '\0' || want_count >= kChordRecipeCap ||
+          !parse_one_event(cursor, &want_events[want_count])) {
+        snprintf(g_error, sizeof(g_error), "line %d %s: bad event", line_no, name);
+        return false;
+      }
+      ++want_count;
+      cursor = semi == nullptr ? nullptr : semi + 1;
+    }
+  }
+
+  struct WantSkip {
+    size_t length;
+    bool too_long;
+    char text[24];
+  };
+  WantSkip want_skips[kChordSkipCap];
+  size_t want_skip_count = 0;
+  if (fields[5][0] != '\0') {
+    char *cursor = fields[5];
+    while (cursor != nullptr) {
+      char *semi = strchr(cursor, ';');
+      if (semi != nullptr) *semi = '\0';
+      char *parts[3];
+      int length = 0;
+      bool too_long = false;
+      size_t text_len = 0;
+      if (cursor[0] == '\0' || want_skip_count >= kChordSkipCap ||
+          !split_limit(cursor, ':', parts, 3) || !parse_int(parts[0], &length, 0, 1000) ||
+          !parse_flag(parts[1], &too_long) ||
+          !unescape_field(parts[2], want_skips[want_skip_count].text,
+                          sizeof(want_skips[want_skip_count].text), &text_len)) {
+        snprintf(g_error, sizeof(g_error), "line %d %s: bad skip", line_no, name);
+        return false;
+      }
+      want_skips[want_skip_count].length = static_cast<size_t>(length);
+      want_skips[want_skip_count].too_long = too_long;
+      ++want_skip_count;
+      cursor = semi == nullptr ? nullptr : semi + 1;
+    }
+  }
+
+  ChordRecipe got;
+  const bool parsed_ok = chord_parse_recipe(recipe, &got);
+  if (parsed_ok == want_failed || got.failed != want_failed || got.overflow_skips != want_overflow) {
+    snprintf(g_error, sizeof(g_error), "line %d %s: ok %d failed %d/%d overflow %d/%d", line_no,
+             name, parsed_ok ? 1 : 0, got.failed ? 1 : 0, want_failed ? 1 : 0,
+             got.overflow_skips ? 1 : 0, want_overflow ? 1 : 0);
+    return false;
+  }
+  if (got.count != want_count) {
+    snprintf(g_error, sizeof(g_error), "line %d %s: event count %u want %u", line_no, name,
+             static_cast<unsigned>(got.count), static_cast<unsigned>(want_count));
+    return false;
+  }
+  for (size_t i = 0; i < want_count; ++i) {
+    const ChordEvent &have = got.events[i];
+    const ChordEvent &want = want_events[i];
+    if (have.op != want.op || have.key != want.key || have.code != want.code ||
+        have.gap_after_ms != want.gap_after_ms) {
+      snprintf(g_error, sizeof(g_error), "line %d %s: event %u differs", line_no, name,
+               static_cast<unsigned>(i));
+      return false;
+    }
+  }
+  if (got.skip_count != want_skip_count) {
+    snprintf(g_error, sizeof(g_error), "line %d %s: skip count %u want %u", line_no, name,
+             static_cast<unsigned>(got.skip_count), static_cast<unsigned>(want_skip_count));
+    return false;
+  }
+  for (size_t i = 0; i < want_skip_count; ++i) {
+    const ChordSkip &have = got.skips[i];
+    const WantSkip &want = want_skips[i];
+    if (have.length != want.length || have.too_long != want.too_long ||
+        strcmp(have.text, want.text) != 0) {
+      snprintf(g_error, sizeof(g_error), "line %d %s: skip %u differs", line_no, name,
+               static_cast<unsigned>(i));
+      return false;
+    }
+  }
+  (void)recipe_len;
+  return true;
+}
+
+extern "C" void test_shared_recipe_vectors(void) {
+  static const char *kPaths[] = {
+      "test/recipe_vectors.tsv",
+      "../test/recipe_vectors.tsv",
+      "../../test/recipe_vectors.tsv",
+      "../../../test/recipe_vectors.tsv",
+  };
+  FILE *file = nullptr;
+  for (const char *path : kPaths) {
+    file = fopen(path, "rb");
+    if (file != nullptr) break;
+  }
+  if (file == nullptr) {
+    TEST_FAIL_MESSAGE("could not open test/recipe_vectors.tsv");
+    return;
+  }
+
+  int cases = 0;
+  int line_no = 0;
+  bool ok = true;
+  char line[2048];
+  while (fgets(line, sizeof(line), file) != nullptr) {
+    ++line_no;
+    if (strchr(line, '\n') == nullptr && strchr(line, '\r') == nullptr && feof(file) == 0) {
+      snprintf(g_error, sizeof(g_error), "line %d is longer than the reader", line_no);
+      ok = false;
+      break;
+    }
+    size_t n = strlen(line);
+    while (n > 0 && (line[n - 1] == '\n' || line[n - 1] == '\r')) line[--n] = '\0';
+    if (line[0] == '\0' || line[0] == '#') continue;
+    if (!vector_line_ok(line, line_no)) {
+      ok = false;
+      break;
+    }
+    ++cases;
+  }
+  fclose(file);
+  if (!ok) TEST_FAIL_MESSAGE(g_error);
+  TEST_ASSERT_TRUE_MESSAGE(cases > 0, "recipe vector file has no cases");
+}
+
 extern "C" void test_each_csv_output_parses(void) {
   TEST_ASSERT_TRUE_MESSAGE(g_count > 0, g_error);
   for (size_t i = 0; i < g_count; ++i) {
@@ -915,6 +1191,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_skip_overflow_is_flagged);
   RUN_TEST(test_recipe_that_does_not_fit_fails);
   RUN_TEST(test_recipe_token_and_cap_bounds);
+  RUN_TEST(test_shared_recipe_vectors);
   RUN_TEST(test_csv_bits_match_firmware_table);
   RUN_TEST(test_each_csv_row_matches_spec);
   RUN_TEST(test_each_csv_output_parses);

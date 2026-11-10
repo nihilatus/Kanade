@@ -90,7 +90,7 @@
 | [`tools/build_chord_map_machine.py`](tools/build_chord_map_machine.py) | 人表 → 機器表與 [`include/chord_map.inc`](include/chord_map.inc) |
 | [`tools/prebuild_chord_map.py`](tools/prebuild_chord_map.py) | PlatformIO 編譯前掛鉤，只呼叫上一支 |
 
-`build_chord_map_machine.py` 做轉換；`prebuild_chord_map.py` 不做轉換，只在 `pio run` 編譯前轉呼叫它。`pio run` 與 `pio run -t upload` 會因此重建機器表與韌體用的 include。人表有未知鍵名，或同一組鍵對到不同輸出時，建置會失敗。只想更新 CSV、還不編譯時，在專案根目錄執行：
+`build_chord_map_machine.py` 做轉換；`prebuild_chord_map.py` 不做轉換，只在 `pio run` 編譯前轉呼叫它。`pio run` 與 `pio run -t upload` 會因此重建機器表與韌體用的 include。人表有未知鍵名、同一組鍵對到不同輸出，或輸出裡有裝置會略過的配方 token 時，建置會失敗。只想更新 CSV、還不編譯時，在專案根目錄執行：
 
 ```bat
 python tools/build_chord_map_machine.py
@@ -178,7 +178,10 @@ include/secrets.h         本機熱點密碼，不進 git
 esp32-jis-chordboard-premapping.csv
 data/chord_map.machine.csv
 tools/build_chord_map_machine.py
+tools/recipe.py           配方解析，與 chord_core 同一套規則
 tools/prebuild_chord_map.py
+tools/test_recipe_vectors.py
+test/recipe_vectors.tsv   C++ 與 Python 共用的配方向量
 test/test_chord_core      pio test -e native
 web/index.html            一般鍵盤試打，讀機器表
 docs/chord-map-machine.md

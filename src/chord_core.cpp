@@ -343,8 +343,8 @@ static bool take_combo(ChordRecipe *out, const char *token) {
   return true;
 }
 
-// Abort means the whole recipe does not fit. A skip still returns false here
-// so the caller keeps going.
+// *abort_recipe means the whole recipe does not fit. A skip leaves it false
+// so the caller keeps going. The bool return is not used.
 static bool take_token(ChordRecipe *out, const char *token, bool *abort_recipe) {
   *abort_recipe = false;
   const size_t room = kChordRecipeCap - out->count;
