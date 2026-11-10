@@ -3,6 +3,7 @@
 #include "buttons.h"
 #include "chords.h"
 #include "config_server.h"
+#include "console_log.h"
 #include "hid_keyboard.h"
 
 // ESP32-S3-DevKitC-1 N16R8 — USB HID chord keyboard.
@@ -10,8 +11,8 @@
 // Each switch: GPIO to one side, GND to the other. Pressed = LOW.
 
 void setup() {
+  console_ensure();
 #if ARDUINO_USB_CDC_ON_BOOT
-  Serial.begin(115200);
   delay(200);
   Serial.println();
   Serial.println(F("esp32-jis-keyboard"));

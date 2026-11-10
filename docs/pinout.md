@@ -60,6 +60,12 @@ GPIO3 刻意空下（strapping）。順序與和弦表的鍵名順序相同：`L
 
 ## 手機改和弦
 
-板子會自己開 Wi-Fi 熱點。手機連上後開 `http://192.168.4.1/`。
+板子自己開熱點，不加入家裡的路由器。手機連上後開瀏覽器改組合；存檔寫進 LittleFS 的 `chords.json`，下一組和弦就用新表。沒有存檔，或存檔壞掉、太大時，用燒錄進去的出廠表。
 
-熱點名稱與密碼寫在本機的 `include/secrets.h`。該檔已列入 `.gitignore`，不要提交。範本是 `include/secrets.h.example`；密碼至少 8 碼，而且不能沿用範本裡的占位字。序列埠只印熱點名稱與網址，不印密碼。
+| 項目 | 值 |
+| --- | --- |
+| 熱點名稱 | `include/secrets.h` 的 `WIFI_AP_SSID`，範本是 `JIS-Chord` |
+| 密碼 | 本機 `include/secrets.h` 的 `WIFI_AP_PASSWORD`，不進 git |
+| 網頁 | http://192.168.4.1/ |
+
+複製 [`include/secrets.h.example`](../include/secrets.h.example) 成 `include/secrets.h`。密碼至少 8 碼，而且不能沿用範本裡的占位字；否則熱點不會開。這是個人原型的設定頁，沒有 HTTPS。序列埠只印熱點名稱與 `192.168.4.1`，不印密碼。

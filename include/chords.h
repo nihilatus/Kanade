@@ -1,23 +1,44 @@
 #pragma once
 
-#include <Arduino.h>
+#include <stddef.h>
+#include <stdint.h>
 
 // Chord engine. Tracks the largest simultaneous set while any key is down,
-// confirms full release for 25 ms, then matches the active table once.
-// The active table is include/chord_map.inc unless LittleFS has chords.json.
+// confirms full release for 25 ms, then matches the live table once.
+//
+// Boot loads /chords.json from LittleFS when the file is valid. Otherwise the
+// live table is a copy of the compiled factory rows in include/chord_map.inc.
+// Matching is unchanged: required ⊆ mask ⊆ required ∪ optional, then more
+// required bits, fewer optional bits, smaller id.
 
 void chords_begin();
 void chords_poll();  // call after buttons_poll()
 
-// "saved" after a successful chords.json load or save, otherwise "factory".
-const char *chords_source();
+static constexpr size_t kChordsMaxRows = 256;
+static constexpr size_t kChordsJsonMax = 48 * 1024;
+static constexpr char kChordsPath[] = "/chords.json";
 
-// Canonical JSON: {"source":"...","chords":[{id,kana,output,required,optional}]}
-bool chords_export_json(String &out);
+struct ChordView {
+  uint16_t id;
+  uint16_t required;
+  uint16_t optional;
+  const char *kana;
+  const char *output;
+};
 
-// Replace the live table and write chords.json. On failure the live table
-// and the previous file stay as they were.
-bool chords_save_json(const String &body, String &error);
+size_t chords_count();
+bool chords_at(size_t index, ChordView *out);
+bool chords_using_saved();
+bool chords_fs_ready();
 
-// Delete chords.json and restore the compiled table.
-bool chords_reset_saved(String &error);
+// Parse into a side buffer. The live table stays put until commit.
+// err receives a short Traditional Chinese reason when this returns false.
+bool chords_stage_json(const char *json, size_t len, char *err, size_t err_len);
+void chords_commit_staged();
+void chords_drop_staged();
+void chords_load_factory();
+
+// {"source":"factory"|"saved","count":N,"chords":[...]}
+// Key masks are arrays of LL..RT2 names. Caller frees with free().
+// Null if the document cannot be built.
+char *chords_format_json();

@@ -111,7 +111,7 @@ pio device monitor
 | 全放 25 ms 確認後比對；手機熱點可改表並存進 LittleFS | 連發 |
 | 配方送出（羅馬字、`Shift+1`、`Backspace`、`Ctrl+i` 等） | 外殼／PCB |
 
-和弦引擎讀編譯期表，不再是少數 combo 的 demo。改人表後要重建機器表與 `include/chord_map.inc` 再燒錄。
+出廠表仍由 `include/chord_map.inc` 編譯進去。改人表後要重建機器表，燒錄才會更新出廠內容；手機上儲存的表會蓋過它，直到在網頁還原出廠。
 
 ### 目錄速覽
 
