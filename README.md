@@ -58,7 +58,7 @@
 | [`docs/chord-map-machine.md`](docs/chord-map-machine.md) | 欄位、RT0、觸發／比對規則 |
 | [`tools/build_chord_map_machine.py`](tools/build_chord_map_machine.py) | 人表 → 機器表重建腳本 |
 
-重建機器表與韌體用的 [`include/chord_map.inc`](include/chord_map.inc)：
+`pio run` 與 `pio run -t upload` 會在編譯前自動重建機器表與韌體用的 [`include/chord_map.inc`](include/chord_map.inc)。人表有未知鍵名，或同一組鍵對到不同輸出時，建置會失敗。只想更新 CSV、還不編譯時：
 
 ```bat
 cd /d "E:\cline play\esp32-jis-keyboard"
@@ -111,7 +111,7 @@ pio device monitor
 | 全放 25 ms 確認後比對；手機熱點可改表並存進 LittleFS | 連發 |
 | 配方送出（羅馬字、`Shift+1`、`Backspace`、`Ctrl+i` 等） | 外殼／PCB |
 
-出廠表仍由 `include/chord_map.inc` 編譯進去。改人表後要重建機器表，燒錄才會更新出廠內容；手機上儲存的表會蓋過它，直到在網頁還原出廠。
+出廠表仍由 `include/chord_map.inc` 編譯進去。改人表後，下一次 `pio run` 會重建機器表，燒錄才會更新出廠內容；手機上儲存的表會蓋過它，直到在網頁還原出廠。
 
 ### 目錄速覽
 

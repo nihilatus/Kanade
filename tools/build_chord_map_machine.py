@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import csv
 import re
+import sys
 from collections import defaultdict
 from pathlib import Path
 
@@ -154,7 +155,7 @@ def parse_key_field(field: str) -> tuple[set[str], set[str]]:
     return required, optional
 
 
-def main() -> None:
+def main() -> int:
     rows_out: list[dict[str, str]] = []
     current_category = ""
     omitted_empty = 0
@@ -270,6 +271,10 @@ def main() -> None:
     for e in parse_errors:
         print(e)
 
+    if parse_errors or conflicts:
+        return 1
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

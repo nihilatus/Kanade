@@ -4,9 +4,9 @@ Source of truth (human / editable): [`../eps32jischordboard-premapping.csv`](../
 
 Generated machine table: [`../data/chord_map.machine.csv`](../data/chord_map.machine.csv)
 
-Rebuild: `python tools/build_chord_map_machine.py`
+`pio run` rebuilds this table before compile. To regenerate the CSV without compiling: `python tools/build_chord_map_machine.py`
 
-That command rewrites the machine CSV and [`../include/chord_map.inc`](../include/chord_map.inc). Firmware uses the generated include as the factory table. A chord table saved from the phone is stored in LittleFS as `chords.json` and overrides the factory table until the page’s reset action deletes it.
+That command rewrites the machine CSV and [`../include/chord_map.inc`](../include/chord_map.inc). Unknown key tokens, or the same key set mapped to different outputs, make the script exit non-zero and fail the PlatformIO build. Firmware uses the generated include as the factory table. A chord table saved from the phone is stored in LittleFS as `chords.json` and overrides the factory table until the page’s reset action deletes it.
 
 ## Columns
 
