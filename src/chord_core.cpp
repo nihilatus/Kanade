@@ -94,7 +94,7 @@ void chord_engine_reset(ChordEngine *engine) {
 static ChordStep take_peak(ChordEngine *engine) {
   const uint16_t mask = engine->peak.mask;
   chord_peak_clear(&engine->peak);
-  ChordStep step;
+  ChordStep step{};
   step.fire = mask != 0;
   step.fire_mask = mask;
   return step;
@@ -107,9 +107,7 @@ static void begin_hold(ChordEngine *engine, uint16_t mask) {
 }
 
 ChordStep chord_engine_step(ChordEngine *engine, uint16_t mask, uint32_t now_ms) {
-  ChordStep step;
-  step.fire = false;
-  step.fire_mask = 0;
+  ChordStep step{};
   if (engine == nullptr) return step;
 
   switch (engine->phase) {
@@ -156,9 +154,7 @@ ChordStep chord_engine_step(ChordEngine *engine, uint16_t mask, uint32_t now_ms)
 }
 
 ChordStep chord_engine_set_mode(ChordEngine *engine, ChordFireMode mode) {
-  ChordStep step;
-  step.fire = false;
-  step.fire_mask = 0;
+  ChordStep step{};
   if (engine == nullptr) return step;
   if (mode != engine->mode && mode == ChordFireMode::FirstUp &&
       engine->phase == ChordPhase::ReleaseGuard) {
