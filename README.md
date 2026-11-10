@@ -78,6 +78,8 @@
 
 沒有 NVS 紀錄時，開機用 `CHORD_FIRE_DEFAULT_FIRST`（沒設就是全放）。手機熱點頁或序列埠 `fire release` / `fire first` 會寫進 NVS，並蓋過編譯旗標。試打頁的開關只影響瀏覽器。每鍵要先穩定 `kChordDebounceMs` 才算按下或放開。
 
+方向鍵和 `Backspace` 的連發是韌體自己定時送出按下再放開，間隔 `kChordRepeatIntervalMs`，不跟 Windows 的鍵盤重複速度走。
+
 ---
 
 ## 設定檔

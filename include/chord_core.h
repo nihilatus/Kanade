@@ -12,6 +12,17 @@ static constexpr int kChordKeyCount = 14;
 static constexpr uint8_t kChordDebounceMs = 8;
 // ReleaseAll waits this long after the debounced mask stays empty.
 static constexpr uint32_t kChordReleaseGuardMs = 10;
+// A subset or superset of the peak is the same chord only until this gap.
+// The engine sees debounced edges, so a contact that re-closes as the release
+// is accepted shows up about one debounce later. The practice page has no
+// GPIO debounce; rolls of 15 ms already clear the guard, and 1–9 ms drops a
+// nested chord such as あ after か. 10 ms keeps that bounce and still splits
+// a nested mask that arrives with the guard already elapsed (a stalled poll).
+static constexpr uint32_t kChordBounceMs = 10;
+static_assert(kChordBounceMs > kChordDebounceMs,
+              "bounce window must cover a debounced return");
+static_assert(kChordBounceMs <= kChordReleaseGuardMs,
+              "nested chords must split once the release guard has elapsed");
 static constexpr uint8_t kChordTapGapMs = 12;
 static constexpr uint8_t kChordGapNone = 0;
 // Held arrows and Backspace: first tap after the peak stops growing, then
@@ -72,8 +83,9 @@ void chord_engine_reset(ChordEngine *engine);
 // One poll. now_ms is the caller's clock. fire is set only when the mask
 // that would be sent is non-empty.
 // ReleaseAll: an empty mask waits kChordReleaseGuardMs. A mask that returns
-// inside that window and is a subset or superset of the peak stays one chord.
-// Any other mask sends the waiting peak on this step and starts a new hold.
+// before kChordBounceMs and is a subset or superset of the peak stays one
+// chord. Any later mask, including a nested one, sends the waiting peak on
+// this step and starts a new hold.
 ChordStep chord_engine_step(ChordEngine *engine, uint16_t mask, uint32_t now_ms);
 
 // Switching to FirstUp while ReleaseGuard is waiting sends immediately.

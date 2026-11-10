@@ -336,6 +336,10 @@
     const KEYS = ["LL", "LU", "LR", "LD", "LT0", "LT1", "LT2", "RL", "RU", "RR", "RD", "RT0", "RT1", "RT2"];
     const KEY_BIT = Object.fromEntries(KEYS.map((name, index) => [name, 1 << index]));
     const RELEASE_MS = 10;
+    // Same number as kChordBounceMs. Keyboard edges are already stable, so a
+    // return inside this window is bounce; a later nested chord (あ after か)
+    // is sent on its own even if the release timer has not fired yet.
+    const BOUNCE_MS = 10;
     const STORAGE_MAP = "chord-practice-keymap";
     const STORAGE_VOICE = "chord-practice-voice";
     const STORAGE_FIRE = "chord-practice-fire";
@@ -396,6 +400,7 @@
     let maxChord = 0;
     let maxCount = 0;
     let guardTimer = 0;
+    let guardSince = 0;
     const history = [];
 
     function popcount(value) {
@@ -771,6 +776,17 @@
       return shared === mask || shared === maxChord;
     }
 
+    function bounceReturn(mask) {
+      return (Date.now() - guardSince) < BOUNCE_MS && sameChordAsPeak(mask);
+    }
+
+    function armGuard() {
+      phase = "guard";
+      guardSince = Date.now();
+      clearTimeout(guardTimer);
+      guardTimer = setTimeout(finishGuard, RELEASE_MS);
+    }
+
     function commitPeak() {
       const chord = maxChord;
       maxChord = 0;
@@ -794,7 +810,7 @@
       } else if (phase === "guard") {
         clearTimeout(guardTimer);
         phase = "holding";
-        if (!sameChordAsPeak(downMask)) commitPeak();
+        if (!bounceReturn(downMask)) commitPeak();
       }
       if (phase === "holding") noteSnapshot(downMask);
       renderStage();
@@ -821,8 +837,7 @@
         return;
       }
       if (downMask === 0 && phase === "holding") {
-        phase = "guard";
-        guardTimer = setTimeout(finishGuard, RELEASE_MS);
+        armGuard();
       } else if (downMask !== 0 && (phase === "holding" || phase === "guard")) {
         noteSnapshot(downMask);
       }
@@ -834,7 +849,7 @@
       if (phase !== "guard") return;
       if (downMask !== 0) {
         phase = "holding";
-        if (!sameChordAsPeak(downMask)) commitPeak();
+        if (!bounceReturn(downMask)) commitPeak();
         noteSnapshot(downMask);
         renderStage();
         return;
@@ -868,9 +883,7 @@
         return;
       }
       if (phase === "holding") {
-        phase = "guard";
-        clearTimeout(guardTimer);
-        guardTimer = setTimeout(finishGuard, RELEASE_MS);
+        armGuard();
         renderStage();
         paintKeys();
       }
@@ -983,7 +996,7 @@
       paintKeys();
       noticeEl.textContent = fireMode === "first"
         ? "高峰後第一顆放開就送出。請同時按下、再放開；尾鍵還沒放完時按下的下一組會被略過。"
-        : "全部放開並停 " + RELEASE_MS + " ms 才送出。下一組若提前按下，會和這一組合在一起。";
+        : "全部放開並停 " + RELEASE_MS + " ms 才送出。只有這段開頭的彈回會接上同一組；再按下一組會先送出上一組。";
     }
 
     function syncVoiceButton() {

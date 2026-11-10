@@ -75,8 +75,9 @@ bool chord_peak_broken(const ChordPeak &peak, uint16_t mask) {
   return peak.count > 0 && (mask & peak.mask) != peak.mask;
 }
 
-// ReleaseGuard absorbed an empty mask. A subset is bounce of this chord.
-// A superset is the same chord still being built. Anything else is the next chord.
+// ReleaseGuard has already seen every key up. A subset is keys from this
+// chord bouncing. A superset is the same chord still landing. Either counts
+// only inside kChordBounceMs; a later nested mask is the next chord.
 static bool release_guard_same_chord(const ChordPeak &peak, uint16_t mask) {
   if (peak.count == 0) return true;
   const uint16_t shared = static_cast<uint16_t>(mask & peak.mask);
@@ -133,7 +134,8 @@ ChordStep chord_engine_step(ChordEngine *engine, uint16_t mask, uint32_t now_ms)
 
     case ChordPhase::ReleaseGuard:
       if (mask != 0) {
-        if (release_guard_same_chord(engine->peak, mask)) {
+        const uint32_t gap = now_ms - engine->guard_since;
+        if (gap < kChordBounceMs && release_guard_same_chord(engine->peak, mask)) {
           engine->phase = ChordPhase::Holding;
           chord_note_snapshot(&engine->peak, mask);
         } else {

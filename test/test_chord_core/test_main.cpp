@@ -543,6 +543,9 @@ extern "C" void test_both_modes_send_a_chord_once(void) {
 
 extern "C" void test_bounce_within_debounce_does_not_split(void) {
   TEST_ASSERT_EQUAL_INT(8, static_cast<int>(kChordDebounceMs));
+  TEST_ASSERT_EQUAL_INT(10, static_cast<int>(kChordBounceMs));
+  TEST_ASSERT_TRUE(kChordBounceMs > kChordDebounceMs);
+  TEST_ASSERT_TRUE(kChordReleaseGuardMs >= kChordBounceMs);
   TEST_ASSERT_TRUE(kChordReleaseGuardMs > kChordDebounceMs);
 
   ChordEngine engine;
@@ -600,6 +603,56 @@ extern "C" void test_repress_inside_guard_merges(void) {
   TEST_ASSERT_EQUAL_UINT16(0x0007, step.fire_mask);
   step = chord_engine_step(&engine, 0, up2 + kChordReleaseGuardMs + 5);
   TEST_ASSERT_FALSE(step.fire);
+}
+
+// あ (RT0) is a subset of か (LU + optional RT0). After the bounce window that
+// nesting is the next chord, in either order. One millisecond earlier stays
+// one peak, which is the contact-return case.
+extern "C" void test_nested_chord_after_bounce_window_sends_both(void) {
+  const uint16_t a = 0x0800;
+  const uint16_t ka = 0x0802;
+  const uint32_t up = 100;
+
+  ChordEngine engine;
+  chord_engine_reset(&engine);
+  chord_engine_step(&engine, ka, 0);
+  chord_engine_step(&engine, 0, up);
+  ChordStep step = chord_engine_step(&engine, a, up + kChordBounceMs - 1);
+  TEST_ASSERT_FALSE(step.fire);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::Holding), static_cast<int>(engine.phase));
+  TEST_ASSERT_EQUAL_UINT16(ka, engine.peak.mask);
+
+  chord_engine_reset(&engine);
+  chord_engine_step(&engine, ka, 0);
+  chord_engine_step(&engine, 0, up);
+  step = chord_engine_step(&engine, a, up + kChordBounceMs);
+  TEST_ASSERT_TRUE(step.fire);
+  TEST_ASSERT_EQUAL_UINT16(ka, step.fire_mask);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::Holding), static_cast<int>(engine.phase));
+  TEST_ASSERT_EQUAL_UINT16(a, engine.peak.mask);
+
+  const uint32_t up_a = up + kChordBounceMs + 40;
+  step = chord_engine_step(&engine, 0, up_a);
+  TEST_ASSERT_FALSE(step.fire);
+  step = chord_engine_step(&engine, 0, up_a + kChordReleaseGuardMs);
+  TEST_ASSERT_TRUE(step.fire);
+  TEST_ASSERT_EQUAL_UINT16(a, step.fire_mask);
+
+  chord_engine_reset(&engine);
+  chord_engine_step(&engine, a, 0);
+  chord_engine_step(&engine, 0, up);
+  step = chord_engine_step(&engine, ka, up + kChordBounceMs);
+  TEST_ASSERT_TRUE(step.fire);
+  TEST_ASSERT_EQUAL_UINT16(a, step.fire_mask);
+  TEST_ASSERT_EQUAL_UINT16(ka, engine.peak.mask);
+
+  chord_engine_reset(&engine);
+  chord_engine_step(&engine, ka, 0);
+  chord_engine_step(&engine, 0, up);
+  step = chord_engine_step(&engine, a, up + 40);
+  TEST_ASSERT_TRUE(step.fire);
+  TEST_ASSERT_EQUAL_UINT16(ka, step.fire_mask);
+  TEST_ASSERT_EQUAL_UINT16(a, engine.peak.mask);
 }
 
 extern "C" void test_different_chord_inside_guard_sends_both(void) {
@@ -1439,6 +1492,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_both_modes_send_a_chord_once);
   RUN_TEST(test_bounce_within_debounce_does_not_split);
   RUN_TEST(test_repress_inside_guard_merges);
+  RUN_TEST(test_nested_chord_after_bounce_window_sends_both);
   RUN_TEST(test_different_chord_inside_guard_sends_both);
   RUN_TEST(test_first_up_draining_ignores_presses);
   RUN_TEST(test_recipe_shapes);
