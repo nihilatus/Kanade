@@ -765,6 +765,19 @@
       }
     }
 
+    function sameChordAsPeak(mask) {
+      if (maxCount === 0) return true;
+      const shared = mask & maxChord;
+      return shared === mask || shared === maxChord;
+    }
+
+    function commitPeak() {
+      const chord = maxChord;
+      maxChord = 0;
+      maxCount = 0;
+      fire(chord);
+    }
+
     function chordDown(bit) {
       if (downMask & bit) return;
       downMask |= bit;
@@ -781,6 +794,7 @@
       } else if (phase === "guard") {
         clearTimeout(guardTimer);
         phase = "holding";
+        if (!sameChordAsPeak(downMask)) commitPeak();
       }
       if (phase === "holding") noteSnapshot(downMask);
       renderStage();
@@ -820,6 +834,7 @@
       if (phase !== "guard") return;
       if (downMask !== 0) {
         phase = "holding";
+        if (!sameChordAsPeak(downMask)) commitPeak();
         noteSnapshot(downMask);
         renderStage();
         return;

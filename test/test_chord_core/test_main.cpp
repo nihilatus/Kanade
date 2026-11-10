@@ -602,6 +602,45 @@ extern "C" void test_repress_inside_guard_merges(void) {
   TEST_ASSERT_FALSE(step.fire);
 }
 
+extern "C" void test_different_chord_inside_guard_sends_both(void) {
+  ChordEngine engine;
+  chord_engine_reset(&engine);
+
+  const uint16_t ab = 0x0003;
+  const uint16_t c = 0x0004;
+
+  ChordStep step = chord_engine_step(&engine, ab, 0);
+  TEST_ASSERT_FALSE(step.fire);
+  const uint32_t up = 100;
+  step = chord_engine_step(&engine, 0, up);
+  TEST_ASSERT_FALSE(step.fire);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::ReleaseGuard), static_cast<int>(engine.phase));
+  TEST_ASSERT_EQUAL_UINT16(ab, engine.peak.mask);
+  TEST_ASSERT_EQUAL_UINT8(2, engine.peak.count);
+
+  const uint32_t press_c = up + kChordReleaseGuardMs - 1;
+  step = chord_engine_step(&engine, c, press_c);
+  TEST_ASSERT_TRUE(step.fire);
+  TEST_ASSERT_EQUAL_UINT16(ab, step.fire_mask);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::Holding), static_cast<int>(engine.phase));
+  TEST_ASSERT_EQUAL_UINT16(c, engine.peak.mask);
+  TEST_ASSERT_EQUAL_UINT8(1, engine.peak.count);
+
+  const uint32_t up_c = press_c + 40;
+  step = chord_engine_step(&engine, 0, up_c);
+  TEST_ASSERT_FALSE(step.fire);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::ReleaseGuard), static_cast<int>(engine.phase));
+  TEST_ASSERT_EQUAL_UINT16(c, engine.peak.mask);
+  step = chord_engine_step(&engine, 0, up_c + kChordReleaseGuardMs - 1);
+  TEST_ASSERT_FALSE(step.fire);
+  step = chord_engine_step(&engine, 0, up_c + kChordReleaseGuardMs);
+  TEST_ASSERT_TRUE(step.fire);
+  TEST_ASSERT_EQUAL_UINT16(c, step.fire_mask);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::Idle), static_cast<int>(engine.phase));
+  step = chord_engine_step(&engine, 0, up_c + kChordReleaseGuardMs + 1);
+  TEST_ASSERT_FALSE(step.fire);
+}
+
 extern "C" void test_first_up_draining_ignores_presses(void) {
   ChordEngine engine;
   chord_engine_reset(&engine);
@@ -864,6 +903,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_both_modes_send_a_chord_once);
   RUN_TEST(test_bounce_within_debounce_does_not_split);
   RUN_TEST(test_repress_inside_guard_merges);
+  RUN_TEST(test_different_chord_inside_guard_sends_both);
   RUN_TEST(test_first_up_draining_ignores_presses);
   RUN_TEST(test_recipe_shapes);
   RUN_TEST(test_skip_overflow_is_flagged);

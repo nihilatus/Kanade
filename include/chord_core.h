@@ -61,6 +61,9 @@ void chord_engine_reset(ChordEngine *engine);
 
 // One poll. now_ms is the caller's clock. fire is set only when the mask
 // that would be sent is non-empty.
+// ReleaseAll: an empty mask waits kChordReleaseGuardMs. A mask that returns
+// inside that window and is a subset or superset of the peak stays one chord.
+// Any other mask sends the waiting peak on this step and starts a new hold.
 ChordStep chord_engine_step(ChordEngine *engine, uint16_t mask, uint32_t now_ms);
 
 // Switching to FirstUp while ReleaseGuard is waiting sends immediately.

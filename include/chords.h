@@ -10,6 +10,7 @@
 // With no stored key, boot uses CHORD_FIRE_DEFAULT_FIRST (0 = release).
 // A stored value overrides that flag. Timings:
 //   "release" — wait until every key is up, then kChordReleaseGuardMs, then send.
+//               A different chord pressed during that wait sends immediately.
 //   "first"   — after the peak, send when the first peak key goes up, then
 //               drain until every key is up before a new chord can start.
 // Each key is stable only after kChordDebounceMs. Both constants live in
