@@ -27,15 +27,20 @@ static bool g_hold = false;
 static uint32_t g_next_ms = 0;
 
 void hid_keyboard_begin() {
-  // Identify as a keyboard. Japanese IME on the PC still expects romaji
-  // Latin letters; a full JIS HID country code / layout can come later.
+  // ASCII goes through the JIS map. a–z and the digits share usages with a
+  // US keyboard; the characters this table actually sends that do not are
+  // '[' (0x30) and ']' (0x31). Shift+8 / Shift+9 become （ ） only when the
+  // host keyboard type is Japanese. Windows reads that setting, not the USB
+  // country code, so this device leaves the country code unset.
+  // Henkan (0x8A), Muhenkan (0x8B), and Kana (0x88) are pressRaw usages.
+  // The stock keyboard descriptor already declares usages 0–255.
   USB.VID(0x303A);  // Espressif
   USB.PID(0x4004);  // local prototype — change before shipping
   USB.productName("ESP32 JIS Chord KB");
   USB.manufacturerName("JoystickWriter Lab");
   USB.serialNumber("jis-kb-proto-1");
 
-  Keyboard.begin();
+  Keyboard.begin(KeyboardLayout_ja_JP);
   USB.begin();
   g_begun = true;
 }

@@ -3,8 +3,11 @@
 #include <Arduino.h>
 
 // Native USB HID keyboard (6KRO boot-protocol style via Arduino USBHIDKeyboard).
-// Sends Latin/romaji keystrokes and a few named keys; PC Japanese IME
-// converts romaji. Product presents as a keyboard — not a gamepad.
+// ASCII uses the JIS layout. Romaji letters match a US keyboard; '[' and ']'
+// do not. The PC Japanese IME converts romaji. Henkan, Muhenkan, and Kana
+// are raw usages inside the stock descriptor (usages 0–255). The USB country
+// code is left unset: Windows follows the user's keyboard type. Product
+// presents as a keyboard — not a gamepad.
 //
 // Recipes are queued. hid_keyboard_poll() sends at most one report when it
 // is due, so the key scan in loop() keeps running between keystrokes.
@@ -13,7 +16,7 @@ void hid_keyboard_begin();
 bool hid_keyboard_ready();
 void hid_keyboard_poll();
 
-// Type an ASCII/romaji string (a–z, space, punctuation the stock layout maps).
+// Type an ASCII/romaji string (a–z, space, punctuation the JIS layout maps).
 // Each character is its own press report, a gap, then release. Keyboard.write()
 // would send both reports before a ~10 ms host poll, so a repeat such as "nn"
 // can collapse into one key. Queued; does not block the caller.
