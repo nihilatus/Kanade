@@ -391,6 +391,8 @@ static bool take_token(ChordRecipe *out, const char *token, bool *abort_recipe) 
       return false;
     }
   }
+  // Trailer stays kChordGapNone: HID already applies each Write's tap gap to
+  // its release. Named and combo tokens end on ReleaseAll, so that event is the tap.
   if (!put_event(out, ChordEvOp::ReleaseAll, ChordKeyKind::Char, 0, kChordGapNone)) {
     *abort_recipe = true;
     return false;
