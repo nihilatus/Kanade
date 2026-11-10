@@ -14,3 +14,6 @@ Thumbs.db
 
 # Wi-Fi password for the chord editor. Copy include/secrets.h.example.
 include/secrets.h
+
+# Retired 32-key notes and tables. Not part of the current keyboard.
+docs/archive/
