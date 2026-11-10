@@ -40,7 +40,7 @@
 3. 送出時機可切換，開機後沿用上次選擇（預設是全放）：
    - **全放再送**：全部放開，並再維持 10 ms 空檔，才比對與送出一次。下一組若在 mask 回到 0 之前就按下，會被併進同一組。
    - **首鍵放開就送**：高峰後第一顆屬於高峰的鍵放開就送出，然後進入收尾，等全部放開才開始新的和弦。手感前提是同一組先一起按下、再放開。
-   手機熱點頁的兩個按鈕，或序列埠的 `fire release` / `fire first`，都會寫進 NVS。試打頁左上角同一個開關只影響瀏覽器。
+   手機熱點頁的兩個按鈕，或序列埠的 `fire release` / `fire first`，都會寫進 NVS。試打頁頁首的同一個開關只影響瀏覽器。
 4. 比對規則（詳見 [`docs/chord-map-machine.md`](docs/chord-map-machine.md)）：
 
    ```text
@@ -77,7 +77,7 @@ python tools/build_chord_map_machine.py
 
 ## 用一般鍵盤試打
 
-[`web/index.html`](web/index.html) 用電腦鍵盤模擬 14 顆和弦鍵，不必接開發板，也不送 USB HID。判讀規則與韌體相同（最大同時集合、全放 10 ms 或首鍵放開就送、`required`／`optional`、較具體的列優先）。電腦鍵盤的按下／放開已經是穩定邊緣，所以不做韌體那 8 ms GPIO 消彈跳。左上角「全放再送／首鍵放開就送」只存在這個瀏覽器，用來對照手感。
+[`web/index.html`](web/index.html) 用電腦鍵盤模擬 14 顆和弦鍵，不必接開發板，也不送 USB HID。判讀規則與韌體相同（最大同時集合、全放 10 ms 或首鍵放開就送、`required`／`optional`、較具體的列優先）。電腦鍵盤的按下／放開已經是穩定邊緣，所以不做韌體那 8 ms GPIO 消彈跳。頁首「全放再送／首鍵放開就送」只存在這個瀏覽器，用來對照手感。
 
 頁面用相對路徑讀 [`data/chord_map.machine.csv`](data/chord_map.machine.csv)，要從專案根目錄開一個本機伺服器，直接用檔案開啟讀不到表：
 
