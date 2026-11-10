@@ -480,6 +480,164 @@ extern "C" void test_switch_to_first_during_guard_sends(void) {
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::Holding), static_cast<int>(engine.phase));
 }
 
+extern "C" void test_both_modes_send_a_chord_once(void) {
+  const uint16_t chord = 0x0003;
+
+  ChordEngine release;
+  chord_engine_reset(&release);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordFireMode::ReleaseAll), static_cast<int>(release.mode));
+
+  ChordStep step = chord_engine_step(&release, chord, 0);
+  TEST_ASSERT_FALSE(step.fire);
+  step = chord_engine_step(&release, chord, 8);
+  TEST_ASSERT_FALSE(step.fire);
+  TEST_ASSERT_EQUAL_UINT16(chord, release.peak.mask);
+
+  step = chord_engine_step(&release, 0, 20);
+  TEST_ASSERT_FALSE(step.fire);
+  step = chord_engine_step(&release, 0, 20 + kChordReleaseGuardMs - 1);
+  TEST_ASSERT_FALSE(step.fire);
+  step = chord_engine_step(&release, 0, 20 + kChordReleaseGuardMs);
+  TEST_ASSERT_TRUE(step.fire);
+  TEST_ASSERT_EQUAL_UINT16(chord, step.fire_mask);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::Idle), static_cast<int>(release.phase));
+  step = chord_engine_step(&release, 0, 40);
+  TEST_ASSERT_FALSE(step.fire);
+
+  step = chord_engine_step(&release, chord, 50);
+  TEST_ASSERT_FALSE(step.fire);
+  step = chord_engine_step(&release, 0, 60);
+  TEST_ASSERT_FALSE(step.fire);
+  step = chord_engine_step(&release, 0, 60 + kChordReleaseGuardMs);
+  TEST_ASSERT_TRUE(step.fire);
+  TEST_ASSERT_EQUAL_UINT16(chord, step.fire_mask);
+  step = chord_engine_step(&release, 0, 80);
+  TEST_ASSERT_FALSE(step.fire);
+
+  ChordEngine first;
+  chord_engine_reset(&first);
+  first.mode = ChordFireMode::FirstUp;
+
+  step = chord_engine_step(&first, chord, 0);
+  TEST_ASSERT_FALSE(step.fire);
+  step = chord_engine_step(&first, chord, 8);
+  TEST_ASSERT_FALSE(step.fire);
+  step = chord_engine_step(&first, 0x0001, 9);
+  TEST_ASSERT_TRUE(step.fire);
+  TEST_ASSERT_EQUAL_UINT16(chord, step.fire_mask);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::Draining), static_cast<int>(first.phase));
+  step = chord_engine_step(&first, 0x0001, 10);
+  TEST_ASSERT_FALSE(step.fire);
+  step = chord_engine_step(&first, 0, 11);
+  TEST_ASSERT_FALSE(step.fire);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::Idle), static_cast<int>(first.phase));
+
+  step = chord_engine_step(&first, 0x0004, 20);
+  TEST_ASSERT_FALSE(step.fire);
+  step = chord_engine_step(&first, 0, 21);
+  TEST_ASSERT_TRUE(step.fire);
+  TEST_ASSERT_EQUAL_UINT16(0x0004, step.fire_mask);
+  step = chord_engine_step(&first, 0, 22);
+  TEST_ASSERT_FALSE(step.fire);
+}
+
+extern "C" void test_bounce_within_debounce_does_not_split(void) {
+  TEST_ASSERT_EQUAL_INT(8, static_cast<int>(kChordDebounceMs));
+  TEST_ASSERT_TRUE(kChordReleaseGuardMs > kChordDebounceMs);
+
+  ChordEngine engine;
+  chord_engine_reset(&engine);
+  const uint16_t chord = 0x0003;
+
+  ChordStep step = chord_engine_step(&engine, chord, 0);
+  TEST_ASSERT_FALSE(step.fire);
+
+  const uint32_t up = 1000;
+  step = chord_engine_step(&engine, 0, up);
+  TEST_ASSERT_FALSE(step.fire);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::ReleaseGuard), static_cast<int>(engine.phase));
+
+  step = chord_engine_step(&engine, chord, up + kChordDebounceMs);
+  TEST_ASSERT_FALSE(step.fire);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::Holding), static_cast<int>(engine.phase));
+  TEST_ASSERT_EQUAL_UINT16(chord, engine.peak.mask);
+
+  const uint32_t up2 = up + kChordDebounceMs + 100;
+  step = chord_engine_step(&engine, 0, up2);
+  TEST_ASSERT_FALSE(step.fire);
+  step = chord_engine_step(&engine, 0, up2 + kChordReleaseGuardMs - 1);
+  TEST_ASSERT_FALSE(step.fire);
+  step = chord_engine_step(&engine, 0, up2 + kChordReleaseGuardMs);
+  TEST_ASSERT_TRUE(step.fire);
+  TEST_ASSERT_EQUAL_UINT16(chord, step.fire_mask);
+  step = chord_engine_step(&engine, 0, up2 + kChordReleaseGuardMs + 1);
+  TEST_ASSERT_FALSE(step.fire);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::Idle), static_cast<int>(engine.phase));
+}
+
+extern "C" void test_repress_inside_guard_merges(void) {
+  ChordEngine engine;
+  chord_engine_reset(&engine);
+
+  ChordStep step = chord_engine_step(&engine, 0x0003, 0);
+  TEST_ASSERT_FALSE(step.fire);
+  const uint32_t up = 100;
+  step = chord_engine_step(&engine, 0, up);
+  TEST_ASSERT_FALSE(step.fire);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::ReleaseGuard), static_cast<int>(engine.phase));
+  TEST_ASSERT_EQUAL_UINT16(0x0003, engine.peak.mask);
+
+  step = chord_engine_step(&engine, 0x0007, up + kChordReleaseGuardMs - 1);
+  TEST_ASSERT_FALSE(step.fire);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::Holding), static_cast<int>(engine.phase));
+  TEST_ASSERT_EQUAL_UINT16(0x0007, engine.peak.mask);
+
+  const uint32_t up2 = up + 50;
+  step = chord_engine_step(&engine, 0, up2);
+  TEST_ASSERT_FALSE(step.fire);
+  step = chord_engine_step(&engine, 0, up2 + kChordReleaseGuardMs);
+  TEST_ASSERT_TRUE(step.fire);
+  TEST_ASSERT_EQUAL_UINT16(0x0007, step.fire_mask);
+  step = chord_engine_step(&engine, 0, up2 + kChordReleaseGuardMs + 5);
+  TEST_ASSERT_FALSE(step.fire);
+}
+
+extern "C" void test_first_up_draining_ignores_presses(void) {
+  ChordEngine engine;
+  chord_engine_reset(&engine);
+  engine.mode = ChordFireMode::FirstUp;
+
+  ChordStep step = chord_engine_step(&engine, 0x0003, 0);
+  TEST_ASSERT_FALSE(step.fire);
+  step = chord_engine_step(&engine, 0x0002, 1);
+  TEST_ASSERT_TRUE(step.fire);
+  TEST_ASSERT_EQUAL_UINT16(0x0003, step.fire_mask);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::Draining), static_cast<int>(engine.phase));
+  TEST_ASSERT_EQUAL_UINT8(0, engine.peak.count);
+
+  step = chord_engine_step(&engine, 0x0005, 2);
+  TEST_ASSERT_FALSE(step.fire);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::Draining), static_cast<int>(engine.phase));
+  TEST_ASSERT_EQUAL_UINT16(0, engine.peak.mask);
+
+  step = chord_engine_step(&engine, 0x0004, 3);
+  TEST_ASSERT_FALSE(step.fire);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::Draining), static_cast<int>(engine.phase));
+
+  step = chord_engine_step(&engine, 0, 4);
+  TEST_ASSERT_FALSE(step.fire);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::Idle), static_cast<int>(engine.phase));
+
+  step = chord_engine_step(&engine, 0x0004, 5);
+  TEST_ASSERT_FALSE(step.fire);
+  TEST_ASSERT_EQUAL_UINT16(0x0004, engine.peak.mask);
+  step = chord_engine_step(&engine, 0, 6);
+  TEST_ASSERT_TRUE(step.fire);
+  TEST_ASSERT_EQUAL_UINT16(0x0004, step.fire_mask);
+  step = chord_engine_step(&engine, 0, 7);
+  TEST_ASSERT_FALSE(step.fire);
+}
+
 extern "C" void test_recipe_shapes(void) {
   TEST_ASSERT_EQUAL_INT(12, static_cast<int>(kChordTapGapMs));
   TEST_ASSERT_FALSE(chord_parse_recipe(nullptr, nullptr));
@@ -605,6 +763,81 @@ extern "C" void test_recipe_that_does_not_fit_fails(void) {
   TEST_ASSERT_TRUE(got.failed);
 }
 
+extern "C" void test_recipe_token_and_cap_bounds(void) {
+  const ChordEvent shift_plus[] = {ev_press(ChordKeyKind::Shift, 0, 0),
+                                   ev_press(ChordKeyKind::Char, '+', 12), ev_release(12)};
+  expect_events("Shift++", shift_plus, 3);
+
+  char plain23[24];
+  memset(plain23, 'a', 23);
+  plain23[23] = '\0';
+  ChordEvent want23[24];
+  for (int i = 0; i < 23; ++i) want23[i] = ev_write('a');
+  want23[23] = ev_release(0);
+  expect_events(plain23, want23, 24);
+
+  char long24[32];
+  memset(long24, 'b', 24);
+  long24[24] = ' ';
+  long24[25] = 'a';
+  long24[26] = '\0';
+  ChordRecipe got;
+  TEST_ASSERT_TRUE(chord_parse_recipe(long24, &got));
+  TEST_ASSERT_FALSE(got.failed);
+  TEST_ASSERT_FALSE(got.overflow_skips);
+  TEST_ASSERT_EQUAL_INT(1, static_cast<int>(got.skip_count));
+  TEST_ASSERT_TRUE(got.skips[0].too_long);
+  TEST_ASSERT_EQUAL_INT(24, static_cast<int>(got.skips[0].length));
+  TEST_ASSERT_EQUAL_STRING("", got.skips[0].text);
+  TEST_ASSERT_EQUAL_INT(2, static_cast<int>(got.count));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordEvOp::Write), static_cast<int>(got.events[0].op));
+  TEST_ASSERT_EQUAL_INT('a', got.events[0].code);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordEvOp::ReleaseAll), static_cast<int>(got.events[1].op));
+
+  char fit[160];
+  size_t n = 0;
+  for (int i = 0; i < 48; ++i) {
+    if (i > 0) fit[n++] = ' ';
+    fit[n++] = 'a';
+  }
+  fit[n] = '\0';
+  TEST_ASSERT_TRUE(chord_parse_recipe(fit, &got));
+  TEST_ASSERT_FALSE(got.failed);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(kChordRecipeCap), static_cast<int>(got.count));
+  TEST_ASSERT_EQUAL_INT(0, static_cast<int>(got.skip_count));
+  TEST_ASSERT_EQUAL_INT('a', got.events[0].code);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordEvOp::ReleaseAll),
+                        static_cast<int>(got.events[kChordRecipeCap - 1].op));
+
+  fit[n++] = ' ';
+  fit[n++] = 'a';
+  fit[n] = '\0';
+  TEST_ASSERT_TRUE(chord_parse_recipe(fit, &got));
+  TEST_ASSERT_TRUE(got.failed);
+  TEST_ASSERT_FALSE(got.overflow_skips);
+  TEST_ASSERT_EQUAL_INT(0, static_cast<int>(got.skip_count));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(kChordRecipeCap), static_cast<int>(got.count));
+
+  char skips[80];
+  n = 0;
+  for (int i = 0; i < static_cast<int>(kChordSkipCap) + 1; ++i) {
+    if (i > 0) skips[n++] = ' ';
+    skips[n++] = '\x7f';
+  }
+  skips[n++] = ' ';
+  skips[n++] = 'z';
+  skips[n] = '\0';
+  TEST_ASSERT_TRUE(chord_parse_recipe(skips, &got));
+  TEST_ASSERT_FALSE(got.failed);
+  TEST_ASSERT_TRUE(got.overflow_skips);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(kChordSkipCap), static_cast<int>(got.skip_count));
+  TEST_ASSERT_FALSE(got.skips[0].too_long);
+  TEST_ASSERT_EQUAL_INT(1, static_cast<int>(got.skips[0].length));
+  TEST_ASSERT_EQUAL_INT(2, static_cast<int>(got.count));
+  TEST_ASSERT_EQUAL_INT('z', got.events[0].code);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordEvOp::ReleaseAll), static_cast<int>(got.events[1].op));
+}
+
 extern "C" void test_each_csv_output_parses(void) {
   TEST_ASSERT_TRUE_MESSAGE(g_count > 0, g_error);
   for (size_t i = 0; i < g_count; ++i) {
@@ -628,9 +861,14 @@ int main(int argc, char **argv) {
   RUN_TEST(test_release_mode_waits_ten_ms);
   RUN_TEST(test_first_up_fires_then_drains);
   RUN_TEST(test_switch_to_first_during_guard_sends);
+  RUN_TEST(test_both_modes_send_a_chord_once);
+  RUN_TEST(test_bounce_within_debounce_does_not_split);
+  RUN_TEST(test_repress_inside_guard_merges);
+  RUN_TEST(test_first_up_draining_ignores_presses);
   RUN_TEST(test_recipe_shapes);
   RUN_TEST(test_skip_overflow_is_flagged);
   RUN_TEST(test_recipe_that_does_not_fit_fails);
+  RUN_TEST(test_recipe_token_and_cap_bounds);
   RUN_TEST(test_csv_bits_match_firmware_table);
   RUN_TEST(test_each_csv_row_matches_spec);
   RUN_TEST(test_each_csv_output_parses);
