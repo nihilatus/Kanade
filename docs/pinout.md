@@ -1,6 +1,7 @@
-# ESP32-S3 JIS keyboard — pin map
+# ESP32-S3 JIS keyboard — diode key matrix pin map
 
-Adapted from Project store `docs/esp32-hid-pinout.md` (gamepad design → keyboard chord surface). Same GPIOs; firmware role is **USB HID keyboard**, not gamepad.
+Firmware role is **USB HID keyboard** (chord → romaji), not a gamepad.  
+Physical input is a **6×6 diode matrix** (36 cells, 32 keys + 4 spare), not 1-GPIO-per-key.
 
 ## Board & USB
 
@@ -9,60 +10,86 @@ Adapted from Project store `docs/esp32-hid-pinout.md` (gamepad design → keyboa
 | Board | ESP32-S3-DevKitC-1 **N16R8** |
 | HID port | Connector labeled **USB** (native USB OTG) |
 | Not for HID | **UART** port (USB-to-UART bridge) — flash / serial only |
-| USB D− / D+ | **GPIO19 / GPIO20** — never assign as buttons |
+| USB D− / D+ | **GPIO19 / GPIO20** — never assign as matrix lines |
 
-## Caveats (same as store design)
+## Why a matrix
 
-- **GPIO35 / 36 / 37** — octal PSRAM on N16R8. Map uses **GPIO35 only for Right Center**; leave 36/37 alone. Bench-test R3; fall back to a matrix/expander if flaky.
-- **Strapping:** GPIO0 (BOOT), GPIO45, GPIO46 — don’t hold at reset; enable pull-up on 45/46 **after** boot.
-- **RGB LED:** v1.1 ≈ GPIO38; v1.0 ≈ GPIO48 — pressing that key glitches the LED.
-- **UART0:** GPIO43/44 — wiring them as buttons drops the UART console.
+32 logical buttons would exhaust safe GPIOs on N16R8 if wired 1:1 (USB, PSRAM, strapping, UART, RGB).  
+A **6×6** matrix uses **12 GPIOs** and leaves spare cells for future keys.
 
-## GPIO → logical button (32× direct)
+## Safe GPIO set used
 
-| # | Logical | GPIO | Notes |
-| ---: | --- | ---: | --- |
-| 1 | D-pad Up | 1 | |
-| 2 | D-pad Down | 2 | |
-| 3 | D-pad Left | 42 | |
-| 4 | D-pad Right | 41 | |
-| 5 | A | 40 | stub: → `shi` |
-| 6 | B | 39 | |
-| 7 | X | 47 | |
-| 8 | Y | 21 | |
-| 9 | L1 | 4 | |
-| 10 | R1 | 5 | |
-| 11 | L2 | 6 | |
-| 12 | R2 | 7 | |
-| 13 | Start | 15 | stub: → space |
-| 14 | Select | 16 | |
-| 15 | Left N | 17 | stub chord with Right E → `ka` |
-| 16 | Left NE | 18 | |
-| 17 | Left E | 8 | |
-| 18 | Left SE | 3 | |
-| 19 | Left S | 9 | |
-| 20 | Left SW | 10 | |
-| 21 | Left W | 11 | |
-| 22 | Left NW | 12 | |
-| 23 | Left Center | 13 | stub: → `a` |
-| 24 | Right N | 14 | |
-| 25 | Right NE | 48 | RGB on v1.0 |
-| 26 | Right E | 38 | RGB on v1.1; stub chord |
-| 27 | Right SE | 45 | strapping |
-| 28 | Right S | 0 | BOOT |
-| 29 | Right SW | 46 | strapping |
-| 30 | Right W | 43 | UART0 TX |
-| 31 | Right NW | 44 | UART0 RX |
-| 32 | Right Center | **35** | PSRAM line — caveat |
+Prefer clean lines: **1–18, 21, 39–42, 47**.  
+Avoided: **19/20** (USB), **35–37** (octal PSRAM), **0/45/46** (strapping), **38/48** (RGB), **43/44** (UART0).
 
-**Do not use:** 19, 20 (USB); 36, 37 (PSRAM).
+| Role | GPIOs |
+| --- | --- |
+| **Rows** (driven) | **1, 2, 3, 4, 5, 6** |
+| **Cols** (read) | **7, 8, 9, 10, 11, 12** |
 
-Electrical: switch to GND, internal pull-up, pressed = LOW, debounce ~8 ms (firmware).
+## Scan method
 
-## Stub vs full wiring
+1. Columns are `INPUT_PULLUP` (idle HIGH).
+2. Each row is driven **LOW** in turn (`OUTPUT`); other rows stay Hi-Z (`INPUT`).
+3. A closed switch pulls its column LOW through the diode → pressed.
+4. Firmware debounce ≈ **8 ms**. Ghosting is prevented by per-key diodes (assumed installed).
 
-`src/buttons.cpp` currently **samples only** Left Center, Left N, Right E, A, Start. All other rows keep their GPIO numbers in the table but are skipped until you clear the stub mask in `stub_enabled()`.
+## Diode orientation (required)
+
+Per switch, series diode for anti-ghosting:
+
+```
+  COL (pull-up) ── switch ──|>|── ROW (driven LOW when scanned)
+                              ↑
+                         anode → cathode toward ROW
+```
+
+- **Anode** toward the **switch / column** side.  
+- **Cathode** toward the **row** (driven) line.  
+- Equivalent wording: *switch → diode anode, cathode toward row*.
+
+If polarity is reversed, that key will never register (or the whole matrix misbehaves). Use **1N4148** (or SOD-123 equivalent).
+
+## Matrix map (row, col) → logical button
+
+Rows = GPIO index order above (R0=GPIO1 … R5=GPIO6).  
+Cols = C0=GPIO7 … C5=GPIO12.
+
+|  | C0 (7) | C1 (8) | C2 (9) | C3 (10) | C4 (11) | C5 (12) |
+| --- | --- | --- | --- | --- | --- | --- |
+| **R0 (1)** | Left N | Left NE | Left E | Left SE | Left S | Left SW |
+| **R1 (2)** | Left W | Left NW | **Left Center** | Right N | Right NE | **Right E** |
+| **R2 (3)** | Right SE | Right S | Right SW | Right W | Right NW | Right Center |
+| **R3 (4)** | D-pad Up | D-pad Down | D-pad Left | D-pad Right | **A** | B |
+| **R4 (5)** | X | Y | L1 | L2 | R1 | R2 |
+| **R5 (6)** | **Start** | Select | *(spare)* | *(spare)* | *(spare)* | *(spare)* |
+
+Bold cells are the **stub** keys enabled in firmware for first HID proof.
+
+### Stub cell cheat-sheet
+
+| Logical | Cell | Types (stub) |
+| --- | --- | --- |
+| Left Center | R1 C2 | `a` |
+| Left N | R0 C0 | with Right E → `ka` |
+| Right E | R1 C5 | chord partner |
+| A | R3 C4 | `shi` |
+| Start | R5 C0 | space |
+
+## Wiring checklist (one key)
+
+1. One side of momentary switch → **column** GPIO (via shared col bus).  
+2. Other side of switch → **diode anode**.  
+3. Diode **cathode** → **row** GPIO (via shared row bus).  
+4. Repeat for all 32 keys; share row/col buses on protoboard / DuPont harness.
+
+## Stub vs full matrix
+
+`src/buttons.cpp` currently **samples only** Left Center, Left N, Right E, A, Start (`stub_enabled`).  
+All 32 cells are mapped; clear / expand the stub mask as you solder more keys. Spare cells stay empty until needed.
 
 ## Later
 
 Full chord engine will port logic / `mapping_table.csv` from sibling repo `E:\cline play\joystick writer`. This firmware types **romaji** HID keycodes; the PC only needs a Japanese IME.
+
+Parts list: [`docs/bom.md`](bom.md).

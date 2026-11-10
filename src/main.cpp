@@ -13,7 +13,7 @@ void setup() {
   delay(200);
   Serial.println();
   Serial.println(F("esp32-jis-keyboard scaffold"));
-  Serial.println(F("HID on USB OTG port; chord→romaji stub active"));
+  Serial.println(F("HID on USB OTG; 6x6 diode matrix; chord→romaji stub"));
 #endif
 
   buttons_begin();
@@ -21,7 +21,8 @@ void setup() {
   chords_begin();
 
 #if ARDUINO_USB_CDC_ON_BOOT
-  Serial.println(F("Stub keys: LeftCenter=a, LeftN+RightE=ka, A=shi, Start=space"));
+  Serial.println(F("Matrix rows GPIO1-6, cols GPIO7-12"));
+  Serial.println(F("Stub: LC a, LN+RE ka, A shi, Start space"));
 #endif
 }
 

@@ -5,12 +5,12 @@
 
 // --- Stub chord table (proof only) ---
 //
-// | Physical combo                         | Romaji typed |
+// | Physical combo (matrix cell)           | Romaji typed |
 // |----------------------------------------|--------------|
-// | Left Center (release)                  | a            |
-// | Left N held + Right E release          | ka           |
-// | A (release)                            | shi          |
-// | Start (release)                        | (space)      |
+// | Left Center R1C2 (release)             | a            |
+// | Left N R0C0 held + Right E R1C5 release| ka           |
+// | A R3C4 (release)                       | shi          |
+// | Start R5C0 (release)                   | (space)      |
 //
 // Later: port mapping_table.csv + engine timing from joystick-writer.
 

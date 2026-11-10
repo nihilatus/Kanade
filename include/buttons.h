@@ -5,6 +5,7 @@
 
 // Logical buttons — same product roles as joystick-writer / store pinout,
 // but consumed here as a keyboard chord surface (not a gamepad).
+// Physical wiring is a diode key matrix (see docs/pinout.md), not 1 GPIO/key.
 
 enum ButtonId : uint8_t {
   BTN_DPAD_UP = 0,
@@ -42,21 +43,27 @@ enum ButtonId : uint8_t {
   BTN_COUNT
 };
 
-struct ButtonPin {
-  ButtonId id;
-  int8_t gpio;           // -1 = not wired / stub-disabled
+static constexpr uint8_t kMatrixRows = 6;
+static constexpr uint8_t kMatrixCols = 6;
+
+// Empty / unused matrix cell
+static constexpr int8_t kMatrixEmpty = -1;
+
+struct MatrixKey {
+  int8_t button;  // ButtonId, or kMatrixEmpty if spare
   const char *name;
-  bool pullup_after_boot; // GPIO45/46: enable pull-up only after boot
 };
 
-extern const ButtonPin kButtonPins[BTN_COUNT];
+extern const int kMatrixRowPins[kMatrixRows];
+extern const int kMatrixColPins[kMatrixCols];
+extern const MatrixKey kMatrixMap[kMatrixRows][kMatrixCols];
 
 void buttons_begin();
-void buttons_poll();  // debounce + sample
+void buttons_poll();  // scan matrix + debounce
 
-bool button_pressed(ButtonId id);   // current debounced level (active-low → true)
+bool button_pressed(ButtonId id);   // current debounced level (active → true)
 bool button_just_pressed(ButtonId id);
 bool button_just_released(ButtonId id);
 
-// Stub helpers: which GPIOs are actually sampled this build
+// Stub helpers: which logical keys are sampled this build
 bool button_gpio_enabled(ButtonId id);

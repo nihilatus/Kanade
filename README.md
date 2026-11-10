@@ -16,9 +16,10 @@ Device looks like a USB keyboard (not a gamepad). Chord → romaji runs on the M
 | Board | ESP32-S3-DevKitC-1 N16R8 |
 | HID cable | Plug PC into the port labeled **USB** (OTG) |
 | Flash / serial | Port labeled **UART** (optional CDC also on OTG if enabled) |
-| Reserved | **GPIO19 / GPIO20** — USB data; do not wire buttons |
+| Reserved | **GPIO19 / GPIO20** — USB data; do not wire matrix lines |
 
-Pin table: [`docs/pinout.md`](docs/pinout.md)
+**Input hardware:** **6×6 diode key matrix** (12 GPIOs: rows 1–6, cols 7–12).  
+Pin / cell map: [`docs/pinout.md`](docs/pinout.md) · Parts: [`docs/bom.md`](docs/bom.md)
 
 ---
 
@@ -26,21 +27,30 @@ Pin table: [`docs/pinout.md`](docs/pinout.md)
 
 | Done | Stub / later |
 | --- | --- |
-| PlatformIO + Arduino + TinyUSB HID keyboard | Full 32-key sampling (only 5 GPIOs enabled) |
-| Debounced GPIO read for stub keys | Full chord engine + SOCD timing |
+| PlatformIO + Arduino + TinyUSB HID keyboard | Full 32-key sampling (only 5 cells enabled) |
+| 6×6 matrix scan + debounce (diodes assumed) | Full chord engine + SOCD timing |
 | Demo chords → romaji HID (`a` / `ka` / `shi` / space) | Port `mapping_table.csv` from joystick-writer |
-| Pin map docs | JIS HID country/layout descriptor polish |
+| Pin map + BOM | JIS HID country/layout descriptor polish |
 
 ### Stub chord proof
 
-| Combo | Types |
-| --- | --- |
-| Left Center (GPIO13) release | `a` |
-| Left N (17) held + Right E (38) release | `ka` |
-| A (40) release | `shi` |
-| Start (15) release | space |
+| Combo | Matrix cell | Types |
+| --- | --- | --- |
+| Left Center release | R1 C2 | `a` |
+| Left N held + Right E release | R0 C0 + R1 C5 | `ka` |
+| A release | R3 C4 | `shi` |
+| Start release | R5 C0 | space |
 
-Wire those switches to GND (active-low). Expand `stub_enabled()` in `src/buttons.cpp` as you solder more keys.
+Wire those cells with switch + diode (cathode toward row). Expand `stub_enabled()` in `src/buttons.cpp` as you solder more keys.
+
+---
+
+## How to build the matrix (short)
+
+1. Buy parts from [`docs/bom.md`](docs/bom.md) — 32 tactiles + 32× 1N4148, proto/breadboard, DuPont.
+2. Bus **rows** to GPIO **1–6**, **cols** to GPIO **7–12**.
+3. Per key: `COL — switch — diode anode → cathode — ROW` (see pinout).
+4. Start with the five stub cells; expand the stub mask when more keys work.
 
 ---
 
@@ -68,7 +78,7 @@ If upload fails while OTG HID holds the port, hold **BOOT**, tap **EN/RST**, rel
 
 - `ARDUINO_USB_MODE=0` — USB OTG TinyUSB stack (required for HID on the USB connector).
 - `ARDUINO_USB_CDC_ON_BOOT=1` — optional serial over OTG for logs; set to `0` if it confuses the host.
-- N16R8 flash/PSRAM flags are set; GPIO35 as Right Center still needs a bench check.
+- N16R8 flash/PSRAM flags are set; matrix GPIOs avoid PSRAM / USB / strapping pins.
 
 ---
 
@@ -77,22 +87,22 @@ If upload fails while OTG HID holds the port, hold **BOOT**, tap **EN/RST**, rel
 ```
 platformio.ini
 src/main.cpp          entry
-src/buttons.cpp       GPIO map + stub mask + debounce
+src/buttons.cpp       6×6 matrix map + stub mask + scan/debounce
 src/hid_keyboard.cpp  USB HID keyboard sender
 src/chords.cpp        tiny chord → romaji table
 include/*.h
-docs/pinout.md
+docs/pinout.md        row/col GPIOs, cell map, diode orientation
+docs/bom.md           parts Augustine must buy/prepare
 ```
 
 ---
 
 ## Remaining gaps / 之後要做
 
-1. Enable all 32 inputs (or matrix fallback if GPIO35 fails).
+1. Enable all 32 matrix cells in `stub_enabled()` once wired.
 2. Port chord engine + CSV from `E:\cline play\joystick writer`.
 3. Decide final USB VID/PID / product strings; optional true JIS layout report.
-4. CDC vs UART logging strategy once 43/44 are buttons.
-5. Hardware harness / PCB — out of scope for this scaffold.
+4. Physical enclosure / PCB — out of scope for this scaffold.
 
 ---
 
