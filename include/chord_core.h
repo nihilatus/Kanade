@@ -116,9 +116,11 @@ struct ChordRecipe {
   // Skip storage filled up and later tokens were dropped. Do not send.
   bool overflow_skips;
   // A token needed more room than the event buffer. Nothing should be sent.
+  // count is 0, so walking events sends nothing even if this flag is missed.
   bool failed;
 };
 
-// False when recipe or out is null. An unknown token is a skip, not a failure.
-// A token of 24 bytes or more is a too_long skip. The rest of the recipe still parses.
+// False when recipe or out is null, or when the recipe does not fit (failed,
+// count 0). An unknown token is a skip, not a failure. A token of 24 bytes or
+// more is a too_long skip. The rest of the recipe still parses.
 bool chord_parse_recipe(const char *recipe, ChordRecipe *out);

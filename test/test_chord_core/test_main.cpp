@@ -680,6 +680,10 @@ extern "C" void test_first_up_draining_ignores_presses(void) {
 extern "C" void test_recipe_shapes(void) {
   TEST_ASSERT_EQUAL_INT(12, static_cast<int>(kChordTapGapMs));
   TEST_ASSERT_FALSE(chord_parse_recipe(nullptr, nullptr));
+  ChordRecipe empty;
+  TEST_ASSERT_FALSE(chord_parse_recipe(nullptr, &empty));
+  TEST_ASSERT_FALSE(empty.failed);
+  TEST_ASSERT_EQUAL_INT(0, static_cast<int>(empty.count));
 
   const ChordEvent a[] = {ev_write('a'), ev_release(0)};
   expect_events("a", a, 2);
@@ -784,8 +788,9 @@ extern "C" void test_recipe_that_does_not_fit_fails(void) {
   recipe[n] = '\0';
 
   ChordRecipe got;
-  TEST_ASSERT_TRUE(chord_parse_recipe(recipe, &got));
+  TEST_ASSERT_FALSE(chord_parse_recipe(recipe, &got));
   TEST_ASSERT_TRUE(got.failed);
+  TEST_ASSERT_EQUAL_INT(0, static_cast<int>(got.count));
   TEST_ASSERT_EQUAL_INT(0, static_cast<int>(got.skip_count));
 
   n = 0;
@@ -798,8 +803,9 @@ extern "C" void test_recipe_that_does_not_fit_fails(void) {
   memcpy(recipe + n, combo, 7);
   n += 7;
   recipe[n] = '\0';
-  TEST_ASSERT_TRUE(chord_parse_recipe(recipe, &got));
+  TEST_ASSERT_FALSE(chord_parse_recipe(recipe, &got));
   TEST_ASSERT_TRUE(got.failed);
+  TEST_ASSERT_EQUAL_INT(0, static_cast<int>(got.count));
 }
 
 extern "C" void test_recipe_token_and_cap_bounds(void) {
@@ -851,11 +857,11 @@ extern "C" void test_recipe_token_and_cap_bounds(void) {
   fit[n++] = ' ';
   fit[n++] = 'a';
   fit[n] = '\0';
-  TEST_ASSERT_TRUE(chord_parse_recipe(fit, &got));
+  TEST_ASSERT_FALSE(chord_parse_recipe(fit, &got));
   TEST_ASSERT_TRUE(got.failed);
   TEST_ASSERT_FALSE(got.overflow_skips);
   TEST_ASSERT_EQUAL_INT(0, static_cast<int>(got.skip_count));
-  TEST_ASSERT_EQUAL_INT(static_cast<int>(kChordRecipeCap), static_cast<int>(got.count));
+  TEST_ASSERT_EQUAL_INT(0, static_cast<int>(got.count));
 
   char skips[80];
   n = 0;

@@ -419,7 +419,8 @@ bool chord_parse_recipe(const char *recipe, ChordRecipe *out) {
     }
     if (out->count >= kChordRecipeCap) {
       out->failed = true;
-      return true;
+      out->count = 0;
+      return false;
     }
     char token[24];
     memcpy(token, start, len);
@@ -428,8 +429,9 @@ bool chord_parse_recipe(const char *recipe, ChordRecipe *out) {
     take_token(out, token, &abort_recipe);
     if (abort_recipe) {
       out->failed = true;
-      return true;
+      out->count = 0;
+      return false;
     }
   }
-  return true;
+  return !out->failed;
 }

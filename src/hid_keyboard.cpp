@@ -202,13 +202,13 @@ void hid_type_recipe(const char *recipe) {
   const bool release_first = queue_busy();
 
   ChordRecipe &parsed = g_parsed_recipe;
-  if (!chord_parse_recipe(recipe, &parsed)) return;
+  const bool parsed_ok = chord_parse_recipe(recipe, &parsed);
   for (size_t i = 0; i < parsed.skip_count; ++i) {
     const ChordSkip &skip = parsed.skips[i];
     if (skip.too_long) log_long_token(skip.length);
     else log_skip(skip.text);
   }
-  if (parsed.failed || parsed.overflow_skips) {
+  if (!parsed_ok || parsed.overflow_skips) {
 #if ARDUINO_USB_CDC_ON_BOOT
     if (parsed.failed) Serial.println(F("hid recipe too long, skipped"));
     else Serial.println(F("hid recipe dropped tokens, skipped"));
