@@ -25,6 +25,7 @@
 #include "config_http.h"
 #include "config_job.h"
 #include "console_log.h"
+#include "output_policy.h"
 #include "pin_map.h"
 
 #undef write
@@ -65,6 +66,9 @@ static bool g_switch_raw = false;
 static bool g_switch_stable = false;
 static uint32_t g_switch_change_ms = 0;
 static bool g_start_failed = false;
+static OutputMode g_output_mode = OutputMode::Usb;
+static bool g_wifi_boot_closed = false;
+static bool g_restart = false;
 
 static WiFiServer g_server(80);
 static WiFiClient g_client;
@@ -979,12 +983,19 @@ static void stop_ap() {
   console_println("AP off");
 }
 
+void config_server_set_output_mode(OutputMode mode) { g_output_mode = mode; }
+
+bool config_server_restart_requested() { return g_restart; }
+
+bool config_server_wifi_closed() { return g_switch_stable; }
+
 void config_server_begin() {
   console_ensure();
   load_api_token();
   pinMode(pin_gpio(PinFn::WifiEnable), INPUT_PULLUP);
   g_switch_raw = switch_closed_raw();
   g_switch_stable = g_switch_raw;
+  g_wifi_boot_closed = g_switch_stable;
   g_switch_change_ms = millis();
   if (g_worker == nullptr) {
     const BaseType_t ok =
@@ -1003,8 +1014,14 @@ void config_server_begin() {
 void config_server_poll() {
   poll_switch();
   service_job();
-  if (g_switch_stable && !g_http) start_ap();
-  else if (!g_switch_stable && g_http) stop_ap();
+  if (wifi_edge_requests_restart(g_output_mode, g_wifi_boot_closed, g_switch_stable)) {
+    // Do not start or stop the radio here. The caller restarts, and the next
+    // boot either serves the AP or starts BLE.
+    g_restart = true;
+  } else if (!g_restart) {
+    if (g_switch_stable && !g_http) start_ap();
+    else if (!g_switch_stable && g_http) stop_ap();
+  }
   if (g_http) service_conn();
   service_job();
 }

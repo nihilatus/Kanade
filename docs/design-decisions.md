@@ -31,7 +31,7 @@
 - `config_server_poll()` 每一圈最多搬 `kHttpSlice`。慢請求或過大的 body 不能拖住關熱點。
 - 和弦 JSON 的解析與 LittleFS 讀寫在另一個核心。那個工作開不起來時，GET／POST／還原回答 503，不要退回在這圈 loop 裡做。
 - 活表只在這次 poll 換上。先 stage，成功才 commit。上一筆還沒結束不接下一筆。斷線不能留下半截表。
-- 熱點開著時不掃描、不送 USB HID。熱點關掉時，掃描與 USB HID 照常。
+- 熱點開著時不掃描、不送鍵。USB 模式熱點關掉時，掃描與 USB HID 照常，不重啟。藍牙模式見下面的輸出開關：熱點開關再變就重啟，不在同一次開機裡改走藍牙。
 
 路由變多、要從檔案系統送靜態檔、WebSocket、上傳檔案或 HTTPS 時，再重看非阻塞套件。在那之前維持自寫。
 
@@ -49,13 +49,14 @@
 | --- | --- |
 | 日文轉換 | 韌體送羅馬字與少數特殊鍵。假名轉換是主機日文 IME 的事。主機鍵盤類型要設成 Kanade 設定的配列。(目前只實作JIS)。USB 國碼不設定，Windows 不會靠它切換版面。 |
 | 改配列 | 熱點頁不能改。不加指撥開關。 |
-| 裝置種類 | USB HID 鍵盤，不是手把，也不是類比搖桿。格鬥搖桿的按鈕只是開關，韌體仍以鍵盤列舉。 |
+| 裝置種類 | 鍵盤，不是手把，也不是類比搖桿。USB 模式是 USB HID。藍牙模式是 BLE HID。格鬥搖桿的按鈕只是開關。 |
 | 按鍵接法 | 14 鍵各接一隻 GPIO 到 GND，內部上拉，按下為 LOW。沒有矩陣、沒有二極體、沒有外加上拉、沒有並在開關上的電容。 |
-| 接腳對應 | 功能看符號，腳號只在 include/pin_map.h。掃描與熱點都查這張表，不在別處寫 GPIO 號碼。新的輸入（例如移動腳）加一列，不放進 14 個和弦位元。 |
+| 接腳對應 | 功能看符號，腳號只在 `include/pin_map.h`。掃描、熱點與輸出開關都查這張表，不在別處寫 GPIO 號碼。新的輸入（例如移動腳）加一列，不放進 14 個和弦位元。 |
 | 掃描與送鍵 | `loop` 不為了打完一串字而停住。配方排成佇列，到點最多送一個 HID report。重複字母（例如 `nn`）不用 `Keyboard.write()`：那會在主機一次 poll 之前把按下與放開都送出，兩下會併成一下。佇列最後一格留給 `release-all`，避免修飾鍵漏到下一組。 |
 | 純邏輯 | `chord_core` 不碰 Arduino、GPIO、檔案、USB。宿主測試 `pio test -e native` 編譯的就是這份。判斷規則要加在這裡，不要只寫進 `chords.cpp`。 |
 | 表的來源 | 唯一可手改的是 `esp32-jis-chordboard-premapping.csv`。機器表與 `include/chord_map.inc` 由腳本產生。出廠表編進韌體，不必上傳 LittleFS 映像。手機存檔 `chords.json` 蓋過出廠表，直到網頁還原出廠。 |
 | 配方裡認不得的 token | 裝置上略過那個 token，其餘仍送。略過紀錄溢位時仍送出其餘內容，只少記 token 文字。事件緩衝放不下，整份配方不送。出廠表不允許靠略過：建置時認不得的 token 會讓 `pio run` 失敗。 |
 | 熱點 | 只在 GPIO15 接到 GND 時開 SoftAP，不加入家裡的路由器，沒有 HTTPS。密碼是信任邊界。`WIFI_API_TOKEN` 非空時用那組，不印到序列埠。留空時第一次開機產生 token、寫進 NVS，並只印一次；之後 `/api/*` 都要 `X-Api-Token`。瀏覽器仍要 `Origin` 是 `http://192.168.4.1` 或沒有這個標頭。密碼不印到序列埠，`include/secrets.h` 不進 git。 |
+| 輸出開關 | GPIO16 開路是 USB HID，導通到 GND 是 BLE HID，一次一種。這塊板的 Arduino 預編是 NimBLE，不是經典藍牙。模式不寫進 NVS 或 LittleFS，切換消彈跳後先放開按鍵再重啟。配對是 Just Works bonding，金鑰在 NimBLE 自己的 NVS；切換不清 bond、不強制重新配對。藍牙模式若 GPIO15 也導通，不啟動 BLE，只服務熱點；這個開關再變也重啟。USB 模式的熱點仍是運行中開關。藍牙模式不呼叫 `Keyboard.begin()`，OTG 不列舉成鍵盤；既有 USB CDC 日誌不變。 |
 | 記憶體 | 活表與 JSON DOM 放 PSRAM，把內部 RAM 留給 Wi-Fi。 |
 | 試打頁 | `web/index.html` 用電腦鍵盤試規則，不送 USB HID。作業系統給的按下／放開已經是穩定邊緣，所以不做韌體的 `kChordDebounceMs`。送出時機、比對與連發呼叫由 `chord_core` 編成的 `web/chord_core.wasm`。 |
