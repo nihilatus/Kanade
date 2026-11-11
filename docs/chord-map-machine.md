@@ -23,7 +23,7 @@ section,label,output,left_fingers,right_fingers,left_thumb,right_thumb,repeat
 | `section` | 區段名，例如 `單母音`、`傳統 た 行`、`符號`。空白表示沿用上一列。新區段寫在該區段第一列 |
 | `label` | 給人看的字：假名（`あ`）、符號（`「`、`★ ☆`），或功能名（`退格`、`空白（變換）`）。方向鍵、Enter 可以空白。腳本抄進機器表的 `kana` |
 | `output` | 實際送出的配方，例如 `a`、`[`、`Backspace`、`Shift+1` |
-| `left_fingers` / `right_fingers` | 拇指以外的四指（食指、中指、無名指、小指）。鍵名用 `+` 連接，例如 `LL+LU` |
+| `left_fingers` / `right_fingers` | 手指鍵。左手 `LL` `LU` `LR` `LD`，右手 `RL` `RU` `RR` `RD`。鍵名用 `+` 連接，例如 `LL+LU`。建議打法見 [打法](playing.md) |
 | `left_thumb` / `right_thumb` | 拇指。`(RT0)` 表示這顆可按可不按；裸 `RT0` 是必按 |
 | `repeat` | `allow` 或 `no`。`allow` 在高峰仍按著時可以連送 |
 

@@ -68,7 +68,7 @@
 | 左 | `LL` `LU` `LR` `LD` `LT0` `LT1` `LT2` |
 | 右 | `RL` `RU` `RR` `RD` `RT0` `RT1` `RT2` |
 
-沒有類比 stick，也不要照早期 32 鍵矩陣接線。
+沒有類比 stick，也不要照早期 32 鍵矩陣接線。手怎麼放、字什麼時候出去，見 [`docs/playing.md`](docs/playing.md)。
 
 ---
 
@@ -202,6 +202,7 @@ wasm/emsdk-version.txt    編成 wasm 的 emsdk 版本
 web/chord_core.wasm       試打頁載入的判讀模組
 web/index.html            一般鍵盤試打，讀機器表與 wasm
 docs/chord-map-machine.md
+docs/playing.md            打法：指法，以及現在與尚未做成的送出習慣
 docs/pinout.md
 docs/gpio-spare.md         空腳與現用腳的能力；腳位先不改
 docs/bom.md
