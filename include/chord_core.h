@@ -4,8 +4,8 @@
 #include <stdint.h>
 
 // Pure chord logic: key bits, rule match, peak snapshot, send state machine,
-// and recipe parsing. No Arduino, GPIO, filesystem, or USB. Host tests and
-// the firmware both call this.
+// one poll's masks and wake time, and recipe parsing. No Arduino, GPIO,
+// filesystem, or USB. Host tests and the firmware both call this.
 
 static constexpr int kChordKeyCount = 14;
 // Raw GPIO must hold this long before the chord mask changes.
@@ -118,6 +118,34 @@ void chord_repeat_reset(ChordRepeat *rep);
 ChordRepeatStep chord_repeat_step(ChordRepeat *rep, ChordPhase phase, uint16_t peak_mask,
                                   bool peak_repeats, bool engine_fired, uint16_t fired_mask,
                                   uint32_t now_ms);
+
+// Masks this poll should send, in order, and the next absolute wake on the
+// caller's uint32 clock. count is 0, 1, or 2. wake_ms is 0 when nothing is
+// strictly in the future: a deadline that is already due is performed by the
+// step that observes it, so the caller must not schedule that same time.
+struct ChordDispatch {
+  uint8_t count;
+  uint16_t mask0;
+  uint16_t mask1;
+  uint32_t wake_ms;
+};
+
+// Called only while Holding with a non-empty peak, after this step. Null
+// means no peak repeats. The rule table stays with the caller.
+using ChordPeakRepeats = bool (*)(uint16_t mask);
+
+// Engine step, then one repeat tap. A repeat that already tapped this hold
+// drops the release copy of the same mask. mask0 is the repeat tap when one
+// is due; an engine fire that was not swallowed follows it.
+// A null engine or rep returns zeros and changes nothing.
+ChordDispatch chord_dispatch_step(ChordEngine *engine, ChordRepeat *rep, uint16_t mask,
+                                  uint32_t now_ms, ChordPeakRepeats peak_repeats);
+
+// Same send and wake result for a mode change. Switching to FirstUp while
+// ReleaseGuard is waiting can emit the waiting peak, and a repeat that
+// already tapped that hold swallows it.
+ChordDispatch chord_dispatch_set_mode(ChordEngine *engine, ChordRepeat *rep, ChordFireMode mode,
+                                      uint32_t now_ms, ChordPeakRepeats peak_repeats);
 
 enum class ChordKeyKind : uint8_t {
   Char = 0,

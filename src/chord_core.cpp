@@ -249,6 +249,75 @@ ChordRepeatStep chord_repeat_step(ChordRepeat *rep, ChordPhase phase, uint16_t p
   return step;
 }
 
+// A time that is already due is 0 so the caller does not spin: the step that
+// observes it performs the send.
+static uint32_t future_at(uint32_t now_ms, uint32_t at) {
+  if (static_cast<int32_t>(at - now_ms) <= 0) return 0;
+  return at;
+}
+
+static uint32_t sooner(uint32_t now_ms, uint32_t wake, uint32_t at) {
+  const uint32_t next = future_at(now_ms, at);
+  if (next == 0) return wake;
+  if (wake == 0 || static_cast<int32_t>(next - wake) < 0) return next;
+  return wake;
+}
+
+static uint32_t dispatch_wake(const ChordEngine &engine, const ChordRepeat &rep, bool peak_repeats,
+                              uint32_t now_ms) {
+  uint32_t wake = 0;
+  if (engine.phase == ChordPhase::ReleaseGuard) {
+    wake = sooner(now_ms, wake, engine.guard_since + kChordReleaseGuardMs);
+  }
+  if (engine.phase != ChordPhase::Holding || engine.peak.mask == 0) return wake;
+  if (rep.mask != engine.peak.mask || !peak_repeats) return wake;
+  if (rep.phase == ChordRepeatPhase::Watching) {
+    wake = sooner(now_ms, wake, rep.since_ms + kChordRepeatSettleMs);
+  } else if (rep.phase == ChordRepeatPhase::Sent) {
+    wake = sooner(now_ms, wake, rep.since_ms + kChordRepeatDelayMs);
+  } else if (rep.phase == ChordRepeatPhase::Repeating) {
+    wake = sooner(now_ms, wake, rep.next_ms);
+  }
+  return wake;
+}
+
+static void push_mask(ChordDispatch *out, uint16_t mask) {
+  if (mask == 0 || out->count >= 2) return;
+  if (out->count == 0) out->mask0 = mask;
+  else out->mask1 = mask;
+  out->count = static_cast<uint8_t>(out->count + 1);
+}
+
+static ChordDispatch finish_dispatch(ChordEngine *engine, ChordRepeat *rep, const ChordStep &step,
+                                     uint32_t now_ms, ChordPeakRepeats peak_repeats) {
+  ChordDispatch out{};
+  const bool holding = engine->phase == ChordPhase::Holding;
+  const uint16_t peak = holding ? engine->peak.mask : 0;
+  const bool repeats = holding && peak != 0 && peak_repeats != nullptr && peak_repeats(peak);
+  const ChordRepeatStep got =
+      chord_repeat_step(rep, engine->phase, peak, repeats, step.fire, step.fire_mask, now_ms);
+  if (got.send) push_mask(&out, got.mask);
+  if (step.fire && !got.swallow_fire) push_mask(&out, step.fire_mask);
+  out.wake_ms = dispatch_wake(*engine, *rep, repeats, now_ms);
+  return out;
+}
+
+ChordDispatch chord_dispatch_step(ChordEngine *engine, ChordRepeat *rep, uint16_t mask,
+                                  uint32_t now_ms, ChordPeakRepeats peak_repeats) {
+  ChordDispatch out{};
+  if (engine == nullptr || rep == nullptr) return out;
+  const ChordStep step = chord_engine_step(engine, mask, now_ms);
+  return finish_dispatch(engine, rep, step, now_ms, peak_repeats);
+}
+
+ChordDispatch chord_dispatch_set_mode(ChordEngine *engine, ChordRepeat *rep, ChordFireMode mode,
+                                      uint32_t now_ms, ChordPeakRepeats peak_repeats) {
+  ChordDispatch out{};
+  if (engine == nullptr || rep == nullptr) return out;
+  const ChordStep step = chord_engine_set_mode(engine, mode);
+  return finish_dispatch(engine, rep, step, now_ms, peak_repeats);
+}
+
 static bool is_plain_char(unsigned char c) { return c >= 0x21 && c <= 0x7E; }
 
 static bool named_key(const char *token, ChordKeyKind *kind, uint8_t *code) {

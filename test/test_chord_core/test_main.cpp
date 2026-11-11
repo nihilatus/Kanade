@@ -1459,6 +1459,164 @@ extern "C" void test_repeat_first_up_swallows_after_tap(void) {
   TEST_ASSERT_EQUAL_INT(0, log.release_fires);
 }
 
+static void assert_no_send(const ChordDispatch &sent) {
+  TEST_ASSERT_EQUAL_UINT8(0, sent.count);
+  TEST_ASSERT_EQUAL_UINT16(0, sent.mask0);
+  TEST_ASSERT_EQUAL_UINT16(0, sent.mask1);
+  TEST_ASSERT_EQUAL_UINT32(0, sent.wake_ms);
+}
+
+extern "C" void test_dispatch_release_wakes_then_sends_once(void) {
+  ChordEngine engine;
+  ChordRepeat rep;
+  chord_engine_reset(&engine);
+  chord_repeat_reset(&rep);
+
+  ChordDispatch sent = chord_dispatch_step(&engine, &rep, 0x0001, 1000, repeats_none);
+  assert_no_send(sent);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::Holding), static_cast<int>(engine.phase));
+
+  sent = chord_dispatch_step(&engine, &rep, 0, 1500, repeats_none);
+  TEST_ASSERT_EQUAL_UINT8(0, sent.count);
+  TEST_ASSERT_EQUAL_UINT32(1510, sent.wake_ms);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::ReleaseGuard), static_cast<int>(engine.phase));
+
+  sent = chord_dispatch_step(&engine, &rep, 0, 1509, repeats_none);
+  TEST_ASSERT_EQUAL_UINT8(0, sent.count);
+  TEST_ASSERT_EQUAL_UINT32(1510, sent.wake_ms);
+
+  sent = chord_dispatch_step(&engine, &rep, 0, 1510, repeats_none);
+  TEST_ASSERT_EQUAL_UINT8(1, sent.count);
+  TEST_ASSERT_EQUAL_UINT16(0x0001, sent.mask0);
+  TEST_ASSERT_EQUAL_UINT16(0, sent.mask1);
+  TEST_ASSERT_EQUAL_UINT32(0, sent.wake_ms);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::Idle), static_cast<int>(engine.phase));
+}
+
+extern "C" void test_dispatch_repeat_wake_follows_settle_delay_interval(void) {
+  ChordEngine engine;
+  ChordRepeat rep;
+  chord_engine_reset(&engine);
+  chord_repeat_reset(&rep);
+
+  ChordDispatch sent = chord_dispatch_step(&engine, &rep, 0x0001, 0, repeats_bit0);
+  TEST_ASSERT_EQUAL_UINT8(0, sent.count);
+  TEST_ASSERT_EQUAL_UINT32(kChordRepeatSettleMs, sent.wake_ms);
+
+  sent = chord_dispatch_step(&engine, &rep, 0x0001, 49, repeats_bit0);
+  TEST_ASSERT_EQUAL_UINT8(0, sent.count);
+  TEST_ASSERT_EQUAL_UINT32(kChordRepeatSettleMs, sent.wake_ms);
+
+  sent = chord_dispatch_step(&engine, &rep, 0x0001, 50, repeats_bit0);
+  TEST_ASSERT_EQUAL_UINT8(1, sent.count);
+  TEST_ASSERT_EQUAL_UINT16(0x0001, sent.mask0);
+  TEST_ASSERT_EQUAL_UINT16(0, sent.mask1);
+  TEST_ASSERT_EQUAL_UINT32(kChordRepeatDelayMs, sent.wake_ms);
+  TEST_ASSERT_NOT_EQUAL(50, sent.wake_ms);
+
+  sent = chord_dispatch_step(&engine, &rep, 0x0001, 400, repeats_bit0);
+  TEST_ASSERT_EQUAL_UINT8(1, sent.count);
+  TEST_ASSERT_EQUAL_UINT16(0x0001, sent.mask0);
+  TEST_ASSERT_EQUAL_UINT32(400u + kChordRepeatIntervalMs, sent.wake_ms);
+
+  sent = chord_dispatch_step(&engine, &rep, 0x0001, 433, repeats_bit0);
+  TEST_ASSERT_EQUAL_UINT8(1, sent.count);
+  TEST_ASSERT_EQUAL_UINT32(433u + kChordRepeatIntervalMs, sent.wake_ms);
+}
+
+extern "C" void test_dispatch_release_after_repeat_is_swallowed(void) {
+  ChordEngine engine;
+  ChordRepeat rep;
+  chord_engine_reset(&engine);
+  chord_repeat_reset(&rep);
+
+  chord_dispatch_step(&engine, &rep, 0x0001, 0, repeats_bit0);
+  ChordDispatch sent = chord_dispatch_step(&engine, &rep, 0x0001, 50, repeats_bit0);
+  TEST_ASSERT_EQUAL_UINT8(1, sent.count);
+
+  sent = chord_dispatch_step(&engine, &rep, 0, 60, repeats_bit0);
+  TEST_ASSERT_EQUAL_UINT8(0, sent.count);
+  TEST_ASSERT_EQUAL_UINT32(70, sent.wake_ms);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::ReleaseGuard), static_cast<int>(engine.phase));
+
+  sent = chord_dispatch_step(&engine, &rep, 0, 70, repeats_bit0);
+  TEST_ASSERT_EQUAL_UINT8(0, sent.count);
+  TEST_ASSERT_EQUAL_UINT16(0, sent.mask0);
+  TEST_ASSERT_EQUAL_UINT32(0, sent.wake_ms);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::Idle), static_cast<int>(engine.phase));
+}
+
+extern "C" void test_dispatch_hold_without_repeat_wakes_only_on_release(void) {
+  ChordEngine engine;
+  ChordRepeat rep;
+  chord_engine_reset(&engine);
+  chord_repeat_reset(&rep);
+
+  ChordDispatch sent = chord_dispatch_step(&engine, &rep, 0x0001, 0, repeats_none);
+  assert_no_send(sent);
+  sent = chord_dispatch_step(&engine, &rep, 0x0001, 1000, repeats_none);
+  assert_no_send(sent);
+
+  sent = chord_dispatch_step(&engine, &rep, 0, 1010, repeats_none);
+  TEST_ASSERT_EQUAL_UINT8(0, sent.count);
+  TEST_ASSERT_EQUAL_UINT32(1020, sent.wake_ms);
+
+  sent = chord_dispatch_step(&engine, &rep, 0, 1020, repeats_none);
+  TEST_ASSERT_EQUAL_UINT8(1, sent.count);
+  TEST_ASSERT_EQUAL_UINT16(0x0001, sent.mask0);
+  TEST_ASSERT_EQUAL_UINT32(0, sent.wake_ms);
+}
+
+extern "C" void test_dispatch_set_mode_swallows_only_after_a_tap(void) {
+  ChordEngine engine;
+  ChordRepeat rep;
+  chord_engine_reset(&engine);
+  chord_repeat_reset(&rep);
+
+  chord_dispatch_step(&engine, &rep, 0x0001, 0, repeats_bit0);
+  chord_dispatch_step(&engine, &rep, 0, 20, repeats_bit0);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::ReleaseGuard), static_cast<int>(engine.phase));
+  ChordDispatch sent =
+      chord_dispatch_set_mode(&engine, &rep, ChordFireMode::FirstUp, 25, repeats_bit0);
+  TEST_ASSERT_EQUAL_UINT8(1, sent.count);
+  TEST_ASSERT_EQUAL_UINT16(0x0001, sent.mask0);
+  TEST_ASSERT_EQUAL_UINT32(0, sent.wake_ms);
+
+  chord_engine_reset(&engine);
+  chord_repeat_reset(&rep);
+  chord_dispatch_step(&engine, &rep, 0x0001, 0, repeats_bit0);
+  chord_dispatch_step(&engine, &rep, 0x0001, 50, repeats_bit0);
+  chord_dispatch_step(&engine, &rep, 0, 60, repeats_bit0);
+  sent = chord_dispatch_set_mode(&engine, &rep, ChordFireMode::FirstUp, 65, repeats_bit0);
+  TEST_ASSERT_EQUAL_UINT8(0, sent.count);
+  TEST_ASSERT_EQUAL_UINT16(0, sent.mask0);
+  TEST_ASSERT_EQUAL_UINT32(0, sent.wake_ms);
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordFireMode::FirstUp), static_cast<int>(engine.mode));
+}
+
+extern "C" void test_dispatch_null_state_is_untouched(void) {
+  ChordEngine engine;
+  ChordRepeat rep;
+  chord_engine_reset(&engine);
+  chord_repeat_reset(&rep);
+  engine.phase = ChordPhase::Holding;
+  engine.peak.mask = 0x0001;
+  engine.peak.count = 1;
+  engine.mode = ChordFireMode::ReleaseAll;
+
+  assert_no_send(chord_dispatch_step(nullptr, &rep, 0x0001, 10, repeats_bit0));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordRepeatPhase::Idle), static_cast<int>(rep.phase));
+
+  assert_no_send(chord_dispatch_step(&engine, nullptr, 0x0001, 10, repeats_bit0));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::Holding), static_cast<int>(engine.phase));
+  TEST_ASSERT_EQUAL_UINT16(0x0001, engine.peak.mask);
+
+  assert_no_send(chord_dispatch_set_mode(nullptr, &rep, ChordFireMode::FirstUp, 10, repeats_bit0));
+  assert_no_send(chord_dispatch_set_mode(&engine, nullptr, ChordFireMode::FirstUp, 10, repeats_bit0));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordFireMode::ReleaseAll), static_cast<int>(engine.mode));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::Holding), static_cast<int>(engine.phase));
+}
+
 extern "C" void test_repeat_switch_to_first_swallows_guard_fire(void) {
   ChordEngine engine;
   ChordRepeat rep;
@@ -1528,5 +1686,11 @@ int main(int argc, char **argv) {
   RUN_TEST(test_repeat_late_poll_does_not_catch_up);
   RUN_TEST(test_repeat_first_up_swallows_after_tap);
   RUN_TEST(test_repeat_switch_to_first_swallows_guard_fire);
+  RUN_TEST(test_dispatch_release_wakes_then_sends_once);
+  RUN_TEST(test_dispatch_repeat_wake_follows_settle_delay_interval);
+  RUN_TEST(test_dispatch_release_after_repeat_is_swallowed);
+  RUN_TEST(test_dispatch_hold_without_repeat_wakes_only_on_release);
+  RUN_TEST(test_dispatch_set_mode_swallows_only_after_a_tap);
+  RUN_TEST(test_dispatch_null_state_is_untouched);
   return UNITY_END();
 }

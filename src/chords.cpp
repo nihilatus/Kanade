@@ -243,7 +243,8 @@ static void log_chord(const char *kind, uint16_t id, uint16_t mask, const char *
 }
 
 static void fire(uint16_t mask);  // defined below; send path uses the live table
-static void dispatch_chord_step(const ChordStep &step, uint32_t now_ms);
+static bool peak_auto_repeats(uint16_t mask);
+static void fire_dispatch(const ChordDispatch &sent);
 
 static const char *fire_mode_name(ChordFireMode mode) {
   return mode == ChordFireMode::FirstUp ? "first" : "release";
@@ -303,8 +304,7 @@ bool chords_set_fire_mode_name(const char *name, bool dispatch) {
 
   if (dispatch) {
     const uint32_t now = millis();
-    const ChordStep step = chord_engine_set_mode(&g_engine, next);
-    dispatch_chord_step(step, now);
+    fire_dispatch(chord_dispatch_set_mode(&g_engine, &g_repeat, next, now, peak_auto_repeats));
   } else {
     g_engine.mode = next;
   }
@@ -339,14 +339,9 @@ static bool peak_auto_repeats(uint16_t mask) {
   return g_live[index].repeat;
 }
 
-static void dispatch_chord_step(const ChordStep &step, uint32_t now_ms) {
-  const bool holding = g_engine.phase == ChordPhase::Holding;
-  const uint16_t peak = holding ? g_engine.peak.mask : 0;
-  const ChordRepeatStep rep =
-      chord_repeat_step(&g_repeat, g_engine.phase, peak, holding && peak_auto_repeats(peak),
-                        step.fire, step.fire_mask, now_ms);
-  if (rep.send) fire(rep.mask);
-  if (step.fire && !rep.swallow_fire) fire(step.fire_mask);
+static void fire_dispatch(const ChordDispatch &sent) {
+  if (sent.count > 0) fire(sent.mask0);
+  if (sent.count > 1) fire(sent.mask1);
 }
 
 size_t chords_count() { return g_live_count; }
@@ -697,6 +692,5 @@ void chords_begin() {
 
 void chords_poll() {
   const uint32_t now = millis();
-  const ChordStep step = chord_engine_step(&g_engine, buttons_mask(), now);
-  dispatch_chord_step(step, now);
+  fire_dispatch(chord_dispatch_step(&g_engine, &g_repeat, buttons_mask(), now, peak_auto_repeats));
 }

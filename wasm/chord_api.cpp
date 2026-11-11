@@ -2,9 +2,9 @@
 // it lives outside src/, and the firmware keeps calling chord_core directly.
 //
 // One static session. No heap. The page writes rules into chord_wasm_rules_ptr()
-// and then calls chord_wasm_set_rules. Sends follow src/chords.cpp
-// dispatch_chord_step: engine step, then repeat, and a repeat that already
-// tapped swallows the release copy.
+// and then calls chord_wasm_set_rules. Sends come from chord_dispatch_step:
+// engine step, then repeat, and a repeat that already tapped swallows the
+// release copy. wake_ms is that step's next absolute time.
 //
 // ChordWasmRule at chord_wasm_rules_ptr(), little-endian:
 //   0 u16 id, 2 u16 required, 4 u16 optional, 6 u8 repeat, 7 u8 pad
@@ -59,58 +59,13 @@ static bool peak_auto_repeats(uint16_t mask) {
   return g_rules[index].repeat;
 }
 
-// Soonest strictly-future deadline. A time that is already due is 0 so the
-// page does not spin: the step that observes it performs the send.
-static uint32_t future_at(uint32_t now_ms, uint32_t at) {
-  if (static_cast<int32_t>(at - now_ms) <= 0) return 0;
-  return at;
-}
-
-static uint32_t sooner(uint32_t now_ms, uint32_t wake, uint32_t at) {
-  const uint32_t next = future_at(now_ms, at);
-  if (next == 0) return wake;
-  if (wake == 0 || static_cast<int32_t>(next - wake) < 0) return next;
-  return wake;
-}
-
-static uint32_t wake_at(uint32_t now_ms) {
-  uint32_t wake = 0;
-  if (g_engine.phase == ChordPhase::ReleaseGuard) {
-    wake = sooner(now_ms, wake, g_engine.guard_since + kChordReleaseGuardMs);
-  }
-  if (g_engine.phase != ChordPhase::Holding || g_engine.peak.mask == 0) return wake;
-  if (g_repeat.mask != g_engine.peak.mask || !peak_auto_repeats(g_engine.peak.mask)) return wake;
-  if (g_repeat.phase == ChordRepeatPhase::Watching) {
-    wake = sooner(now_ms, wake, g_repeat.since_ms + kChordRepeatSettleMs);
-  } else if (g_repeat.phase == ChordRepeatPhase::Sent) {
-    wake = sooner(now_ms, wake, g_repeat.since_ms + kChordRepeatDelayMs);
-  } else if (g_repeat.phase == ChordRepeatPhase::Repeating) {
-    wake = sooner(now_ms, wake, g_repeat.next_ms);
-  }
-  return wake;
-}
-
-static void push_mask(uint16_t mask) {
-  if (mask == 0 || g_last.count >= 2) return;
-  if (g_last.count == 0) g_last.mask0 = mask;
-  else g_last.mask1 = mask;
-  g_last.count = static_cast<uint8_t>(g_last.count + 1);
-}
-
-static void publish(const ChordStep &step, uint32_t now_ms) {
-  const bool holding = g_engine.phase == ChordPhase::Holding;
-  const uint16_t peak = holding ? g_engine.peak.mask : 0;
-  const ChordRepeatStep rep =
-      chord_repeat_step(&g_repeat, g_engine.phase, peak, holding && peak_auto_repeats(peak),
-                        step.fire, step.fire_mask, now_ms);
-  g_last.count = 0;
-  g_last.mask0 = 0;
-  g_last.mask1 = 0;
-  if (rep.send) push_mask(rep.mask);
-  if (step.fire && !rep.swallow_fire) push_mask(step.fire_mask);
+static void store_dispatch(const ChordDispatch &sent) {
+  g_last.count = sent.count;
+  g_last.mask0 = sent.mask0;
+  g_last.mask1 = sent.mask1;
   g_last.phase = static_cast<uint8_t>(g_engine.phase);
   g_last.peak = g_engine.peak.mask;
-  g_last.wake_ms = wake_at(now_ms);
+  g_last.wake_ms = sent.wake_ms;
 }
 
 extern "C" {
@@ -145,14 +100,13 @@ int chord_wasm_set_rules(uint32_t count) {
 }
 
 void chord_wasm_step(uint32_t mask, uint32_t now_ms) {
-  const ChordStep step = chord_engine_step(&g_engine, static_cast<uint16_t>(mask), now_ms);
-  publish(step, now_ms);
+  store_dispatch(chord_dispatch_step(&g_engine, &g_repeat, static_cast<uint16_t>(mask), now_ms,
+                                     peak_auto_repeats));
 }
 
 void chord_wasm_set_mode(uint32_t mode, uint32_t now_ms) {
   const ChordFireMode next = mode == 1 ? ChordFireMode::FirstUp : ChordFireMode::ReleaseAll;
-  const ChordStep step = chord_engine_set_mode(&g_engine, next);
-  publish(step, now_ms);
+  store_dispatch(chord_dispatch_set_mode(&g_engine, &g_repeat, next, now_ms, peak_auto_repeats));
 }
 
 int chord_wasm_find(uint32_t mask) {
