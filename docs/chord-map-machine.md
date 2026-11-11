@@ -79,4 +79,4 @@ Rule matching, the peak snapshot, both send timings, and recipe parsing live in 
 pio test -e native
 ```
 
-The test reads every row of [`../data/chord_map.machine.csv`](../data/chord_map.machine.csv) and rebuilds the expected match from that row. Recipe tokens are locked by [`../test/recipe_vectors.tsv`](../test/recipe_vectors.tsv): the native test and `python tools/test_recipe_vectors.py` both read that file. `pio test -e native` runs the Python check first.
+The chord test reads every row of [`../data/chord_map.machine.csv`](../data/chord_map.machine.csv) and rebuilds the expected match from that row. Recipe tokens are locked by [`../test/recipe_vectors.tsv`](../test/recipe_vectors.tsv): that test and `python tools/test_recipe_vectors.py` both read that file. `pio test -e native` runs the Python check first, then the chord tests and the config HTTP and job tests. The native build compiles `chord_core.cpp`, `config_http.cpp`, `config_job.cpp`, and `config_files.cpp`.

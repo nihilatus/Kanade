@@ -4,7 +4,7 @@
 
 硬體適配器：把 14 顆實體鍵解讀成和弦，在 MCU 上產出羅馬字／鍵位。主機必須把鍵盤類型設成日文 106/109，再啟用日文 IME（羅馬字）。與同系列 Python 專案 `joystick writer` 分開。韌體依 14 鍵和弦表送出羅馬字與快捷鍵配方。
 
-遠端倉庫（private）：https://github.com/nihilatus/esp32-jis-keyboard
+遠端倉庫（公開）：https://github.com/nihilatus/esp32-jis-keyboard
 
 ---
 
@@ -53,7 +53,7 @@
 | `src/config_server.cpp` | GPIO15、SoftAP、和弦 JSON API 與手機頁。熱點關掉時鍵盤照常送鍵 |
 | `src/main.cpp` | `setup`／`loop` 把上面串起來。序列埠指令是 `fire`（送出時機）、`keys`（印目前按鍵）、`drops`（開機後丟掉的配方、略過的 token、主機未就緒次數；UART0 也印）與 `trace`（傾印開機後最近 512 筆 raw 邊緣與穩定遮罩；傾印期間 `loop` 暫停） |
 | `web/index.html` | 用電腦鍵盤試打。讀機器表，不燒錄、不送 USB HID |
-| `test/test_chord_core` | `pio test -e native`。只編譯 `chord_core.cpp` |
+| `test/test_chord_core` | 和弦判斷、高峰、送出時機、配方。`pio test -e native` 一併編譯 `config_http.cpp`、`config_job.cpp`、`config_files.cpp`，並跑 `test_config_http`、`test_config_job` |
 
 手機存檔會蓋過出廠表，直到網頁上還原出廠。送出時機寫在 NVS，與和弦表分開。試打頁的開關只存在那個瀏覽器。
 
@@ -158,7 +158,7 @@ pio device monitor
 
 | 已有 | 尚未 |
 | --- | --- |
-| PlatformIO + Arduino + TinyUSB HID 鍵盤。描述符用途 0–255，已含 変換（0x8A）、無変換（0x8B）、カタカナひらがな（0x88）；配方裡的 `Henkan` 等走 `pressRaw` | VID/PID 仍是原型值 |
+| PlatformIO + Arduino + TinyUSB HID 鍵盤。描述符用途 0–255，已含 変換（0x8A）、無変換（0x8B）、カタカナひらがな（0x88）；配方裡的 `Henkan` 等走 `pressRaw` | 試作 VID `0x303A`、PID `0x4004`。有別人要用再向 Espressif 申請 PID，見 [設計取捨](docs/design-decisions.md) |
 | 14 鍵直連、每鍵 `kChordDebounceMs` 穩定消彈跳。機器表 `repeat=allow` 的列在高峰穩定 50ms 後送第一下，同一組按住到 400ms 後每 33ms 連發 | — |
 | [送出時機](#輸入邏輯)；手機熱點可改表並存進 LittleFS | 外殼／PCB |
 | 配方送出（羅馬字、`Shift+1`、`Backspace`、`Ctrl+i` 等），ASCII 走 JIS 配列（`KeyboardLayout_ja_JP`）。USB 國碼不設定；一般鍵盤試打頁 | — |
@@ -184,9 +184,12 @@ tools/recipe.py           配方解析，與 chord_core 同一套規則
 tools/prebuild_chord_map.py
 tools/test_recipe_vectors.py
 test/recipe_vectors.tsv   C++ 與 Python 共用的配方向量
-test/test_chord_core      pio test -e native
+test/test_chord_core      和弦判斷；pio test -e native
+test/test_config_http     設定頁 HTTP 請求檢查
+test/test_config_job      熱點工作在掃描之外的狀態
 web/index.html            一般鍵盤試打，讀機器表
 docs/chord-map-machine.md
 docs/pinout.md
 docs/bom.md
+docs/design-decisions.md  已決定、目前維持的取捨
 ```
