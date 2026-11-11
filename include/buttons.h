@@ -38,6 +38,11 @@ extern const ButtonDef kButtons[BTN_COUNT];
 void buttons_begin();
 void buttons_poll();  // sample GPIOs + per-key debounce
 
+// Sample each GPIO and treat that level as already stable. Clears edges.
+// Does not write a trace event. Call when the AP goes off, before the next
+// buttons_poll, so presses and releases during the AP are not a chord.
+void buttons_resync();
+
 bool button_pressed(ButtonId id);  // debounced level (pressed → true)
 bool button_just_pressed(ButtonId id);
 bool button_just_released(ButtonId id);

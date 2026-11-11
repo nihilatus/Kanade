@@ -36,12 +36,15 @@
   否則用出廠表
 
 每一圈 loop
-  14 顆 GPIO
-    → buttons        去彈跳，得到 14-bit 遮罩
-    → chords         交給 chord_core：高峰、送出時機、比對活表
-    → hid_keyboard   配方先經過作用中的 HostLayout（目前是 JIS），再排隊，到點才送一個 USB HID report
   GPIO15
-    → config_server  合上才開熱點；只在熱點開著時處理網頁與 JSON
+    → config_server  消抖開關；熱點開著才處理網頁與 JSON
+  熱點未開
+    14 顆 GPIO
+      → buttons        去彈跳，得到 14-bit 遮罩
+      → chords         交給 chord_core：高峰、送出時機、比對活表
+      → hid_keyboard   配方先經過作用中的 HostLayout（目前是 JIS），再排隊，到點才送一個 USB HID report
+  熱點已開
+    不讀 14 鍵、不走和弦、不送 HID
 ```
 
 遮罩的 bit0..13 固定是 `LL LU LR LD LT0 LT1 LT2 RL RU RR RD RT0 RT1 RT2`。PC 收到的是一般鍵盤的羅馬字與少數特殊鍵，日文轉換交給 IME，韌體不做假名轉換。主機鍵盤類型要設成 Kanade 設定的配列。(目前只實作JIS)。字元走作用中的 HostLayout，目前是 JIS：`a`–`z` 與數字的用途碼和美式相同，出廠表裡不同的是 `[`（0x30）和 `]`（0x31）。`Shift+8`／`Shift+9` 在 JIS 上才是（）。`Hankaku`、`Muhenkan`、`Henkan`、`Kana` 也要與 Kanade 同一套配列，Windows 才會當成半角/全角、無変換、変換、ひらがな。USB 國碼不設定，Windows 不會靠它切換版面。
@@ -52,7 +55,7 @@
 | `src/chord_core.cpp` | 鍵名、高峰快照、全放／首鍵放開、規則比對、配方解析 |
 | `src/chords.cpp` | 出廠表與 LittleFS 活表、NVS 裡的送出模式。比對成功才呼叫送鍵；比對不到時序列埠印「無符合規則」與遮罩，不送鍵 |
 | `src/hid_keyboard.cpp` | 把配方排進同一條時間軸。`loop` 不會為了打完一串字而停住 |
-| `src/config_server.cpp` | GPIO15、SoftAP、和弦 JSON API 與手機頁。熱點關掉時鍵盤照常送鍵 |
+| `src/config_server.cpp` | GPIO15、SoftAP、和弦 JSON API 與手機頁。熱點開著時不掃描、不送鍵；熱點關掉才掃描鍵盤 |
 | `src/main.cpp` | `setup`／`loop` 把上面串起來。序列埠指令是 `fire`（送出時機）、`keys`（印目前按鍵）、`drops`（開機後丟掉的配方、略過的 token、主機未就緒次數；UART0 也印）與 `trace`（傾印開機後最近 512 筆 raw 邊緣與穩定遮罩；傾印期間 `loop` 暫停） |
 | `web/index.html` | 用電腦鍵盤試打。讀機器表，不燒錄、不送 USB HID |
 | `test/test_chord_core` | 和弦判斷、高峰、送出時機、配方。`pio test -e native` 一併編譯 `config_http.cpp`、`config_job.cpp`、`config_files.cpp`，並跑 `test_config_http`、`test_config_job` |

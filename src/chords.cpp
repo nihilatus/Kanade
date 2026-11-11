@@ -687,6 +687,13 @@ void chords_begin() {
   try_load_saved();
 }
 
+void chords_abandon() {
+  const ChordFireMode mode = g_engine.mode;
+  chord_engine_reset(&g_engine);
+  g_engine.mode = mode;
+  chord_repeat_reset(&g_repeat);
+}
+
 void chords_poll() {
   const uint32_t now = millis();
   fire_dispatch(chord_dispatch_step(&g_engine, &g_repeat, buttons_mask(), now, peak_auto_repeats));

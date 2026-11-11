@@ -1007,3 +1007,5 @@ void config_server_poll() {
   if (g_http) service_conn();
   service_job();
 }
+
+bool config_ap_is_up() { return g_http; }

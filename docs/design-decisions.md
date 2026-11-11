@@ -20,14 +20,14 @@
 
 ## 3. 設定頁自己寫 HTTP，不用 Arduino-ESP32 的 WebServer
 
-維持。`src/config_server.cpp` 自己讀寫 socket，是為了不要卡住鍵盤掃描。不要為了程式較短改回 `WebServer` 或同類會在請求裡等到收完、解析完的伺服器。
+維持。`src/config_server.cpp` 自己讀寫 socket，是為了每一圈都讀得到熱點開關。慢請求不能拖住「熱點關、鍵盤恢復」。不要為了程式較短改回 `WebServer` 或同類會在請求裡等到收完、解析完的伺服器。
 
 要守住的行為：
 
-- `config_server_poll()` 每一圈最多搬一小段（`kHttpSlice`）。慢請求或過大的 body 不能停住掃描。
-- 和弦 JSON 的解析與 LittleFS 讀寫在另一個核心。那個工作開不起來時，GET／POST／還原回答 503，不要退回在掃描迴圈裡做。
+- `config_server_poll()` 每一圈最多搬一小段（`kHttpSlice`）。慢請求或過大的 body 不能拖住關熱點。
+- 和弦 JSON 的解析與 LittleFS 讀寫在另一個核心。那個工作開不起來時，GET／POST／還原回答 503，不要退回在這圈 loop 裡做。
 - 活表只在這次 poll 換上。先 stage，成功才 commit。
-- 熱點關掉時，掃描與 USB HID 照常。
+- 熱點開著時不掃描、不送 USB HID。熱點關掉時，掃描與 USB HID 照常。
 
 ## 4. 暫不申請正式的 VID／PID
 

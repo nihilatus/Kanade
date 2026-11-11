@@ -222,16 +222,31 @@ static void loop_measure_note(uint32_t elapsed_us, bool ap_on) {
 }
 #endif
 
+// False until loop() sees the AP. setup() may already have started it.
+static bool g_ap_was_up = false;
+
 void loop() {
 #if CHORD_MEASURE_LOOP
   const bool timing = !loop_measure_done();
   const uint32_t loop_t0 = timing ? micros() : 0;
 #endif
-  buttons_poll();
-  trace_keys_if_changed();
-  chords_poll();
-  hid_keyboard_poll();
   config_server_poll();
+  const bool ap_up = config_ap_is_up();
+  if (ap_up != g_ap_was_up) {
+    if (ap_up) {
+      chords_abandon();
+      hid_keyboard_silence();
+    } else {
+      buttons_resync();
+    }
+    g_ap_was_up = ap_up;
+  }
+  if (!ap_up) {
+    buttons_poll();
+    trace_keys_if_changed();
+    chords_poll();
+    hid_keyboard_poll();
+  }
   poll_fire_cmd(g_uart);
 #if ARDUINO_USB_CDC_ON_BOOT
   poll_fire_cmd(g_usb);

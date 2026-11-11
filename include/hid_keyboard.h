@@ -21,6 +21,11 @@ void hid_keyboard_begin();
 bool hid_keyboard_ready();
 void hid_keyboard_poll();
 
+// Drop queued reports and release every key on the host now. Does not count
+// as a dropped recipe. Call when the AP comes up: hid_keyboard_poll will not
+// run again until the AP is off, so a queued release would arrive late.
+void hid_keyboard_silence();
+
 // Type an ASCII/romaji string (a–z, space, punctuation the active layout maps).
 // Each character is its own press report, a gap, then release. Keyboard.write()
 // would send both reports before a ~10 ms host poll, so a repeat such as "nn"

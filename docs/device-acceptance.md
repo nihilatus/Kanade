@@ -1,6 +1,6 @@
 # 實機驗收
 
-給改完韌體、準備燒上板子的人。宿主測試 `pio test -e native` 覆蓋和弦判斷，以及檔案替換與熱點工作在記憶體裡的狀態。LittleFS 開機載入、USB HID 佇列、熱點開著時的掃描，要在板上看。
+給改完韌體、準備燒上板子的人。宿主測試 `pio test -e native` 覆蓋和弦判斷，以及檔案替換與熱點工作在記憶體裡的狀態。LittleFS 開機載入、USB HID 佇列、熱點開著時鍵盤不送鍵，要在板上看。
 
 動到 `src/chords.cpp`、`src/hid_keyboard.cpp`、`src/config_server.cpp`、存檔路徑或 USB 送鍵時，燒錄後跑「每次大改必跑」。只改 `chord_core` 或人編 CSV 時，宿主測試與 [試打頁](../web/index.html) 就夠，不必每輪都拔電。
 
@@ -106,11 +106,13 @@ curl.exe -s -H "Content-Type: application/json" --data-binary @table-a.json http
 
   不允許 `LL` 打出 `aaa` 與 `bbb` 以外的半截、開機後已知和弦完全不打字、或記事本裡黏著 Shift／Ctrl。出現 `LittleFS 掛載失敗，格式化一次` 這項不通過。
 
-- [ ] **7. 熱點開著連打**
+- [ ] **7. 熱點開著不打字**
 
-  還原出廠並重開，確認 `LT1` 是 `nn`。GPIO15 接地，序列埠有 `AP ` 與 `http://192.168.4.1/`。開著設定頁，或正在送表 A 時，連打 `LT1`（要看到分開的 `nn`，不能併成一個 `n`），並按住 `LT2` 或 `LT0+RU` 讓連射跑起來。掃描不停：連射期間另一組短和弦仍打得出來。
+  還原出廠並重開，確認 `LT1` 是 `nn`。GPIO15 接地，序列埠有 `AP ` 與 `http://192.168.4.1/`。開著設定頁，或正在送表 A 時，連打 `LT1`，並按住 `LT2` 或 `LT0+RU`。記事本不增加字元，也沒有黏住的 Shift 或 Ctrl。
 
-  全部放開。記事本停止增加字元。序列埠輸入 `drops`。`recipes` 不因熱點開著或這輪連打而增加。`tokens` 只有配方裡有認不得的 token 才增加；出廠表這兩組應保持 0。撥開 GPIO15，印 `AP off`。再按 `LT1`，仍是 `nn`。
+  序列埠輸入 `drops`。`recipes` 不因熱點開著或這輪按鍵而增加。`tokens` 只有配方裡有認不得的 token 才增加；出廠表這兩組應保持 0。撥開 GPIO15，印 `AP off`。再按 `LT1`，仍是 `nn`。
+
+  另一次：開機時 GPIO15 已經接地。在撥開之前按 `LT1`，記事本不增加字。撥開並看到 `AP off` 之後，`LT1` 才是 `nn`。
 
 ## 動到該檔才加跑
 

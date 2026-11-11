@@ -75,6 +75,20 @@ void buttons_begin() {
   }
 }
 
+void buttons_resync() {
+  const uint32_t now = millis();
+  for (uint8_t i = 0; i < BTN_COUNT; ++i) {
+    const bool down = digitalRead(kButtons[i].pin) == LOW;
+    raw_down[i] = down;
+    stable_down[i] = down;
+    prev_down[i] = down;
+    edge_press[i] = false;
+    edge_release[i] = false;
+    last_change_ms[i] = now;
+  }
+  g_trace_stable = buttons_mask();
+}
+
 void buttons_poll() {
   const uint32_t now = millis();
 

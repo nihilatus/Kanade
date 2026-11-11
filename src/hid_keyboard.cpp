@@ -151,6 +151,15 @@ static void note_send_us(uint32_t elapsed_us) {
   max_us = 0;
 }
 
+void hid_keyboard_silence() {
+  g_head = 0;
+  g_count = 0;
+  g_hold = false;
+  g_next_ms = 0;
+  if (!hid_keyboard_ready()) return;
+  Keyboard.releaseAll();
+}
+
 void hid_keyboard_poll() {
   if (g_count == 0) return;
   const uint32_t now = millis();

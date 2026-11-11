@@ -137,8 +137,8 @@ static_assert(settings_origin_matches_ip(), "kConfigOrigin must be http:// plus 
 static constexpr uint32_t kWifiSwitchDebounceMs = 50;
 static_assert(kWifiSwitchDebounceMs > kChordDebounceMs,
               "wifi switch debounce must outlast a key bounce");
-// Bytes moved on one config_server_poll. A slow client must not stall the scan
-// for a whole bounce window.
+// Bytes moved on one config_server_poll. A slow client must not delay
+// noticing the switch open for a whole bounce window.
 static constexpr size_t kHttpSlice = 512;
 // Drop a config connection that makes no progress for this long.
 static constexpr uint32_t kHttpStallMs = 5000;

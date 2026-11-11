@@ -28,6 +28,11 @@
 void chords_begin();
 void chords_poll();  // call after buttons_poll()
 
+// Drop the chord in progress and any auto-repeat. The live table and the
+// send timing stay. Call when the AP comes up so a half-held chord is not
+// sent after the AP goes off.
+void chords_abandon();
+
 // "release" or "first". Setter returns false for any other name.
 // dispatch runs the engine mode change. Switching to first-up that way sends a
 // chord already waiting in the release guard. Pass false to store the mode
