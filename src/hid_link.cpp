@@ -1,32 +1,22 @@
 #include "hid_link.h"
 
-#include <driver/gpio.h>
-
 #include "USB.h"
 #include "USBHIDKeyboard.h"
 #include "class/hid/hid_device.h"
 
 #include "hid_ble.h"
 #include "host_layout.h"
-#include "pin_map.h"
+#include "output_switch.h"
 
 // app_main() calls USB.begin() before setup() when CDC is on. TinyUSB refuses
 // a HID device added after that. This constructor runs first and registers the
-// USB keyboard only when GPIO16 is open. A closed pin is BLE: leave HID off so
-// the OTG port does not enumerate as a keyboard. A failed pin read keeps USB.
+// USB keyboard only when the latched boot level is open. A closed pin is BLE:
+// leave HID off so the OTG port does not enumerate as a keyboard.
 static USBHIDKeyboard *g_usb_keys = nullptr;
 
 struct UsbKeyboardEarly {
   UsbKeyboardEarly() {
-    const int pin = pin_gpio(PinFn::OutputMode);
-    gpio_config_t cfg = {};
-    cfg.pin_bit_mask = 1ULL << pin;
-    cfg.mode = GPIO_MODE_INPUT;
-    cfg.pull_up_en = GPIO_PULLUP_ENABLE;
-    cfg.pull_down_en = GPIO_PULLDOWN_DISABLE;
-    cfg.intr_type = GPIO_INTR_DISABLE;
-    const bool usb = gpio_config(&cfg) != ESP_OK || gpio_get_level(static_cast<gpio_num_t>(pin)) != 0;
-    if (usb) g_usb_keys = new USBHIDKeyboard();
+    if (!output_switch_boot_closed()) g_usb_keys = new USBHIDKeyboard();
   }
 };
 

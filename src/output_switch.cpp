@@ -2,11 +2,17 @@
 
 #include <stdio.h>
 
+#include <driver/gpio.h>
+#include <esp_rom_sys.h>
+
 #include <Arduino.h>
 
 #include "console_log.h"
 #include "pin_map.h"
 #include "settings.h"
+
+// The pull-up has just been enabled. Wait before the level is trusted.
+static constexpr uint32_t kOutputSwitchSettleUs = 100;
 
 static bool g_boot_closed = false;
 static bool g_raw = false;
@@ -15,9 +21,28 @@ static uint32_t g_change_ms = 0;
 
 static bool closed_raw() { return digitalRead(pin_gpio(PinFn::OutputMode)) == LOW; }
 
+bool output_switch_boot_closed() {
+  static bool sampled = false;
+  static bool closed = false;
+  if (sampled) return closed;
+  const int pin = pin_gpio(PinFn::OutputMode);
+  gpio_config_t cfg = {};
+  cfg.pin_bit_mask = 1ULL << pin;
+  cfg.mode = GPIO_MODE_INPUT;
+  cfg.pull_up_en = GPIO_PULLUP_ENABLE;
+  cfg.pull_down_en = GPIO_PULLDOWN_DISABLE;
+  cfg.intr_type = GPIO_INTR_DISABLE;
+  if (gpio_config(&cfg) == ESP_OK) {
+    esp_rom_delay_us(kOutputSwitchSettleUs);
+    closed = gpio_get_level(static_cast<gpio_num_t>(pin)) == 0;
+  }
+  sampled = true;
+  return closed;
+}
+
 void output_switch_begin() {
   pinMode(pin_gpio(PinFn::OutputMode), INPUT_PULLUP);
-  g_boot_closed = closed_raw();
+  g_boot_closed = output_switch_boot_closed();
   g_raw = g_boot_closed;
   g_stable = g_boot_closed;
   g_change_ms = millis();

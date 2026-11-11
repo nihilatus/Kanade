@@ -10,7 +10,8 @@
 // Bonds stay in the BLE stack's own NVS. This module does not write the
 // output mode and does not delete bonds.
 
-// False when BLE init or advertising fails. USB begin returns true.
+// False when BLE init or advertising fails, or when USB is requested after a
+// closed boot sample. An open sample starts USB and returns true.
 bool hid_link_begin(OutputMode mode);
 bool hid_link_ready();
 // USB: the HID endpoint can take another report. BLE: the host is subscribed.
