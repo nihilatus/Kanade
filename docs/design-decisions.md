@@ -50,4 +50,4 @@
 | 配方裡認不得的 token | 裝置上略過那個 token，其餘仍送。略過紀錄溢位，或事件緩衝放不下，整份配方不送。出廠表不允許靠略過：建置時認不得的 token 會讓 `pio run` 失敗。 |
 | 熱點 | 只在 GPIO15 接到 GND 時開 SoftAP，不加入家裡的路由器，沒有 HTTPS。密碼是信任邊界。`WIFI_API_TOKEN` 留空時，連上熱點的程式都能叫 API；瀏覽器仍要 `Origin` 是 `http://192.168.4.1` 或沒有這個標頭。密碼與 token 不印到序列埠，`include/secrets.h` 不進 git。 |
 | 記憶體 | 活表與 JSON DOM 放 PSRAM，把內部 RAM 留給 Wi-Fi。 |
-| 試打頁 | `web/index.html` 用電腦鍵盤試規則，不送 USB HID。作業系統給的按下／放開已經是穩定邊緣，所以不做韌體的 `kChordDebounceMs`。頁面上的送出時機只存在那個瀏覽器。 |
+| 試打頁 | `web/index.html` 用電腦鍵盤試規則，不送 USB HID。作業系統給的按下／放開已經是穩定邊緣，所以不做韌體的 `kChordDebounceMs`。送出時機、比對與連發呼叫由 `chord_core` 編成的 `web/chord_core.wasm`。 |

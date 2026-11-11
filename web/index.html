@@ -335,11 +335,11 @@
   <script>
     const KEYS = ["LL", "LU", "LR", "LD", "LT0", "LT1", "LT2", "RL", "RU", "RR", "RD", "RT0", "RT1", "RT2"];
     const KEY_BIT = Object.fromEntries(KEYS.map((name, index) => [name, 1 << index]));
-    const RELEASE_MS = 10;
-    // Same number as kChordBounceMs. Keyboard edges are already stable, so a
-    // return inside this window is bounce; a later nested chord (あ after か)
-    // is sent on its own even if the release timer has not fired yet.
-    const BOUNCE_MS = 10;
+    // ChordPhase in include/chord_core.h. The wasm step returns these numbers.
+    const PHASE_IDLE = 0;
+    const PHASE_HOLDING = 1;
+    const PHASE_GUARD = 2;
+    const PHASE_DRAINING = 3;
     const STORAGE_MAP = "chord-practice-keymap";
     const STORAGE_VOICE = "chord-practice-voice";
     const STORAGE_FIRE = "chord-practice-fire";
@@ -396,21 +396,70 @@
     let fireMode = localStorage.getItem(STORAGE_FIRE) === "first" ? "first" : "release";
     let speakToken = 0;
     let downMask = 0;
-    let phase = "idle";
-    let maxChord = 0;
-    let maxCount = 0;
-    let guardTimer = 0;
-    let guardSince = 0;
+    let phase = PHASE_IDLE;
+    let peakMask = 0;
+    let announcedMask = null;
+    let sentDetail = "";
+    let wakeTimer = 0;
+    let releaseMs = null;
+    let bounceMs = null;
+    let core = null;
     const history = [];
 
-    function popcount(value) {
-      let count = 0;
-      let bits = value;
-      while (bits) {
-        bits &= bits - 1;
-        count += 1;
+    function nowMs() {
+      return Date.now() >>> 0;
+    }
+
+    function pickExport(exp, name) {
+      if (typeof exp[name] === "function") return exp[name];
+      if (typeof exp["_" + name] === "function") return exp["_" + name];
+      throw new Error("判讀模組缺少 " + name);
+    }
+
+    function readSend() {
+      const view = new DataView(core.memory.buffer);
+      const off = core.lastPtr;
+      return {
+        count: view.getUint8(off),
+        phase: view.getUint8(off + 1),
+        mask0: view.getUint16(off + 2, true),
+        mask1: view.getUint16(off + 4, true),
+        peak: view.getUint16(off + 6, true),
+        wakeMs: view.getUint32(off + 8, true)
+      };
+    }
+
+    async function loadCore() {
+      const response = await fetch("chord_core.wasm");
+      if (!response.ok) throw new Error("讀不到判讀模組（" + response.status + "）");
+      const bytes = await response.arrayBuffer();
+      const module = await WebAssembly.compile(bytes);
+      const imports = {};
+      for (const entry of WebAssembly.Module.imports(module)) {
+        if (!imports[entry.module]) imports[entry.module] = {};
+        imports[entry.module][entry.name] = () => {
+          throw new Error("判讀模組需要未提供的匯入 " + entry.module + "." + entry.name);
+        };
       }
-      return count;
+      const instance = await WebAssembly.instantiate(module, imports);
+      const exp = instance.exports;
+      if (typeof exp._initialize === "function") exp._initialize();
+      core = {
+        memory: exp.memory,
+        reset: pickExport(exp, "chord_wasm_reset"),
+        setRules: pickExport(exp, "chord_wasm_set_rules"),
+        step: pickExport(exp, "chord_wasm_step"),
+        setMode: pickExport(exp, "chord_wasm_set_mode"),
+        find: pickExport(exp, "chord_wasm_find"),
+        releaseMs: pickExport(exp, "chord_wasm_release_ms"),
+        bounceMs: pickExport(exp, "chord_wasm_bounce_ms"),
+        ruleCap: pickExport(exp, "chord_wasm_rule_cap"),
+        rulesPtr: pickExport(exp, "chord_wasm_rules_ptr")(),
+        lastPtr: pickExport(exp, "chord_wasm_last_ptr")()
+      };
+      releaseMs = core.releaseMs();
+      bounceMs = core.bounceMs();
+      core.reset(fireMode === "first" ? 1 : 0);
     }
 
     function maskNames(mask) {
@@ -485,6 +534,7 @@
       const requiredCol = col("keys_required");
       const optionalCol = col("keys_optional");
       const categoryCol = col("category");
+      const repeatCol = col("repeat");
       if (idCol < 0 || kanaCol < 0 || outputCol < 0 || requiredCol < 0 || optionalCol < 0) {
         throw new Error("需要 id、kana、output、keys_required、keys_optional 欄");
       }
@@ -493,46 +543,51 @@
         const cells = table[i];
         if (cells.every((cell) => cell.trim() === "")) continue;
         const id = Number(cells[idCol]);
-        if (!Number.isFinite(id)) throw new Error("第 " + (i + 1) + " 列的 id 不對");
+        if (!Number.isFinite(id) || id < 0 || id > 0xffff || id !== Math.trunc(id)) {
+          throw new Error("第 " + (i + 1) + " 列的 id 不對");
+        }
         const required = maskFromSpec((cells[requiredCol] || "").trim(), i + 1);
         const optional = maskFromSpec((cells[optionalCol] || "").trim(), i + 1);
         if (required & optional) throw new Error("第 " + (i + 1) + " 列的必按與可選重疊");
+        const repeatText = repeatCol >= 0 ? (cells[repeatCol] || "").trim() : "no";
         next.push({
           id,
           kana: (cells[kanaCol] || "").trim(),
           output: (cells[outputCol] || "").trim(),
           category: categoryCol >= 0 ? (cells[categoryCol] || "").trim() : "",
           required,
-          optional
+          optional,
+          repeat: repeatText === "allow"
         });
       }
       if (!next.length) throw new Error("沒有和弦列");
+      if (!core) throw new Error("判讀模組還沒載入");
+      const cap = core.ruleCap();
+      if (next.length > cap) throw new Error("和弦列超過 " + cap);
+      const view = new DataView(core.memory.buffer);
+      for (let i = 0; i < next.length; i += 1) {
+        const off = core.rulesPtr + i * 8;
+        view.setUint16(off, next[i].id, true);
+        view.setUint16(off + 2, next[i].required, true);
+        view.setUint16(off + 4, next[i].optional, true);
+        view.setUint8(off + 6, next[i].repeat ? 1 : 0);
+        view.setUint8(off + 7, 0);
+      }
+      if (core.setRules(next.length) !== 0) throw new Error("規則寫入失敗");
       rules = next;
+      core.reset(fireMode === "first" ? 1 : 0);
+      announcedMask = null;
+      resultEl.dataset.locked = "";
       statusEl.textContent = sourceLabel + " · " + rules.length + " 列";
       resetQuiz();
+      stepMask(downMask);
     }
 
     function findRule(mask) {
-      let best = null;
-      let bestReq = -1;
-      let bestOpt = 255;
-      let bestId = 0xffff;
-      for (const row of rules) {
-        if ((row.required & mask) !== row.required) continue;
-        const allowed = row.required | row.optional;
-        if ((mask & ~allowed) !== 0) continue;
-        const reqN = popcount(row.required);
-        const optN = popcount(row.optional);
-        const better = best === null || reqN > bestReq ||
-          (reqN === bestReq && optN < bestOpt) ||
-          (reqN === bestReq && optN === bestOpt && row.id < bestId);
-        if (!better) continue;
-        best = row;
-        bestReq = reqN;
-        bestOpt = optN;
-        bestId = row.id;
-      }
-      return best;
+      if (!core || !mask) return null;
+      const index = core.find(mask);
+      if (index < 0 || index >= rules.length) return null;
+      return rules[index];
     }
 
     function displayOf(row) {
@@ -550,25 +605,36 @@
     }
 
     function renderStage() {
-      if (phase === "draining") {
+      if (phase === PHASE_DRAINING) {
         detailEl.textContent = "收尾中，等全部放開 · 還按著 " + formatMask(downMask);
         return;
       }
+      // A repeat already showed this hold. The release guard must not replace
+      // that text with the key names for the next 10 ms.
+      if (!quizOn && announcedMask !== null && phase === PHASE_GUARD) {
+        detailEl.textContent = "放開確認中 · 最大 " + formatMask(peakMask);
+        return;
+      }
       if (quizOn) {
-        if (phase === "holding" || phase === "guard") {
-          const shown = phase === "holding" ? downMask : maxChord;
-          detailEl.textContent = (phase === "guard" ? "放開確認中 · " : "按住中 · ") + formatMask(shown);
+        if (phase === PHASE_HOLDING || phase === PHASE_GUARD) {
+          const shown = phase === PHASE_HOLDING ? downMask : peakMask;
+          detailEl.textContent = (phase === PHASE_GUARD ? "放開確認中 · " : "按住中 · ") + formatMask(shown);
         }
         return;
       }
-      if (phase === "holding" || phase === "guard") {
-        const shown = phase === "holding" ? downMask : maxChord;
-        setResult(formatMask(shown), "held", phase === "guard"
-          ? "放開確認中 · 最大 " + formatMask(maxChord)
-          : "按住中 · 最大 " + formatMask(maxChord));
+      if (phase === PHASE_HOLDING || phase === PHASE_GUARD) {
+        const shown = phase === PHASE_HOLDING ? downMask : peakMask;
+        setResult(formatMask(shown), "held", phase === PHASE_GUARD
+          ? "放開確認中 · 最大 " + formatMask(peakMask)
+          : "按住中 · 最大 " + formatMask(peakMask));
         return;
       }
-      if (resultEl.dataset.locked === "1") return;
+      if (resultEl.dataset.locked === "1") {
+        if (!quizOn && (detailEl.textContent.startsWith("放開確認中") || detailEl.textContent.startsWith("收尾中"))) {
+          detailEl.textContent = sentDetail;
+        }
+        return;
+      }
       setResult(idlePrompt(), "idle", "");
     }
 
@@ -737,9 +803,12 @@
       resultEl.dataset.locked = "1";
     }
 
-    function fire(mask) {
+    function showSend(mask, announce) {
+      const keys = formatMask(mask);
+      const row = findRule(mask);
       if (quizOn) {
-        grade(mask);
+        if (announce) grade(mask);
+        else detailEl.textContent = "連發 · " + (!row || !row.output ? "無對應" : displayOf(row));
         return;
       }
       resultEl.dataset.locked = "1";
@@ -748,145 +817,81 @@
         resultEl.dataset.locked = "";
         return;
       }
-      const keys = formatMask(mask);
-      const row = findRule(mask);
       if (!row || !row.output) {
+        sentDetail = keys;
         setResult("無對應", "miss", keys);
-        remember("無對應", keys);
+        if (announce) remember("無對應", keys);
         return;
       }
       const text = displayOf(row);
-      setResult(text, "", row.output + " · " + keys + " · id " + row.id);
+      sentDetail = row.output + " · " + keys + " · id " + row.id;
+      setResult(text, "", sentDetail);
+      if (!announce) return;
       remember(text, row.output);
       if (row.kana) speak(row.kana, "ja-JP");
       else speak(OUTPUT_SPEECH[row.output] || row.output, "zh-TW");
     }
 
-    function noteSnapshot(mask) {
-      const count = popcount(mask);
-      if (count > maxCount || (count === maxCount && mask !== maxChord)) {
-        maxChord = mask;
-        maxCount = count;
+    function applySends(send) {
+      const masks = [];
+      if (send.count >= 1) masks.push(send.mask0);
+      if (send.count >= 2) masks.push(send.mask1);
+      let sent = false;
+      for (const mask of masks) {
+        const announce = announcedMask !== mask;
+        showSend(mask, announce);
+        announcedMask = mask;
+        sent = true;
       }
+      if (phase === PHASE_IDLE) announcedMask = null;
+      return sent;
     }
 
-    function sameChordAsPeak(mask) {
-      if (maxCount === 0) return true;
-      const shared = mask & maxChord;
-      return shared === mask || shared === maxChord;
+    function armWake(wakeMs) {
+      clearTimeout(wakeTimer);
+      wakeTimer = 0;
+      if (!wakeMs) return;
+      const delay = (wakeMs - nowMs()) >>> 0;
+      // A huge unsigned gap means the deadline already passed between the
+      // step and this schedule. One extra step performs that send.
+      const wait = delay === 0 || delay > 60000 ? 0 : delay;
+      wakeTimer = setTimeout(() => stepMask(downMask), wait);
     }
 
-    function bounceReturn(mask) {
-      return (Date.now() - guardSince) < BOUNCE_MS && sameChordAsPeak(mask);
+    function takeSend(send) {
+      phase = send.phase;
+      peakMask = send.peak;
+      const sent = applySends(send);
+      armWake(send.wakeMs);
+      if (!sent || phase === PHASE_DRAINING) renderStage();
+      paintKeys();
     }
 
-    function armGuard() {
-      phase = "guard";
-      guardSince = Date.now();
-      clearTimeout(guardTimer);
-      guardTimer = setTimeout(finishGuard, RELEASE_MS);
-    }
-
-    function commitPeak() {
-      const chord = maxChord;
-      maxChord = 0;
-      maxCount = 0;
-      fire(chord);
+    function stepMask(mask) {
+      if (!core) return;
+      core.step(mask & 0xffff, nowMs());
+      takeSend(readSend());
     }
 
     function chordDown(bit) {
+      if (!core) return;
       if (downMask & bit) return;
       downMask |= bit;
-      if (phase === "draining") {
-        renderStage();
-        paintKeys();
-        return;
-      }
-      if (phase === "idle") {
-        phase = "holding";
-        maxChord = 0;
-        maxCount = 0;
-        resultEl.dataset.locked = "";
-      } else if (phase === "guard") {
-        clearTimeout(guardTimer);
-        phase = "holding";
-        if (!bounceReturn(downMask)) commitPeak();
-      }
-      if (phase === "holding") noteSnapshot(downMask);
-      renderStage();
-      paintKeys();
+      stepMask(downMask);
     }
 
     function chordUp(bit) {
+      if (!core) return;
       if ((downMask & bit) === 0) return;
       downMask = (downMask & ~bit) & 0x3fff;
-      if (fireMode === "first") {
-        if (phase === "holding" && maxCount > 0 && (downMask & maxChord) !== maxChord) {
-          const chord = maxChord;
-          maxChord = 0;
-          maxCount = 0;
-          phase = downMask === 0 ? "idle" : "draining";
-          fire(chord);
-        } else if (phase === "draining" && downMask === 0) {
-          phase = "idle";
-        } else if (phase === "holding") {
-          noteSnapshot(downMask);
-        }
-        renderStage();
-        paintKeys();
-        return;
-      }
-      if (downMask === 0 && phase === "holding") {
-        armGuard();
-      } else if (downMask !== 0 && (phase === "holding" || phase === "guard")) {
-        noteSnapshot(downMask);
-      }
-      renderStage();
-      paintKeys();
-    }
-
-    function finishGuard() {
-      if (phase !== "guard") return;
-      if (downMask !== 0) {
-        phase = "holding";
-        if (!bounceReturn(downMask)) commitPeak();
-        noteSnapshot(downMask);
-        renderStage();
-        return;
-      }
-      const chord = maxChord;
-      phase = "idle";
-      maxChord = 0;
-      maxCount = 0;
-      fire(chord);
-      paintKeys();
+      stepMask(downMask);
     }
 
     function releaseAll() {
-      if (downMask === 0 && phase === "idle") return;
+      if (!core) return;
+      if (downMask === 0 && phase === PHASE_IDLE) return;
       downMask = 0;
-      if (fireMode === "first") {
-        clearTimeout(guardTimer);
-        if (phase === "holding" && maxCount > 0 && maxChord !== 0) {
-          const chord = maxChord;
-          maxChord = 0;
-          maxCount = 0;
-          phase = "idle";
-          fire(chord);
-        } else {
-          phase = "idle";
-          maxChord = 0;
-          maxCount = 0;
-        }
-        renderStage();
-        paintKeys();
-        return;
-      }
-      if (phase === "holding") {
-        armGuard();
-        renderStage();
-        paintKeys();
-      }
+      stepMask(0);
     }
 
     function codeOwner(code) {
@@ -943,7 +948,7 @@
         else bindEl.textContent = bound ? bound.label : "指定";
         button.setAttribute("aria-label", name + "，" + bindEl.textContent);
       }
-      if (quizOn && phase === "idle" && remainingCount() > 0) {
+      if (quizOn && phase === PHASE_IDLE && remainingCount() > 0) {
         markTargets(currentLesson());
         coachEl.textContent = howTo(currentLesson());
       }
@@ -975,28 +980,28 @@
       fireBtn.textContent = first ? "首鍵放開就送" : "全放再送";
     }
 
-    function applyFireMode(mode) {
+    function fireNotice() {
+      if (releaseMs === null || bounceMs === null) return "判讀模組還沒載入";
+      if (fireMode === "first") {
+        return "高峰後第一顆放開就送出。請同時按下、再放開；尾鍵還沒放完時按下的下一組會被略過。";
+      }
+      return "全部放開並停 " + releaseMs + " ms 才送出。只有開頭 " + bounceMs +
+        " ms 內的彈回會接上同一組；再按下一組會先送出上一組。";
+    }
+
+    function pushFireMode(mode) {
       fireMode = mode === "first" ? "first" : "release";
       localStorage.setItem(STORAGE_FIRE, fireMode);
-      clearTimeout(guardTimer);
-      if (downMask === 0) {
-        phase = "idle";
-        maxChord = 0;
-        maxCount = 0;
-      } else {
-        phase = "holding";
-        maxChord = 0;
-        maxCount = 0;
-        noteSnapshot(downMask);
-        resultEl.dataset.locked = "";
-      }
       syncFireButton();
+      if (!core) return;
+      core.setMode(fireMode === "first" ? 1 : 0, nowMs());
+      takeSend(readSend());
+    }
+
+    function applyFireMode(mode) {
+      pushFireMode(mode);
       if (quizOn && currentLesson()) coachEl.textContent = howTo(currentLesson());
-      renderStage();
-      paintKeys();
-      noticeEl.textContent = fireMode === "first"
-        ? "高峰後第一顆放開就送出。請同時按下、再放開；尾鍵還沒放完時按下的下一組會被略過。"
-        : "全部放開並停 " + RELEASE_MS + " ms 才送出。只有這段開頭的彈回會接上同一組；再按下一組會先送出上一組。";
+      noticeEl.textContent = fireNotice();
     }
 
     function syncVoiceButton() {
@@ -1017,22 +1022,7 @@
       const next = normalizeBindings(source);
       if (!next || Object.keys(next).length === 0) throw new Error("設定檔裡沒有按鍵對應");
       bindings = next;
-      if (data && (data.fire === "first" || data.fire === "release")) {
-        fireMode = data.fire;
-        localStorage.setItem(STORAGE_FIRE, fireMode);
-        clearTimeout(guardTimer);
-        if (downMask === 0) {
-          phase = "idle";
-          maxChord = 0;
-          maxCount = 0;
-        } else {
-          phase = "holding";
-          maxChord = 0;
-          maxCount = 0;
-          noteSnapshot(downMask);
-        }
-        syncFireButton();
-      }
+      if (data && (data.fire === "first" || data.fire === "release")) pushFireMode(data.fire);
       if (data && typeof data.voice === "boolean") {
         voiceOn = data.voice;
         localStorage.setItem(STORAGE_VOICE, voiceOn ? "1" : "0");
@@ -1090,6 +1080,10 @@
       const name = codeOwner(event.code);
       if (!name) return;
       event.preventDefault();
+      if (!core) {
+        noticeEl.textContent = "判讀模組還沒載入，和弦鍵先不動作";
+        return;
+      }
       chordDown(KEY_BIT[name]);
     }
 
@@ -1201,9 +1195,23 @@
     syncVoiceButton();
     buildKeyList();
 
-    loadDefaultCsv().catch((err) => {
-      statusEl.textContent = (err.message || "讀不到機器表") + "。請在專案根目錄執行 python -m http.server 8765，再開 http://127.0.0.1:8765/web/";
-    });
+    async function boot() {
+      try {
+        await loadCore();
+      } catch (err) {
+        statusEl.textContent = (err.message || "判讀模組載入失敗") +
+          "。請在專案根目錄執行 python -m http.server 8765，再開 http://127.0.0.1:8765/web/";
+        return;
+      }
+      try {
+        await loadDefaultCsv();
+      } catch (err) {
+        statusEl.textContent = (err.message || "讀不到機器表") +
+          "。請在專案根目錄執行 python -m http.server 8765，再開 http://127.0.0.1:8765/web/";
+      }
+    }
+
+    boot();
   </script>
 </body>
 </html>

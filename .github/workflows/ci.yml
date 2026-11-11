@@ -31,6 +31,25 @@ jobs:
       - name: Recipe vectors
         run: python tools/test_recipe_vectors.py
 
+      - name: Cache emsdk
+        uses: actions/cache@v4
+        with:
+          path: ~/emsdk
+          key: emsdk-${{ hashFiles('wasm/emsdk-version.txt') }}
+
+      - name: Chord wasm matches chord_core
+        run: |
+          version=$(tr -d '[:space:]' < wasm/emsdk-version.txt)
+          if [ ! -x "$HOME/emsdk/emsdk" ]; then
+            git clone --depth 1 --branch "$version" https://github.com/emscripten-core/emsdk.git "$HOME/emsdk"
+          fi
+          "$HOME/emsdk/emsdk" install "$version"
+          "$HOME/emsdk/emsdk" activate "$version"
+          source "$HOME/emsdk/emsdk_env.sh"
+          python tools/build_chord_wasm.py --output "$RUNNER_TEMP/chord_core.wasm"
+          cmp web/chord_core.wasm "$RUNNER_TEMP/chord_core.wasm"
+          node tools/test_chord_wasm.mjs
+
       - name: Placeholder secrets
         run: cp include/secrets.h.example include/secrets.h
 

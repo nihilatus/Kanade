@@ -8,7 +8,7 @@ Generated machine table: [`../data/chord_map.machine.csv`](../data/chord_map.mac
 
 That command rewrites the machine CSV and [`../include/chord_map.inc`](../include/chord_map.inc). Unknown key tokens, the same key set mapped to different outputs, or an output the firmware would skip make the script exit non-zero and fail the PlatformIO build. A skipped token is a bad combo (`Shift+Nope`), a byte outside printable ASCII, or a token of 24 bytes or more. On the device that token is only logged; the rest of the recipe can still be sent. The factory table is not allowed to rely on that. A bare word that is not a key name, such as `Backspce`, is typed as letters. It is not a skip. `Shift+Backspce` is a skip, and the build rejects it. Firmware uses the generated include as the factory table. A chord table saved from the phone is stored in LittleFS as `chords.json` and overrides the factory table until the page’s reset action deletes it.
 
-The browser practice page [`../web/index.html`](../web/index.html) fetches this same CSV (serve the repo root; see the README). “載入 CSV” can try another file with these columns; “改回機器表” loads this one again.
+The browser practice page [`../web/index.html`](../web/index.html) loads [`../web/chord_core.wasm`](../web/chord_core.wasm), built from [`../src/chord_core.cpp`](../src/chord_core.cpp), and fetches this same CSV (serve the repo root; see the README). “載入 CSV” can try another file with these columns; “改回機器表” loads this one again. Matching, the peak, both send timings, and repeat run in that module. The page does not keep a second copy.
 
 ## 人編 CSV
 
@@ -103,3 +103,11 @@ pio test -e native
 ```
 
 The chord test reads every row of [`../data/chord_map.machine.csv`](../data/chord_map.machine.csv) and rebuilds the expected match from that row. Recipe tokens are locked by [`../test/recipe_vectors.tsv`](../test/recipe_vectors.tsv): that test and `python tools/test_recipe_vectors.py` both read that file. `pio test -e native` runs the Python check first, then the chord tests and the config HTTP and job tests. The native build compiles `chord_core.cpp`, `config_http.cpp`, `config_job.cpp`, and `config_files.cpp`.
+
+After a change to the guard, bounce, first-up, repeat, or match order, rebuild the practice module with the emsdk version in [`../wasm/emsdk-version.txt`](../wasm/emsdk-version.txt):
+
+```text
+python tools/build_chord_wasm.py
+```
+
+CI installs that same emsdk, rebuilds the wasm, and checks it matches [`../web/chord_core.wasm`](../web/chord_core.wasm). `node tools/test_chord_wasm.mjs` only checks the export wiring. Recipe parsing stays in `tools/recipe.py`, still locked by the shared vectors; the practice page does not send HID recipes.

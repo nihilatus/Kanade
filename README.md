@@ -104,15 +104,21 @@ python tools/build_chord_map_machine.py
 
 ## 用一般鍵盤試打
 
-[`web/index.html`](web/index.html) 用電腦鍵盤模擬 14 顆和弦鍵，不必接開發板，也不送 USB HID。判讀規則與韌體相同（最大同時集合、全放 `kChordReleaseGuardMs` 或首鍵放開就送、`required`／`optional`、較具體的列優先）。電腦鍵盤的按下／放開已經是穩定邊緣，所以不做韌體的 `kChordDebounceMs` GPIO 消彈跳。頁首「全放再送／首鍵放開就送」只存在這個瀏覽器，用來對照手感。
+[`web/index.html`](web/index.html) 用電腦鍵盤模擬 14 顆和弦鍵，不必接開發板，也不送 USB HID。判讀載入 [`web/chord_core.wasm`](web/chord_core.wasm)，由 [`src/chord_core.cpp`](src/chord_core.cpp) 編成：高峰、全放 `kChordReleaseGuardMs`、彈回 `kChordBounceMs`、首鍵放開、`required`／`optional`、較具體的列優先，以及 `repeat=allow` 的連發。頁面沒有自己的一份狀態機。電腦鍵盤的按下／放開已經是穩定邊緣，所以不做韌體的 `kChordDebounceMs` GPIO 消彈跳。頁首「全放再送／首鍵放開就送」會呼叫同一個模組，用來對照手感。連發時語音和逐項驗證只認這一次按住的第一下。
 
-頁面用相對路徑讀 [`data/chord_map.machine.csv`](data/chord_map.machine.csv)。在專案根目錄開一個本機伺服器，直接用檔案開啟讀不到表：
+頁面用相對路徑讀 [`data/chord_map.machine.csv`](data/chord_map.machine.csv)，並載入同目錄的 wasm。在專案根目錄開一個本機伺服器，直接用檔案開啟讀不到：
 
 ```bat
 python -m http.server 8765
 ```
 
 瀏覽器開 [http://127.0.0.1:8765/web/](http://127.0.0.1:8765/web/)。改完人表並重建機器表之後，重新整理就會用新表。
+
+改了守衛、彈跳、比對或連發之後，要用 [`wasm/emsdk-version.txt`](wasm/emsdk-version.txt) 裡寫的 emsdk 版本重編 wasm，否則試打頁還是舊的判讀：
+
+```bat
+python tools/build_chord_wasm.py
+```
 
 | | |
 | --- | --- |
@@ -182,14 +188,19 @@ include/secrets.h         本機熱點密碼，不進 git
 esp32-jis-chordboard-premapping.csv
 data/chord_map.machine.csv
 tools/build_chord_map_machine.py
-tools/recipe.py           配方解析，與 chord_core 同一套規則
+tools/recipe.py           配方解析，與 chord_core 同一套規則，由配方向量鎖住
 tools/prebuild_chord_map.py
 tools/test_recipe_vectors.py
+tools/build_chord_wasm.py 把 chord_core 編成 web/chord_core.wasm
+tools/test_chord_wasm.mjs 檢查 wasm 匯出有接到 chord_core
 test/recipe_vectors.tsv   C++ 與 Python 共用的配方向量
 test/test_chord_core      和弦判斷；pio test -e native
 test/test_config_http     設定頁 HTTP 請求檢查
 test/test_config_job      熱點工作在掃描之外的狀態
-web/index.html            一般鍵盤試打，讀機器表
+wasm/chord_api.cpp        試打頁用的匯出，PlatformIO 不編譯
+wasm/emsdk-version.txt    編成 wasm 的 emsdk 版本
+web/chord_core.wasm       試打頁載入的判讀模組
+web/index.html            一般鍵盤試打，讀機器表與 wasm
 docs/chord-map-machine.md
 docs/pinout.md
 docs/bom.md
