@@ -5,12 +5,12 @@
 
 #include <ArduinoJson.h>
 #include <LittleFS.h>
-#include <Preferences.h>
 #include <esp_heap_caps.h>
 
 #include "buttons.h"
 #include "chord_core.h"
 #include "console_log.h"
+#include "fire_switch.h"
 #include "hid_keyboard.h"
 
 // required ⊆ max_chord ⊆ required ∪ optional.
@@ -46,12 +46,7 @@ static bool g_staged = false;
 // Debounce has already required the raw level to hold before this mask
 // goes empty. ReleaseAll waits kChordReleaseGuardMs after that. FirstUp
 // sends on the first peak-key release and does not use this wait.
-// 0 = release-all when NVS has no stored mode. 1 = first-up.
-#ifndef CHORD_FIRE_DEFAULT_FIRST
-#define CHORD_FIRE_DEFAULT_FIRST 0
-#endif
-static constexpr char kPrefsNs[] = "jis";
-static constexpr char kPrefsFire[] = "fire";
+// The GPIO switch chooses which one. Nothing here is stored.
 
 static ChordEngine g_engine;
 static ChordRepeat g_repeat;
@@ -253,55 +248,14 @@ static void log_fire_mode() {
   console_println(line);
 }
 
-static ChordFireMode fire_mode_from_flag() {
-  return CHORD_FIRE_DEFAULT_FIRST ? ChordFireMode::FirstUp : ChordFireMode::ReleaseAll;
-}
-
-static void load_fire_mode() {
-  const ChordFireMode fallback = fire_mode_from_flag();
-  Preferences prefs;
-  if (!prefs.begin(kPrefsNs, true)) {
-    g_engine.mode = fallback;
-    return;
-  }
-  if (!prefs.isKey(kPrefsFire)) {
-    g_engine.mode = fallback;
-    prefs.end();
-    return;
-  }
-  const uint8_t stored = prefs.getUChar(kPrefsFire, 0);
-  prefs.end();
-  g_engine.mode = stored == 1 ? ChordFireMode::FirstUp : ChordFireMode::ReleaseAll;
-}
-
-static void save_fire_mode() {
-  Preferences prefs;
-  if (!prefs.begin(kPrefsNs, false)) {
-    console_println("送出模式這次沒寫進記憶體，重開機會回到上次成功的設定");
-    return;
-  }
-  prefs.putUChar(kPrefsFire, g_engine.mode == ChordFireMode::FirstUp ? 1 : 0);
-  prefs.end();
-}
-
 const char *chords_fire_mode_name() { return fire_mode_name(g_engine.mode); }
 
-bool chords_set_fire_mode_name(const char *name, bool dispatch) {
-  if (name == nullptr) return false;
-  ChordFireMode next;
-  if (strcmp(name, "release") == 0) next = ChordFireMode::ReleaseAll;
-  else if (strcmp(name, "first") == 0) next = ChordFireMode::FirstUp;
-  else return false;
-
-  if (dispatch) {
-    const uint32_t now = millis();
-    fire_dispatch(chord_dispatch_set_mode(&g_engine, &g_repeat, next, now, peak_auto_repeats));
-  } else {
-    g_engine.mode = next;
-  }
-  save_fire_mode();
+void chords_apply_fire_switch() {
+  const ChordFireMode next = fire_switch_mode();
+  if (next == g_engine.mode) return;
+  const uint32_t now = millis();
+  fire_dispatch(chord_dispatch_set_mode(&g_engine, &g_repeat, next, now, peak_auto_repeats));
   log_fire_mode();
-  return true;
 }
 
 static void fire(uint16_t mask) {
@@ -669,9 +623,9 @@ void chords_begin() {
   chord_repeat_reset(&g_repeat);
 
   console_ensure();
-  load_fire_mode();
+  g_engine.mode = fire_switch_mode();
   log_fire_mode();
-  console_println("序列指令：fire release | fire first | drops");
+  console_println("序列指令：fire | drops");
   g_fs = LittleFS.begin(false);
   if (!g_fs) {
     console_println("LittleFS 掛載失敗，格式化一次");

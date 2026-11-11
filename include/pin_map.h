@@ -28,6 +28,7 @@ enum class PinFn : uint8_t {
   RT2,
   WifiEnable,
   OutputMode,
+  FireTiming,
   Count
 };
 
@@ -46,6 +47,7 @@ static constexpr PinRow kPinMap[] = {
     {PinFn::RD, 12},         {PinFn::RT0, 13},
     {PinFn::RT1, 14},        {PinFn::RT2, 21},
     {PinFn::WifiEnable, 15}, {PinFn::OutputMode, 16},
+    {PinFn::FireTiming, 17},
 };
 
 static constexpr int kPinRowCount = static_cast<int>(sizeof(kPinMap) / sizeof(kPinMap[0]));
@@ -85,5 +87,10 @@ static_assert(pin_rows_follow_enum(0), "pin map rows follow PinFn order");
 static_assert(pin_gpios_unique(0), "gpio numbers are unique");
 static_assert(!pin_fn_is_chord(PinFn::WifiEnable), "wifi switch is not a chord key");
 static_assert(!pin_fn_is_chord(PinFn::OutputMode), "output switch is not a chord key");
+static_assert(!pin_fn_is_chord(PinFn::FireTiming), "fire switch is not a chord key");
 static_assert(pin_gpio(PinFn::WifiEnable) != pin_gpio(PinFn::OutputMode),
               "output switch is not the wifi switch");
+static_assert(pin_gpio(PinFn::FireTiming) != pin_gpio(PinFn::WifiEnable),
+              "fire switch is not the wifi switch");
+static_assert(pin_gpio(PinFn::FireTiming) != pin_gpio(PinFn::OutputMode),
+              "fire switch is not the output switch");

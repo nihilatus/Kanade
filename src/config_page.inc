@@ -46,6 +46,8 @@ R"HTML(
   #save { background: #1d6b3a; border-color: #1d6b3a; }
   #reset { background: transparent; color: #ffb4b4; border-color: #8a4040; }
   button:disabled { opacity: 0.5; }
+  button.mode:disabled { opacity: 1; cursor: default; }
+  button.mode:disabled:not(.on) { opacity: 0.55; }
   button.on { background: #1d4e86; border-color: #6cb6ff; }
   #status { display: block; min-height: 1.3em; margin-top: 8px; font-size: 14px; }
   #status.bad { color: #ff8d8d; }
@@ -78,10 +80,10 @@ R"HTML(
     <h1>Kanade</h1>
     <p class="hint">假名列填羅馬字。符號與操作列從清單選鍵。必＝一定要按。可＝可有可無。同一顆不能兩個都勾。假名只供辨識。output 空白表示這列不送鍵。</p>
     <div class="actions">
-      <button id="fire-release" type="button">全放再送</button>
-      <button id="fire-first" type="button">首鍵放開就送</button>
+      <button id="fire-release" class="mode" type="button" disabled>全放再送</button>
+      <button id="fire-first" class="mode" type="button" disabled>首鍵放開就送</button>
     </div>
-    <p class="hint">全放再送：這組全部放開並再確認空檔才送出。下一組若在前一組還沒放完就按下，兩組會併成一個對不到的集合。首鍵放開就送：高峰後第一顆放開就送出，其餘鍵要全部放開才接下一個。請同時按下、再放開。</p>
+    <p class="hint">送出時機由 GPIO17 開關決定，這頁只顯示。開路是全放再送，接到 GND 是首鍵放開就送。全放再送：這組全部放開並再確認空檔才送出。下一組若在前一組還沒放完就按下，兩組會併成一個對不到的集合。首鍵放開就送：高峰後第一顆放開就送出，其餘鍵要全部放開才接下一個。請同時按下、再放開。</p>
     <input id="q" type="search" placeholder="搜尋假名或 output" autocomplete="off">
     <div class="actions">
       <button id="save" type="button">儲存</button>
@@ -415,22 +417,6 @@ saveBtn.addEventListener("click", () => withBusy(async () => {
   source = "saved";
   setStatus("已儲存，下一組和弦就用新表（" + (data.count != null ? data.count : rows.length) + " 列）", "ok");
 }));
-
-function chooseFire(mode) {
-  return withBusy(async () => {
-    const data = await readBody(await apiFetch("/api/fire", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: mode })
-    }));
-    fireMode = data.mode === "first" ? "first" : "release";
-    paintFire();
-    setStatus(fireMode === "first" ? "已改成首鍵放開就送" : "已改成全放再送", "ok");
-  });
-}
-
-fireReleaseBtn.addEventListener("click", () => chooseFire("release"));
-fireFirstBtn.addEventListener("click", () => chooseFire("first"));
 
 resetBtn.addEventListener("click", () => withBusy(async () => {
   if (!window.confirm("還原成燒錄時的出廠表？手機上存過的組合會刪掉。")) return;

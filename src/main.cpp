@@ -10,6 +10,7 @@
 #include "chords.h"
 #include "config_server.h"
 #include "console_log.h"
+#include "fire_switch.h"
 #include "hid_keyboard.h"
 #include "output_policy.h"
 #include "output_switch.h"
@@ -47,6 +48,7 @@ void setup() {
 
   buttons_begin();
   output_switch_begin();
+  fire_switch_begin();
   chords_begin();
   config_server_set_output_mode(output_switch_mode());
   config_server_begin();
@@ -208,7 +210,7 @@ static void poll_fire_cmd(CmdPort &port) {
       console_println(line);
       continue;
     }
-    if (!chords_set_fire_mode_name(arg)) console_println("fire: release 或 first");
+    console_println("送出模式由開關決定");
   }
 }
 
@@ -266,6 +268,7 @@ void loop() {
     }
     g_ap_was_up = ap_up;
   }
+  if (fire_switch_poll(millis())) chords_apply_fire_switch();
   if (!ap_up) {
     buttons_poll();
     trace_keys_if_changed();

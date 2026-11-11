@@ -7,7 +7,8 @@ extern "C" void setUp(void) {}
 extern "C" void tearDown(void) {}
 
 // Wiring locked here. pin_map.h is the only GPIO list; this test fails if a
-// chord key, the wifi switch, or the output switch moves without an update.
+// chord key, the wifi switch, the output switch, or the fire switch moves
+// without an update.
 extern "C" void test_pin_map_matches_wiring(void) {
   static const char *kNames[kChordKeyCount] = {
       "LL", "LU", "LR", "LD", "LT0", "LT1", "LT2", "RL", "RU", "RR", "RD", "RT0", "RT1", "RT2"};
@@ -26,17 +27,22 @@ extern "C" void test_pin_map_matches_wiring(void) {
 
   TEST_ASSERT_FALSE(pin_fn_is_chord(PinFn::WifiEnable));
   TEST_ASSERT_FALSE(pin_fn_is_chord(PinFn::OutputMode));
+  TEST_ASSERT_FALSE(pin_fn_is_chord(PinFn::FireTiming));
   TEST_ASSERT_EQUAL_INT(15, pin_gpio(PinFn::WifiEnable));
   TEST_ASSERT_EQUAL_INT(16, pin_gpio(PinFn::OutputMode));
+  TEST_ASSERT_EQUAL_INT(17, pin_gpio(PinFn::FireTiming));
   TEST_ASSERT_EQUAL_INT(-1, pin_gpio(PinFn::Count));
 
-  const int extra[] = {pin_gpio(PinFn::WifiEnable), pin_gpio(PinFn::OutputMode)};
+  const int extra[] = {pin_gpio(PinFn::WifiEnable), pin_gpio(PinFn::OutputMode),
+                       pin_gpio(PinFn::FireTiming)};
   for (int i = 0; i < kChordKeyCount; ++i) {
     for (int gpio : extra) {
       TEST_ASSERT_NOT_EQUAL(kChordGpio[i], gpio);
     }
   }
   TEST_ASSERT_NOT_EQUAL(extra[0], extra[1]);
+  TEST_ASSERT_NOT_EQUAL(extra[0], extra[2]);
+  TEST_ASSERT_NOT_EQUAL(extra[1], extra[2]);
 }
 
 int main(int argc, char **argv) {

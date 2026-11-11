@@ -7,7 +7,7 @@
 // GPIO assignments stay in include/pin_map.h.
 // USB VID/PID stay in src/hid_keyboard.cpp.
 // SSID, passphrase, and WIFI_API_TOKEN stay in include/secrets.h.
-// Boot fire mode CHORD_FIRE_DEFAULT_FIRST stays in platformio.ini.
+// Send timing follows the GPIO switch, not a stored value.
 // No Arduino types: host tests and the practice-page wasm include this too.
 
 // --- Key timing ---
@@ -133,5 +133,5 @@ static constexpr size_t kHttpHeaderMax = 1536;
 static constexpr long kDrainMax = 256 * 1024;
 static_assert(kChordsJsonMax < static_cast<size_t>(kDrainMax),
               "a chord save must fit under the drain cap");
-// POST /api/fire body. The mode JSON is a few dozen bytes.
+// POST /api/fire body. The switch decides the mode, so the body is ignored.
 static constexpr size_t kFireBodyMax = 256;

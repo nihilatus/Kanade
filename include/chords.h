@@ -3,14 +3,14 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "chord_core.h"
 #include "settings.h"
 
 // Chord engine. Tracks the largest simultaneous set while any key is down,
 // then matches the live table once.
 //
-// Two send timings, stored in NVS and switchable at runtime.
-// With no stored key, boot uses CHORD_FIRE_DEFAULT_FIRST (0 = release).
-// A stored value overrides that flag. Timings:
+// Two send timings. The GPIO switch is the record: open is "release", closed
+// to GND is "first". A debounced change applies immediately and is not stored.
 //   "release" — wait until every key is up, then kChordReleaseGuardMs, then send.
 //               A different chord pressed during that wait sends immediately.
 //   "first"   — after the peak, send when the first peak key goes up, then
@@ -33,12 +33,12 @@ void chords_poll();  // call after buttons_poll()
 // sent after the AP goes off.
 void chords_abandon();
 
-// "release" or "first". Setter returns false for any other name.
-// dispatch runs the engine mode change. Switching to first-up that way sends a
-// chord already waiting in the release guard. Pass false to store the mode
-// only, which is what the config page does.
+// "release" or "first", whichever the switch last applied.
 const char *chords_fire_mode_name();
-bool chords_set_fire_mode_name(const char *name, bool dispatch = true);
+// Apply fire_switch_mode(). Switching to first-up sends a chord already
+// waiting in the release guard. No-op when the mode is already current.
+// Does not write NVS.
+void chords_apply_fire_switch();
 
 static constexpr char kChordsPath[] = "/chords.json";
 static constexpr char kChordsTmpPath[] = "/chords.json.tmp";

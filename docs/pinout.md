@@ -25,7 +25,7 @@
 - 開關只接 GPIO 與 GND。不要接到 5 V、VIN 或其他電源腳。
 - 麵包板杜邦線盡量短於約 30 cm。
 
-14 顆和弦鍵每一腳要連續穩定 `kChordDebounceMs`（`include/settings.h`）才承認按下或放開。何時送出一組和弦見 [`chord-map-machine.md`](chord-map-machine.md)。熱點開關是 `include/pin_map.h` 的 `PinFn::WifiEnable`，和輸出開關共用 `kSwitchDebounceMs`，見下方。
+14 顆和弦鍵每一腳要連續穩定 `kChordDebounceMs`（`include/settings.h`）才承認按下或放開。何時送出一組和弦見 [`chord-map-machine.md`](chord-map-machine.md)。熱點開關、輸出開關、送出時機開關都在 `include/pin_map.h`，前兩顆和送出時機共用 `kSwitchDebounceMs`，見下方。
 
 ## 不可使用的腳
 
@@ -83,6 +83,21 @@ GPIO3 刻意空下（strapping）。順序與和弦表的鍵名順序相同：`L
 開機時若 GPIO16 導通、而且 GPIO15 也導通，不啟動藍牙，只開熱點。藍牙已經在跑時 GPIO15 變成導通，這次開機不起熱點，直接重啟；下一輪才只服務熱點。這次是因為藍牙讓位才開的熱點，GPIO15 打開後同樣重啟，下一輪才啟藍牙。USB 模式沒有這個重啟。
 
 建議用維持型撥動開關。輕觸開關要按住才會開著，放開熱點就關。
+
+## 送出時機開關
+
+| 項目 | 值 |
+| --- | --- |
+| 腳位 | **GPIO17**（不屬於 14 個和弦鍵，也不進和弦遮罩） |
+| 接法 | 一端接 GPIO17，另一端接 GND。`INPUT_PULLUP`，導通為 LOW |
+| 極性 | 沒接或開路 = 全放再送。導通 = 首鍵放開就送。開路讀到的是 HIGH |
+| 時機 | 開機讀一次。之後穩態連續 `kSwitchDebounceMs` 不同就立刻換，不重啟，也不寫進 NVS 或 LittleFS |
+
+全放再送：這一組全部放開，再維持 `kChordReleaseGuardMs`，才送高峰。首鍵放開就送：高峰之後，這一組裡最先放開的那顆起來就送，其餘還按著的先不當下一組。正在等全放的空檔時撥到首鍵放開，等待中的那一組會馬上送出。反方向只影響下一次判斷。
+
+熱點頁只顯示目前是哪一種，不能在網頁上改。序列埠 `fire` 只查詢；`fire release` 和 `fire first` 不再寫入。試打頁的按鈕只影響那個瀏覽器。
+
+建議用維持型撥動開關。沒接這顆開關時內部上拉，就是全放再送。
 
 ## 一顆鍵怎麼接
 

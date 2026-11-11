@@ -91,7 +91,7 @@ GPIO16 開路時選 USB，接地時選 BLE；開機只啟用一種輸出。韌�
 
 按住期間取同時按下數量最大的一組，送出一次。時機是全放再送，或首鍵放開就送。`(RT0)`、比對與候選優先序見 [`docs/chord-map-machine.md`](docs/chord-map-machine.md)。
 
-沒有 NVS 紀錄時，開機用 `CHORD_FIRE_DEFAULT_FIRST`（沒設就是全放）。手機熱點頁或序列埠 `fire release` / `fire first` 會寫進 NVS，並蓋過編譯旗標。試打頁的開關只影響瀏覽器。每鍵要先穩定 `kChordDebounceMs` 才算按下或放開。
+沒有另存的送出模式。開機與運行中都看 GPIO17：開路是全放再送，接到 GND 是首鍵放開就送。撥動後消抖就換，不重啟。熱點頁和序列埠 `fire` 只顯示目前模式。試打頁的開關只影響瀏覽器。每鍵要先穩定 `kChordDebounceMs` 才算按下或放開。
 
 機器表 `repeat=allow` 的列（目前是方向鍵和 `Backspace`）由韌體自己定時送出按下再放開，間隔 `kChordRepeatIntervalMs`，不跟 Windows 的鍵盤重複速度走。
 
@@ -154,9 +154,10 @@ python tools/build_chord_wasm.py
 | HID | 接標示 **USB** 的 OTG 口 |
 | 燒錄／序列 | 接標示 **UART** 的口 |
 | 輸出選擇 | GPIO16 開路 = USB；接 GND = BLE。開機讀取，執行中切換會先靜音再重啟 |
+| 送出時機 | GPIO17 開路 = 全放再送；接 GND = 首鍵放開就送。運行中切換，不重啟 |
 | 保留 | **GPIO19 / GPIO20**（USB 資料線，勿當按鍵腳） |
 
-**按鍵數量：14。** 每顆開關一腳接 GPIO、一腳接 GND（內部上拉，按下為 LOW）。另外一顆維持型開關接 **GPIO15** 與 GND，合上才開 Wi-Fi 設定熱點。腳位與零件見 [`docs/pinout.md`](docs/pinout.md)、[`docs/bom.md`](docs/bom.md)。空腳、以及現用腳佔走的 ADC／觸控，見 [`docs/gpio-spare.md`](docs/gpio-spare.md)。目前腳位先不改。
+**按鍵數量：14。** 每顆開關一腳接 GPIO、一腳接 GND（內部上拉，按下為 LOW）。另外兩顆維持型開關： **GPIO15** 與 GND 合上才開 Wi-Fi 設定熱點；**GPIO17** 與 GND 合上是首鍵放開就送，開路是全放再送。腳位與零件見 [`docs/pinout.md`](docs/pinout.md)、[`docs/bom.md`](docs/bom.md)。空腳、以及現用腳佔走的 ADC／觸控，見 [`docs/gpio-spare.md`](docs/gpio-spare.md)。目前腳位先不改。
 
 ### 建置與燒錄（Windows）
 
@@ -204,8 +205,9 @@ src/hid_keyboard.cpp      配方先套用配列，再交給 USB／BLE 輸出
 src/hid_link.cpp          輸出連結共用介面
 src/hid_ble.cpp           BLE HID 輸出
 src/output_switch.cpp     GPIO16 開機輸出選擇
+src/fire_switch.cpp       GPIO17 送出時機，運行中切換
 src/config_server.cpp     GPIO15 熱點與手機設定頁
-include/pin_map.h         和弦鍵、熱點與輸出開關腳位
+include/pin_map.h         和弦鍵、熱點、輸出開關與送出時機腳位
 include/output_policy.h   USB／BLE／熱點啟動判斷
 include/chord_map.inc     出廠表，由機器表產生，勿手改
 include/secrets.h         本機熱點密碼，不進 git

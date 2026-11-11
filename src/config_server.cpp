@@ -531,31 +531,9 @@ static void service_job() {
 }
 
 static void handle_fire(char *body, size_t len) {
-  JsonDocument doc;
-  const DeserializationError error = deserializeJson(doc, body, len);
-  const char *mode = nullptr;
-  if (!error && doc["mode"].is<const char *>()) mode = doc["mode"].as<const char *>();
-  // Copy the mode off the document before releasing the body. The document
-  // borrows nothing from body when the input is a bounded buffer, but the
-  // pointer is only used after this check returns.
-  char mode_buf[8];
-  mode_buf[0] = '\0';
-  if (mode != nullptr) {
-    strncpy(mode_buf, mode, sizeof(mode_buf) - 1);
-    mode_buf[sizeof(mode_buf) - 1] = '\0';
-  }
+  (void)len;
   chords_release(body);
-  if (mode_buf[0] == '\0' || !chords_set_fire_mode_name(mode_buf, false)) {
-    begin_error(400, "模式只能是 release 或 first", g_cors);
-    return;
-  }
-  char *ok = alloc_chars(48);
-  if (ok == nullptr) {
-    begin_error(500, "記憶體不足", g_cors);
-    return;
-  }
-  snprintf(ok, 48, "{\"ok\":true,\"mode\":\"%s\"}", chords_fire_mode_name());
-  begin_send(200, kJsonType, ok, strlen(ok), ok, g_cors);
+  begin_error(409, "送出模式由開關決定", g_cors);
 }
 
 static void finish_body() {
