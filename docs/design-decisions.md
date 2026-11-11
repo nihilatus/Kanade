@@ -18,16 +18,22 @@
 
 高峰仍是按住期間同時按下數量最多的那一組；同樣多顆時留較晚的那一組。全放再送，以及首鍵放開就送，兩種時機都保留。連射列（`repeat=allow`）的 50 ms／400 ms／33 ms 由韌體自己計時，不跟 Windows 的鍵盤重複速度。
 
-## 3. 設定頁自己寫 HTTP，不用 Arduino-ESP32 的 WebServer
+## 3. 設定頁自己寫 HTTP，不用套件
 
-維持。`src/config_server.cpp` 自己讀寫 socket，是為了每一圈都讀得到熱點開關。慢請求不能拖住「熱點關、鍵盤恢復」。不要為了程式較短改回 `WebServer` 或同類會在請求裡等到收完、解析完的伺服器。
+維持，而且這條是刻意留下的，不是還沒換成套件。`src/config_server.cpp` 自己讀寫 socket。不要為了程式較短改成 Arduino-ESP32 的 `WebServer`，也不要換成 ESPAsyncWebServer 或任何會在一筆請求裡等到收完、解析完的伺服器，以及非同步回呼裡改活表的伺服器。
 
-要守住的行為：
+熱點開著時本來就不掃描、不送 USB HID，藍牙輸出也還沒有。設定頁因此不必跟鍵盤或藍牙搶同一圈。這不夠成為換套件的理由，不要用「設定頁已經獨立」回頭改這一條。
 
-- `config_server_poll()` 每一圈最多搬一小段（`kHttpSlice`）。慢請求或過大的 body 不能拖住關熱點。
+要守的是熱點開關。GPIO15 撥開之後，鍵盤要在消抖後恢復。`config_server_poll()` 每一圈先看這個開關，HTTP 最多搬一小段（`kHttpSlice`）。慢的 POST、過大的 body、或卡住的客戶端不能把這一圈拖到收完整個請求，否則關熱點會被一筆沒傳完的 HTTP 堵住。同一圈還要收序列埠的 `fire`、`drops`、`keys`、`trace`，堵住 HTTP 也會堵住這些指令。
+
+路由只有設定頁、`/api/chords`、還原、`/api/fire`，一次只收一個連線。標頭檢查、token、Origin 在 `include/config_http.h`，宿主測試不碰 Arduino。套件吃掉的只是 socket 狀態機，下面這些仍要自己寫，所以不換：
+
+- `config_server_poll()` 每一圈最多搬 `kHttpSlice`。慢請求或過大的 body 不能拖住關熱點。
 - 和弦 JSON 的解析與 LittleFS 讀寫在另一個核心。那個工作開不起來時，GET／POST／還原回答 503，不要退回在這圈 loop 裡做。
-- 活表只在這次 poll 換上。先 stage，成功才 commit。
+- 活表只在這次 poll 換上。先 stage，成功才 commit。上一筆還沒結束不接下一筆。斷線不能留下半截表。
 - 熱點開著時不掃描、不送 USB HID。熱點關掉時，掃描與 USB HID 照常。
+
+路由變多、要從檔案系統送靜態檔、WebSocket、上傳檔案或 HTTPS 時，再重看非阻塞套件。在那之前維持自寫。
 
 ## 4. 暫不申請正式的 VID／PID
 
