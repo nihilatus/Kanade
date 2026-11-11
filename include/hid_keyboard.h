@@ -2,7 +2,11 @@
 
 #include <Arduino.h>
 
-// Native USB HID keyboard (6KRO boot-protocol style via Arduino USBHIDKeyboard).
+#include "output_policy.h"
+
+// USB or BLE HID keyboard (6KRO). USB is Arduino USBHIDKeyboard. BLE is the
+// built-in HID-over-GATT keyboard and is started only for a BLE boot with the
+// config AP down. One boot runs one transport.
 // ASCII uses the active HostLayout. Only JIS is implemented. Romaji letters
 // match a US keyboard; '[' and ']' do not. The PC Japanese IME converts
 // romaji. Henkan, Muhenkan, and Kana are raw usages inside the stock
@@ -17,7 +21,9 @@
 // A busy endpoint leaves that report queued. After the endpoint accepts a
 // report, SendReport can still wait up to its 100 ms timeout.
 
-void hid_keyboard_begin();
+// USB or BLE, chosen by the boot-time output switch. Does not start the other
+// transport. False from a failed BLE start leaves the keyboard not ready.
+bool hid_keyboard_begin(OutputMode mode);
 bool hid_keyboard_ready();
 void hid_keyboard_poll();
 

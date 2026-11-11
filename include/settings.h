@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 // Every tunable number lives here. Change the value, then rebuild.
+// GPIO assignments stay in include/pin_map.h.
 // USB VID/PID stay in src/hid_keyboard.cpp.
 // SSID, passphrase, and WIFI_API_TOKEN stay in include/secrets.h.
 // Boot fire mode CHORD_FIRE_DEFAULT_FIRST stays in platformio.ini.
@@ -47,7 +48,7 @@ static_assert(kChordRepeatIntervalMs > kChordTapGapMs * 2,
 
 // --- Recipe and table capacity ---
 // Chord keys. Bit i of the mask is key i, order LL LU LR LD LT0 LT1 LT2
-// RL RU RR RD RT0 RT1 RT2. Changing this also means a new kButtonPins row.
+// RL RU RR RD RT0 RT1 RT2. GPIO numbers for that order live in pin_map.h.
 static constexpr int kChordKeyCount = 14;
 // Events stored for one recipe. A recipe that does not fit is not sent.
 static constexpr size_t kChordRecipeCap = 96;
@@ -74,24 +75,6 @@ static constexpr size_t kRomajiMax = 80;
 static_assert(kRomajiMax <= kChordRecipeCap, "romaji shares the recipe stroke buffer");
 // Rules the practice page may load. Larger than the device table on purpose.
 static constexpr uint32_t kChordWasmRuleCap = 512;
-
-// --- Pins ---
-// One GPIO per chord key, same order as kChordKeyCount. Active-low to GND.
-// GPIO3 is skipped (strapping). Keep docs/pinout.md in step when this changes.
-static constexpr int kButtonPins[kChordKeyCount] = {
-    1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 21,
-};
-// Closed to GND enables the SoftAP. Not one of the chord keys.
-static constexpr int kWifiEnablePin = 15;
-
-constexpr bool settings_pin_is_chord_key(int pin) {
-  for (int i = 0; i < kChordKeyCount; ++i) {
-    if (kButtonPins[i] == pin) return true;
-  }
-  return false;
-}
-static_assert(!settings_pin_is_chord_key(kWifiEnablePin),
-              "wifi switch is not a chord key");
 
 // --- Hotspot ---
 // SoftAP address. kConfigOrigin must be "http://" plus these four octets.

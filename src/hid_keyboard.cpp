@@ -3,15 +3,13 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "USB.h"
 #include "USBHIDKeyboard.h"
-#include "class/hid/hid_device.h"
 
 #include "chord_core.h"
 #include "console_log.h"
+#include "hid_link.h"
 #include "host_layout.h"
 
-static USBHIDKeyboard Keyboard;
 static bool g_begun = false;
 // Whole outputs not queued, tokens skipped while the rest was kept, and
 // outputs refused because the host was not enumerated or was asleep.
@@ -46,31 +44,14 @@ static size_t g_count = 0;
 static bool g_hold = false;
 static uint32_t g_next_ms = 0;
 
-void hid_keyboard_begin() {
-  // ASCII goes through the active HostLayout. Only JIS is implemented.
-  // a–z and the digits share usages with a US keyboard; the characters this
-  // table actually sends that do not are '[' (0x30) and ']' (0x31).
-  // Shift+8 / Shift+9 become （ ） when the host keyboard type matches
-  // Kanade's layout. The USB country code stays unset: it does not switch
-  // the host layout. Set the host keyboard type to Kanade's layout.
-  // Hankaku (0x35), Henkan (0x8A), Muhenkan (0x8B), and Kana (0x88) are
-  // pressRaw usages Windows maps under that keyboard type. Eisuu is LANG2
-  // (0x91), which macOS uses for 英数 and Windows often ignores.
-  // The stock keyboard descriptor already declares usages 0–255.
-  USB.VID(0x303A);  // Espressif
-  USB.PID(0x4004);  // local prototype — change before shipping
-  USB.productName("Kanade");
-  USB.manufacturerName("Kanade");
-  USB.serialNumber("kanade-1");
-
-  Keyboard.begin(kLayoutJis.ascii);
-  USB.begin();
+bool hid_keyboard_begin(OutputMode mode) {
+  if (g_begun) return true;
+  if (!hid_link_begin(mode)) return false;
   g_begun = true;
+  return true;
 }
 
-bool hid_keyboard_ready() {
-  return g_begun && USB;
-}
+bool hid_keyboard_ready() { return g_begun && hid_link_ready(); }
 
 static void log_skip(const char *token) {
 #if ARDUINO_USB_CDC_ON_BOOT
@@ -119,13 +100,13 @@ static void send_event(const HidEvent &event) {
   if (!hid_keyboard_ready()) return;
   switch (event.op) {
     case HidOp::ReleaseAll:
-      Keyboard.releaseAll();
+      hid_link_release_all();
       break;
     case HidOp::Press:
-      Keyboard.press(event.code);
+      hid_link_press(event.code);
       break;
     case HidOp::PressRaw:
-      Keyboard.pressRaw(event.code);
+      hid_link_press_raw(event.code);
       break;
   }
 }
@@ -151,21 +132,30 @@ static void note_send_us(uint32_t elapsed_us) {
   max_us = 0;
 }
 
-void hid_keyboard_silence() {
+static void clear_queue() {
   g_head = 0;
   g_count = 0;
   g_hold = false;
   g_next_ms = 0;
-  if (!hid_keyboard_ready()) return;
-  Keyboard.releaseAll();
+}
+
+void hid_keyboard_silence() {
+  clear_queue();
+  hid_link_release_all();
 }
 
 void hid_keyboard_poll() {
+  // Disconnect dropped the link. Do not send the queued chord after reconnect.
+  if (hid_link_take_drop()) {
+    clear_queue();
+    hid_link_release_all();
+    return;
+  }
   if (g_count == 0) return;
   const uint32_t now = millis();
   if (g_hold && static_cast<int32_t>(now - g_next_ms) < 0) return;
-  // Endpoint still holds the previous report. Leave this event queued.
-  if (!tud_hid_ready()) return;
+  // Endpoint or subscription cannot take this report yet. Leave it queued.
+  if (!hid_link_can_send()) return;
 
   const uint32_t t0 = micros();
   const HidEvent event = g_queue[g_head];

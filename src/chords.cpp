@@ -25,7 +25,7 @@ static constexpr size_t kFactoryCount = sizeof(kFactory) / sizeof(kFactory[0]);
 
 static_assert(kFactoryCount > 0, "factory chord table is empty");
 static_assert(kFactoryCount <= kChordsMaxRows, "factory chord table exceeds kChordsMaxRows");
-static_assert(BTN_COUNT <= 16, "buttons_mask is uint16_t");
+static_assert(kChordKeyCount <= 16, "buttons_mask is uint16_t");
 
 // Rule rows and the string pool their kana/output pointers reference.
 // chords_begin() takes both from PSRAM (about 4 KB + 30 KB). Matching only
@@ -147,13 +147,7 @@ static bool mask_from_array(JsonArray arr, uint16_t *mask, char *err, size_t err
       return false;
     }
     const char *name = value.as<const char *>();
-    int index = -1;
-    for (uint8_t i = 0; i < BTN_COUNT; ++i) {
-      if (strcmp(name, kButtons[i].name) == 0) {
-        index = static_cast<int>(i);
-        break;
-      }
-    }
+    const int index = chord_key_index(name);
     if (index < 0) {
       set_row_err(err, err_len, row, "有不認識的鍵");
       return false;
@@ -186,9 +180,9 @@ static bool take_string(JsonObject obj, const char *key, const char **out, char 
 }
 
 static void add_key_names(JsonArray arr, uint16_t mask) {
-  for (uint8_t i = 0; i < BTN_COUNT; ++i) {
+  for (int i = 0; i < kChordKeyCount; ++i) {
     if ((mask & static_cast<uint16_t>(1u << i)) == 0) continue;
-    arr.add(kButtons[i].name);
+    arr.add(chord_key_name(i));
   }
 }
 
@@ -197,9 +191,9 @@ static void format_mask(uint16_t mask, char *buf, size_t buflen) {
   buf[0] = '\0';
   size_t used = 0;
   bool any = false;
-  for (uint8_t i = 0; i < BTN_COUNT; ++i) {
+  for (int i = 0; i < kChordKeyCount; ++i) {
     if ((mask & static_cast<uint16_t>(1u << i)) == 0) continue;
-    const char *name = kButtons[i].name;
+    const char *name = chord_key_name(i);
     const size_t len = strlen(name);
     const size_t extra = any ? 1 : 0;
     if (used + extra + len + 1 > buflen) break;

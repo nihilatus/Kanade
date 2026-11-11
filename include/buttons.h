@@ -3,27 +3,30 @@
 #include <Arduino.h>
 #include <stdint.h>
 
+#include "pin_map.h"
+
 // 14 discrete chord keys. Each switch sits between its GPIO and GND.
 // Firmware uses INPUT_PULLUP (released = HIGH, pressed = LOW).
 // Bit 0..13 of buttons_mask() follow this enum order, which is also the
 // canonical order in data/chord_map.machine.csv.
 
+// Same values as PinFn for the chord keys. Not a second pin list.
 enum ButtonId : uint8_t {
-  BTN_LL = 0,
-  BTN_LU,
-  BTN_LR,
-  BTN_LD,
-  BTN_LT0,
-  BTN_LT1,
-  BTN_LT2,
-  BTN_RL,
-  BTN_RU,
-  BTN_RR,
-  BTN_RD,
-  BTN_RT0,
-  BTN_RT1,
-  BTN_RT2,
-  BTN_COUNT
+  BTN_LL = static_cast<uint8_t>(PinFn::LL),
+  BTN_LU = static_cast<uint8_t>(PinFn::LU),
+  BTN_LR = static_cast<uint8_t>(PinFn::LR),
+  BTN_LD = static_cast<uint8_t>(PinFn::LD),
+  BTN_LT0 = static_cast<uint8_t>(PinFn::LT0),
+  BTN_LT1 = static_cast<uint8_t>(PinFn::LT1),
+  BTN_LT2 = static_cast<uint8_t>(PinFn::LT2),
+  BTN_RL = static_cast<uint8_t>(PinFn::RL),
+  BTN_RU = static_cast<uint8_t>(PinFn::RU),
+  BTN_RR = static_cast<uint8_t>(PinFn::RR),
+  BTN_RD = static_cast<uint8_t>(PinFn::RD),
+  BTN_RT0 = static_cast<uint8_t>(PinFn::RT0),
+  BTN_RT1 = static_cast<uint8_t>(PinFn::RT1),
+  BTN_RT2 = static_cast<uint8_t>(PinFn::RT2),
+  BTN_COUNT = static_cast<uint8_t>(kChordKeyCount)
 };
 
 static constexpr uint8_t kButtonCount = BTN_COUNT;
@@ -33,7 +36,8 @@ struct ButtonDef {
   const char *name;
 };
 
-extern const ButtonDef kButtons[BTN_COUNT];
+// Filled from pin_map and chord_key_name before main. Callers only read it.
+extern const ButtonDef *const kButtons;
 
 void buttons_begin();
 void buttons_poll();  // sample GPIOs + per-key debounce

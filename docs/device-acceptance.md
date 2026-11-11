@@ -15,6 +15,7 @@
 | 板子 | ESP32-S3-DevKitC-1 N16R8。UART 跑 `pio device monitor`。OTG 接到主機 |
 | 主機 | 鍵盤類型設成 Kanade 設定的配列。(目前只實作JIS)，記事本，日文 IME（羅馬字） |
 | 熱點 | GPIO15 用維持型開關接到 GND 才開。手機或第二台電腦連上後開 http://192.168.4.1/ |
+| 輸出 | GPIO16 維持開路，下面的 USB 鍵盤項才成立。導通到 GND 是藍牙，會重啟。輸出開關那一節才把 GPIO16 接地 |
 | 密碼 | `include/secrets.h`。序列埠只印熱點名稱與網址，不印密碼 |
 
 下面的 `curl.exe` 都要加 `-H "X-Api-Token: （你的 token）"`。`WIFI_API_TOKEN` 留空時，token 是第一次開機序列埠印的那一行，之後不再印；手寫的非空 token 不會印出來。token 不要寫進驗收紀錄。要換掉板上產生的那組，清掉 NVS 命名空間 `jis` 的鍵 `apitoken` 再重開。`curl.exe` 預設不帶 `Origin`，板上把這種請求當成熱點裡的非瀏覽器客戶端。
@@ -176,3 +177,31 @@ curl.exe -s -H "Content-Type: application/json" --data-binary @table-a.json http
 - [ ] **傳輸中斷線**
 
   先讓 `LL` 的輸出確定（表 A 的 `aaa`，或出廠的 `na`）。開始送另一張表，body 還在傳、對端還沒拿到 `{"ok":true,...}` 時關掉手機 Wi-Fi，或對 `curl.exe` 按 Ctrl+C。再按 `LL`，仍是斷線前那一份的完整輸出。若 body 其實已經到齊、板上已經換成新表，`LL` 必須是新表的整份輸出，不能是半截。
+
+### 輸出開關
+
+GPIO16 開路是 USB，導通到 GND 是藍牙。切換會印 `output switch restart` 或 `wifi switch restart`，然後自己重啟。序列埠看 UART。
+
+- [ ] **開路打字走 USB**
+
+  GPIO16 開路，GPIO15 開路。重開。序列埠有 `output USB`，沒有 `output BLE`，也沒有 `BLE advertising`。主機把 OTG 認成鍵盤。只按 `LT1` 再放開，記事本是 `nn`。
+
+- [ ] **導通後重啟走藍牙**
+
+  維持型開關把 GPIO16 接到 GND。序列埠先 `output switch restart`，重開後是 `output BLE` 和 `BLE advertising`。OTG 不再是鍵盤（CDC 序列埠可以還在）。主機的藍牙設定配對名稱 `Kanade`。連上後序列埠有 `BLE connected`、`BLE encrypted`、`BLE subscribed`。只按 `LT1` 再放開，記事本是 `nn`。
+
+- [ ] **已配對重開不用再配**
+
+  配對成功後拔掉供電再接上，GPIO16 仍導通，GPIO15 開路。主機不要刪掉這台裝置。重開後鍵盤自己連回，`LT1` 仍是 `nn`，主機不再跳出新的配對要求。
+
+- [ ] **藍牙模式下熱點讓位**
+
+  GPIO16 維持導通、藍牙已連上時，GPIO15 接到 GND。序列埠是 `wifi switch restart`，不是在同一次開機裡印 `AP ` 之後繼續用藍牙打字。重開後有 `BLE held, AP only`，以及熱點的 `AP ` 與 `http://192.168.4.1/`。沒有 `BLE advertising`。連打 `LT1`，記事本不增加字。撥開 GPIO15，再一次 `wifi switch restart`。重開後回到 `output BLE` 與 `BLE advertising`，連上後 `LT1` 又是 `nn`。
+
+- [ ] **USB 模式下熱點仍不重啟**
+
+  GPIO16 開路。GPIO15 接到 GND，序列埠有 `AP `，沒有 `output switch restart`，也沒有 `wifi switch restart`。撥開 GPIO15，印 `AP off`，板子不重啟。再按 `LT1`，仍是 `nn`。
+
+- [ ] **藍牙還沒訂閱不補送**
+
+  GPIO16 導通，主機還沒連上或還沒訂閱（還沒看到 `BLE subscribed`）。按一次 `LT1`。等記事本認得鍵盤之後，剛才那一次不補送 `nn`。序列埠 `drops` 的 `not_ready` 比按之前大。之後打幾個字，沒有黏住的 Shift 或 Ctrl。

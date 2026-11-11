@@ -3,20 +3,28 @@
 #include "chord_core.h"
 
 static_assert(BTN_COUNT == kChordKeyCount, "button bits match chord_core");
+static_assert(BTN_LL == 0, "chord button ids start at bit 0");
 
 // One GPIO per key, active-low, internal pull-up.
 // No matrix and no diodes: simultaneous chords cannot ghost.
-// See docs/pinout.md. GPIO3 is skipped (strapping).
+// Pin numbers come from pin_map.h. See docs/pinout.md.
 
-const ButtonDef kButtons[BTN_COUNT] = {
-    {kButtonPins[0], chord_key_name(0)},   {kButtonPins[1], chord_key_name(1)},
-    {kButtonPins[2], chord_key_name(2)},   {kButtonPins[3], chord_key_name(3)},
-    {kButtonPins[4], chord_key_name(4)},   {kButtonPins[5], chord_key_name(5)},
-    {kButtonPins[6], chord_key_name(6)},   {kButtonPins[7], chord_key_name(7)},
-    {kButtonPins[8], chord_key_name(8)},   {kButtonPins[9], chord_key_name(9)},
-    {kButtonPins[10], chord_key_name(10)}, {kButtonPins[11], chord_key_name(11)},
-    {kButtonPins[12], chord_key_name(12)}, {kButtonPins[13], chord_key_name(13)},
+static ButtonDef g_buttons[BTN_COUNT];
+
+namespace {
+struct FillButtons {
+  FillButtons() {
+    for (uint8_t i = 0; i < BTN_COUNT; ++i) {
+      g_buttons[i].pin = pin_gpio(static_cast<PinFn>(i));
+      g_buttons[i].name = chord_key_name(static_cast<int>(i));
+    }
+  }
 };
+
+const FillButtons g_fill_buttons;
+}  // namespace
+
+const ButtonDef *const kButtons = g_buttons;
 
 // Both edges. Cheap tactiles usually finish bouncing inside kChordBounceMs.
 // The chord engine waits again after this mask is empty, so a longer debounce

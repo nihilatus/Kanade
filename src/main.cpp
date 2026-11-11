@@ -3,12 +3,16 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <esp_system.h>
+
 #include "buttons.h"
 #include "chord_core.h"
 #include "chords.h"
 #include "config_server.h"
 #include "console_log.h"
 #include "hid_keyboard.h"
+#include "output_policy.h"
+#include "output_switch.h"
 
 // Set to 0 (or -DCHORD_MEASURE_LOOP=0) to leave loop timing out of the scan.
 #ifndef CHORD_MEASURE_LOOP
@@ -18,9 +22,9 @@
 #include <WiFi.h>
 #endif
 
-// Kanade on ESP32-S3-DevKitC-1 N16R8 — USB HID chord keyboard.
-// Plug the PC into the board port labeled USB (OTG), not UART.
-// Each switch: GPIO to one side, GND to the other. Pressed = LOW.
+// Kanade on ESP32-S3-DevKitC-1 N16R8 — chord keyboard.
+// GPIO16 open: USB HID on the port labeled USB (OTG). Closed to GND: BLE HID.
+// Plug the UART header in for the log. Chord switches: GPIO to one side, GND to the other.
 
 void setup() {
   console_ensure();
@@ -42,9 +46,28 @@ void setup() {
 #endif
 
   buttons_begin();
-  hid_keyboard_begin();
+  output_switch_begin();
   chords_begin();
+  config_server_set_output_mode(output_switch_mode());
   config_server_begin();
+  const OutputMode mode = output_switch_mode();
+  if (output_starts_usb(mode)) {
+    if (!hid_keyboard_begin(OutputMode::Usb)) console_println("USB keyboard failed");
+  } else if (output_starts_ble(mode, config_server_wifi_closed())) {
+    if (!hid_keyboard_begin(OutputMode::Ble)) console_println("BLE keyboard failed");
+  } else {
+    console_println("BLE held, AP only");
+  }
+}
+
+static void restart_for_switch() {
+  const bool output = output_switch_restart_requested();
+  const bool wifi = config_server_restart_requested();
+  if (!output && !wifi) return;
+  hid_keyboard_silence();
+  console_println(output ? "output switch restart" : "wifi switch restart");
+  delay(50);
+  esp_restart();
 }
 
 struct CmdPort {
@@ -230,7 +253,9 @@ void loop() {
   const bool timing = !loop_measure_done();
   const uint32_t loop_t0 = timing ? micros() : 0;
 #endif
+  output_switch_poll(millis());
   config_server_poll();
+  restart_for_switch();
   const bool ap_up = config_ap_is_up();
   if (ap_up != g_ap_was_up) {
     if (ap_up) {

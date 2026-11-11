@@ -51,6 +51,7 @@
 | 改配列 | 熱點頁不能改。不加指撥開關。 |
 | 裝置種類 | USB HID 鍵盤，不是手把，也不是類比搖桿。格鬥搖桿的按鈕只是開關，韌體仍以鍵盤列舉。 |
 | 按鍵接法 | 14 鍵各接一隻 GPIO 到 GND，內部上拉，按下為 LOW。沒有矩陣、沒有二極體、沒有外加上拉、沒有並在開關上的電容。 |
+| 接腳對應 | 功能看符號，腳號只在 include/pin_map.h。掃描與熱點都查這張表，不在別處寫 GPIO 號碼。新的輸入（例如移動腳）加一列，不放進 14 個和弦位元。 |
 | 掃描與送鍵 | `loop` 不為了打完一串字而停住。配方排成佇列，到點最多送一個 HID report。重複字母（例如 `nn`）不用 `Keyboard.write()`：那會在主機一次 poll 之前把按下與放開都送出，兩下會併成一下。佇列最後一格留給 `release-all`，避免修飾鍵漏到下一組。 |
 | 純邏輯 | `chord_core` 不碰 Arduino、GPIO、檔案、USB。宿主測試 `pio test -e native` 編譯的就是這份。判斷規則要加在這裡，不要只寫進 `chords.cpp`。 |
 | 表的來源 | 唯一可手改的是 `esp32-jis-chordboard-premapping.csv`。機器表與 `include/chord_map.inc` 由腳本產生。出廠表編進韌體，不必上傳 LittleFS 映像。手機存檔 `chords.json` 蓋過出廠表，直到網頁還原出廠。 |

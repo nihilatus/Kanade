@@ -25,6 +25,7 @@
 #include "config_http.h"
 #include "config_job.h"
 #include "console_log.h"
+#include "pin_map.h"
 
 #undef write
 #undef read
@@ -914,7 +915,7 @@ static void service_conn() {
   }
 }
 
-static bool switch_closed_raw() { return digitalRead(kWifiEnablePin) == LOW; }
+static bool switch_closed_raw() { return digitalRead(pin_gpio(PinFn::WifiEnable)) == LOW; }
 
 static void poll_switch() {
   const uint32_t now = millis();
@@ -981,7 +982,7 @@ static void stop_ap() {
 void config_server_begin() {
   console_ensure();
   load_api_token();
-  pinMode(kWifiEnablePin, INPUT_PULLUP);
+  pinMode(pin_gpio(PinFn::WifiEnable), INPUT_PULLUP);
   g_switch_raw = switch_closed_raw();
   g_switch_stable = g_switch_raw;
   g_switch_change_ms = millis();
@@ -994,7 +995,7 @@ void config_server_begin() {
     }
   }
   char line[48];
-  snprintf(line, sizeof(line), "WiFi switch GPIO%d, closed to GND", kWifiEnablePin);
+  snprintf(line, sizeof(line), "WiFi switch GPIO%d, closed to GND", pin_gpio(PinFn::WifiEnable));
   console_println(line);
   if (g_switch_stable) start_ap();
 }
