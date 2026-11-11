@@ -152,6 +152,8 @@ pio device monitor
 
 `platformio.ini` 重點：`ARDUINO_USB_MODE=0`（OTG TinyUSB HID）；`ARDUINO_USB_CDC_ON_BOOT=1` 可選（序列日誌；有干擾可改 `0`）。
 
+韌體若改了活表、USB 送鍵或熱點，燒錄後照 [`docs/device-acceptance.md`](docs/device-acceptance.md) 跑一輪。`pio test -e native` 只覆蓋純邏輯，不能代替這份清單。
+
 ---
 
 ## 現況與待辦
@@ -192,4 +194,5 @@ docs/chord-map-machine.md
 docs/pinout.md
 docs/bom.md
 docs/design-decisions.md  已決定、目前維持的取捨
+docs/device-acceptance.md 實機驗收；大改後照跑，不代替 pio test -e native
 ```
