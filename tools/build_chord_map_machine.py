@@ -107,7 +107,8 @@ def write_firmware_include(rows: list[dict[str, str]]) -> None:
             )
         )
     INC.parent.mkdir(parents=True, exist_ok=True)
-    INC.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    with INC.open("w", encoding="utf-8", newline="\n") as f:
+        f.write("\n".join(lines) + "\n")
 
 
 def sort_keys(keys: set[str]) -> list[str]:
@@ -271,6 +272,7 @@ def main() -> int:
     with OUT.open("w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(
             f,
+            lineterminator="\n",
             fieldnames=[
                 "id",
                 "kana",
@@ -287,7 +289,7 @@ def main() -> int:
     write_firmware_include(rows_out)
 
     report = ROOT / "data" / "chord_map.machine.report.txt"
-    with report.open("w", encoding="utf-8") as f:
+    with report.open("w", encoding="utf-8", newline="\n") as f:
         f.write(f"source: {SRC.name}\n")
         f.write(f"rows_written: {len(rows_out)}\n")
         f.write(f"omitted_empty_kana_and_output: {omitted_empty}\n")

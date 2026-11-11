@@ -55,3 +55,6 @@ jobs:
 
       - name: Build firmware
         run: pio run -e esp32-s3-devkitc-1
+
+      - name: Generated chord table is committed
+        run: git diff --exit-code
