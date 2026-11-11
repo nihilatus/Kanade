@@ -18,8 +18,9 @@
 //
 // Recipes are queued. hid_keyboard_poll() sends at most one report when it
 // is due, so the key scan in loop() keeps running between keystrokes.
-// A busy endpoint leaves that report queued. After the endpoint accepts a
-// report, SendReport can still wait up to its 100 ms timeout.
+// A busy USB endpoint leaves that report queued. After the endpoint accepts a
+// report, SendReport can still wait up to its 100 ms timeout. A rejected BLE
+// notify, or a notification still in flight, also leaves that report queued.
 
 // USB or BLE, chosen by the boot-time output switch. Does not start the other
 // transport. False from a failed BLE start leaves the keyboard not ready.

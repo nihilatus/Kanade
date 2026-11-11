@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include <Arduino.h>
+#include <freertos/task.h>
 #include <BLE2902.h>
 #include <BLEDevice.h>
 #include <BLEHIDDevice.h>
@@ -42,6 +43,14 @@ static std::atomic<bool> g_connected{false};
 static std::atomic<bool> g_subscribed{false};
 static std::atomic<bool> g_drop{false};
 static bool g_started = false;
+// Notifications accepted by NimBLE and not yet reported back by NOTIFY_TX.
+// Bluedroid has no transmit-complete event, so this stays zero there.
+static std::atomic<uint8_t> g_inflight{0};
+// Set to the caller around notify(). The synchronous onStatus runs on that
+// task; NOTIFY_TX runs on the NimBLE host task. A plain flag would hide the
+// completion if it arrived before notify() returned.
+static std::atomic<TaskHandle_t> g_notify_task{nullptr};
+static std::atomic<bool> g_notify_ok{false};
 
 static bool notifications_on() {
   if (!g_connected.load()) return false;
@@ -54,13 +63,38 @@ static bool notifications_on() {
 #endif
 }
 
+static void clear_inflight() { g_inflight.store(0); }
+
+static void release_inflight() {
+  uint8_t cur = g_inflight.load();
+  while (cur > 0 && !g_inflight.compare_exchange_weak(cur, static_cast<uint8_t>(cur - 1))) {
+  }
+}
+
 static void note_subscription(bool now) {
   const bool was = g_subscribed.exchange(now);
-  if (!was && now) console_println("BLE subscribed");
-  if (was && !now) g_drop.store(true);
+  if (was == now) return;
+  clear_inflight();
+  if (now) console_println("BLE subscribed");
+  else g_drop.store(true);
 }
 
 class InputCallbacks : public BLECharacteristicCallbacks {
+  void onStatus(BLECharacteristic *characteristic, Status status, uint32_t code) override {
+    (void)characteristic;
+    (void)code;
+    if (g_notify_task.load() == xTaskGetCurrentTaskHandle()) {
+      g_notify_ok.store(status == BLECharacteristicCallbacks::Status::SUCCESS_NOTIFY);
+      return;
+    }
+#if defined(CONFIG_NIMBLE_ENABLED)
+    // Success or failure: the controller is done with this buffer.
+    (void)status;
+    release_inflight();
+#else
+    (void)status;
+#endif
+  }
 #if defined(CONFIG_NIMBLE_ENABLED)
   void onSubscribe(BLECharacteristic *characteristic, ble_gap_conn_desc *desc, uint16_t subValue) override {
     (void)characteristic;
@@ -80,6 +114,7 @@ class ServerCallbacks : public BLEServerCallbacks {
     (void)server;
     g_connected.store(false);
     g_subscribed.store(false);
+    clear_inflight();
     g_drop.store(true);
     console_println("BLE disconnected");
   }
@@ -117,8 +152,20 @@ static SecurityCallbacks g_security_cb;
 static bool send_report() {
   if (g_input == nullptr || !notifications_on()) return false;
   g_input->setValue(reinterpret_cast<uint8_t *>(&g_report), sizeof(g_report));
+  g_notify_ok.store(false);
+#if defined(CONFIG_NIMBLE_ENABLED)
+  // Count this attempt before notify(). A completion that arrives inside the
+  // call must not be stranded after a later increment.
+  g_inflight.fetch_add(1);
+#endif
+  g_notify_task.store(xTaskGetCurrentTaskHandle());
   g_input->notify();
-  return true;
+  g_notify_task.store(nullptr);
+  if (g_notify_ok.load()) return true;
+#if defined(CONFIG_NIMBLE_ENABLED)
+  release_inflight();
+#endif
+  return false;
 }
 
 static bool press_raw(uint8_t k) {
@@ -141,15 +188,17 @@ static bool press_raw(uint8_t k) {
           break;
         }
       }
-      if (!placed) return false;
+      // Six slots are full. Retrying this event would stall the queue.
+      if (!placed) return true;
     }
   } else if (g_report.modifiers == 0) {
-    return false;
+    // No key usage and no modifier. Nothing to put on the air.
+    return true;
   }
   return send_report();
 }
 
-static void press_ascii(uint8_t k) {
+static bool press_ascii(uint8_t k) {
   if (k >= 0x88) {
     k = static_cast<uint8_t>(k - 0x88);
   } else if (k >= 0x80) {
@@ -157,7 +206,7 @@ static void press_ascii(uint8_t k) {
     k = 0;
   } else {
     k = kLayoutJis.ascii[k];
-    if (k == 0) return;
+    if (k == 0) return true;
     if ((k & kShiftBit) != 0) {
       g_report.modifiers = static_cast<uint8_t>(g_report.modifiers | kLeftShiftMod);
       k = static_cast<uint8_t>(k & static_cast<uint8_t>(~kShiftBit));
@@ -168,20 +217,29 @@ static void press_ascii(uint8_t k) {
     }
     if (k == kIsoReplacement) k = kIsoKey;
   }
-  press_raw(k);
+  return press_raw(k);
 }
 
 bool hid_ble_ready() { return g_started && notifications_on(); }
 
+bool hid_ble_can_send() {
+  if (!notifications_on()) return false;
+#if defined(CONFIG_NIMBLE_ENABLED)
+  return g_inflight.load() == 0;
+#else
+  return true;
+#endif
+}
+
 bool hid_ble_take_drop() { return g_drop.exchange(false); }
 
-void hid_ble_press(uint8_t code) { press_ascii(code); }
+bool hid_ble_press(uint8_t code) { return press_ascii(code); }
 
-void hid_ble_press_raw(uint8_t code) { press_raw(code); }
+bool hid_ble_press_raw(uint8_t code) { return press_raw(code); }
 
-void hid_ble_release_all() {
+bool hid_ble_release_all() {
   memset(&g_report, 0, sizeof(g_report));
-  send_report();
+  return send_report();
 }
 
 bool hid_ble_begin() {

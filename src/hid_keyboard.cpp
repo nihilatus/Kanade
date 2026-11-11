@@ -96,19 +96,17 @@ static bool take_slot(HidOp op, uint8_t code, uint8_t gap, size_t *added, const 
   return true;
 }
 
-static void send_event(const HidEvent &event) {
-  if (!hid_keyboard_ready()) return;
+static bool send_event(const HidEvent &event) {
+  if (!hid_keyboard_ready()) return false;
   switch (event.op) {
     case HidOp::ReleaseAll:
-      hid_link_release_all();
-      break;
+      return hid_link_release_all();
     case HidOp::Press:
-      hid_link_press(event.code);
-      break;
+      return hid_link_press(event.code);
     case HidOp::PressRaw:
-      hid_link_press_raw(event.code);
-      break;
+      return hid_link_press_raw(event.code);
   }
+  return false;
 }
 
 // Peak time spent inside one send, printed every 5 s while keys are going out.
@@ -154,14 +152,16 @@ void hid_keyboard_poll() {
   if (g_count == 0) return;
   const uint32_t now = millis();
   if (g_hold && static_cast<int32_t>(now - g_next_ms) < 0) return;
-  // Endpoint or subscription cannot take this report yet. Leave it queued.
+  // Endpoint busy, notification still in flight, or not subscribed.
+  // Leave this report queued.
   if (!hid_link_can_send()) return;
 
   const uint32_t t0 = micros();
   const HidEvent event = g_queue[g_head];
+  // Stack did not take the report. Keep it at the head and retry.
+  if (!send_event(event)) return;
   g_head = (g_head + 1) % kQueueCap;
   g_count--;
-  send_event(event);
   const uint32_t elapsed = micros() - t0;
   g_next_ms = now + event.gap_after_ms;
   g_hold = true;

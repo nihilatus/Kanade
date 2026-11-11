@@ -14,10 +14,14 @@
 // closed boot sample. An open sample starts USB and returns true.
 bool hid_link_begin(OutputMode mode);
 bool hid_link_ready();
-// USB: the HID endpoint can take another report. BLE: the host is subscribed.
+// USB: the HID endpoint can take another report. BLE: the host is subscribed
+// and the previous notification has been handed to the controller.
+// Bluedroid has no transmit-complete event, so subscribed is enough there.
 bool hid_link_can_send();
 // BLE disconnect or lost subscription. One-shot. USB always returns false.
 bool hid_link_take_drop();
-void hid_link_press(uint8_t code);
-void hid_link_press_raw(uint8_t code);
-void hid_link_release_all();
+// False when the stack did not take this report. The caller keeps it queued.
+// True when the report was accepted, or when this event has nothing to send.
+bool hid_link_press(uint8_t code);
+bool hid_link_press_raw(uint8_t code);
+bool hid_link_release_all();

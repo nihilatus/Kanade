@@ -71,7 +71,7 @@ bool hid_link_ready() {
 bool hid_link_can_send() {
   if (!hid_link_ready()) return false;
   if (g_mode == OutputMode::Usb) return tud_hid_ready();
-  return true;
+  return hid_ble_can_send();
 }
 
 bool hid_link_take_drop() {
@@ -79,23 +79,30 @@ bool hid_link_take_drop() {
   return hid_ble_take_drop();
 }
 
-void hid_link_press(uint8_t code) {
-  if (!hid_link_ready()) return;
-  if (g_mode == OutputMode::Usb) usb_keys().press(code);
-  else hid_ble_press(code);
-}
-
-void hid_link_press_raw(uint8_t code) {
-  if (!hid_link_ready()) return;
-  if (g_mode == OutputMode::Usb) usb_keys().pressRaw(code);
-  else hid_ble_press_raw(code);
-}
-
-void hid_link_release_all() {
-  if (!g_begun) return;
+bool hid_link_press(uint8_t code) {
+  if (!hid_link_ready()) return false;
   if (g_mode == OutputMode::Usb) {
-    if (hid_link_ready()) usb_keys().releaseAll();
-    return;
+    usb_keys().press(code);
+    return true;
   }
-  hid_ble_release_all();
+  return hid_ble_press(code);
+}
+
+bool hid_link_press_raw(uint8_t code) {
+  if (!hid_link_ready()) return false;
+  if (g_mode == OutputMode::Usb) {
+    usb_keys().pressRaw(code);
+    return true;
+  }
+  return hid_ble_press_raw(code);
+}
+
+bool hid_link_release_all() {
+  if (!g_begun) return false;
+  if (g_mode == OutputMode::Usb) {
+    if (!hid_link_ready()) return false;
+    usb_keys().releaseAll();
+    return true;
+  }
+  return hid_ble_release_all();
 }
