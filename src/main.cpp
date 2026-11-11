@@ -18,7 +18,7 @@
 #include <WiFi.h>
 #endif
 
-// ESP32-S3-DevKitC-1 N16R8 — USB HID chord keyboard.
+// Kanade on ESP32-S3-DevKitC-1 N16R8 — USB HID chord keyboard.
 // Plug the PC into the board port labeled USB (OTG), not UART.
 // Each switch: GPIO to one side, GND to the other. Pressed = LOW.
 
@@ -27,7 +27,7 @@ void setup() {
 #if ARDUINO_USB_CDC_ON_BOOT
   delay(200);
   Serial.println();
-  Serial.println(F("esp32-jis-keyboard"));
+  Serial.println(F("Kanade"));
   Serial.print(F("14 direct keys, active-low, "));
   Serial.print(kChordDebounceMs);
   Serial.println(F(" ms debounce"));

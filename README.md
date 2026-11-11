@@ -1,10 +1,12 @@
-# ESP32-S3 JIS 和弦鍵盤（14 鍵）
+# Kanade
 
-實體離散按鍵 → ESP32 和弦引擎 → USB HID JIS 鍵盤 → PC 日文 IME。
+日文輸入用的和絃鍵盤。名字取自日文「奏」。
 
-硬體適配器：把 14 顆實體鍵解讀成和弦，在 MCU 上產出羅馬字／鍵位。主機必須把鍵盤類型設成日文 106/109，再啟用日文 IME（羅馬字）。與同系列 Python 專案 `joystick writer` 分開。韌體依 14 鍵和弦表送出羅馬字與快捷鍵配方。
+實體離散按鍵 → ESP32 和弦引擎 → USB HID 鍵盤 → PC 日文 IME。
 
-遠端倉庫（公開）：https://github.com/nihilatus/esp32-jis-keyboard
+硬體適配器：把 14 顆實體鍵解讀成和弦，在 MCU 上產出羅馬字／鍵位。主機必須把鍵盤類型設成日文 106/109，再啟用日文 IME（羅馬字）。與同系列 Python 專案 `joystick writer` 分開。韌體依 14 鍵和弦表送出羅馬字與快捷鍵配方。板子是 ESP32-S3。
+
+遠端倉庫（公開）：https://github.com/nihilatus/Kanade
 
 ---
 

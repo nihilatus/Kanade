@@ -1,4 +1,4 @@
-# ESP32-S3 JIS 和弦鍵盤 — 14 鍵直連腳位
+# Kanade — 14 鍵直連腳位
 
 韌體是 **USB HID 鍵盤**（和弦 → 羅馬字／快捷鍵配方）。  
 實體輸入是 **14 顆開關各接一隻 GPIO**，沒有矩陣、沒有二極體。
@@ -79,7 +79,7 @@ GPIO3 刻意空下（strapping）。順序與和弦表的鍵名順序相同：`L
 
 | 項目 | 值 |
 | --- | --- |
-| 熱點名稱 | `include/secrets.h` 的 `WIFI_AP_SSID`，範本是 `JIS-Chord` |
+| 熱點名稱 | `include/secrets.h` 的 `WIFI_AP_SSID`，範本是 `Kanade` |
 | 密碼 | 本機 `include/secrets.h` 的 `WIFI_AP_PASSWORD`，不進 git |
 | 開關 | GPIO15 接到 GND 才開；沒接就關 |
 | 網頁 | http://192.168.4.1/ |

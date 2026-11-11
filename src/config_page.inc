@@ -4,7 +4,7 @@ R"HTML(
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>JIS 和弦</title>
+<title>Kanade</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -75,7 +75,7 @@ R"HTML(
 <body>
 <div class="wrap">
   <header>
-    <h1>JIS 和弦</h1>
+    <h1>Kanade</h1>
     <p class="hint">假名列填羅馬字。符號與操作列從清單選鍵。必＝一定要按。可＝可有可無。同一顆不能兩個都勾。假名只供辨識。output 空白表示這列不送鍵。</p>
     <div class="actions">
       <button id="fire-release" type="button">全放再送</button>

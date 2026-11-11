@@ -114,8 +114,8 @@ extern "C" void test_api_token_action_and_hex(void) {
 
 extern "C" void test_ap_credentials(void) {
   const char *placeholder = "replace-with-8-or-more-chars";
-  TEST_ASSERT_FALSE(ap_credentials_ok("JIS-Chord", placeholder, placeholder));
-  TEST_ASSERT_FALSE(ap_credentials_ok("JIS-Chord", "short", placeholder));
+  TEST_ASSERT_FALSE(ap_credentials_ok("Kanade", placeholder, placeholder));
+  TEST_ASSERT_FALSE(ap_credentials_ok("Kanade", "short", placeholder));
   TEST_ASSERT_FALSE(ap_credentials_ok("", "12345678", placeholder));
   char long_ssid[34];
   memset(long_ssid, 'a', 33);
@@ -124,8 +124,8 @@ extern "C" void test_ap_credentials(void) {
   char long_pass[65];
   memset(long_pass, 'b', 64);
   long_pass[64] = '\0';
-  TEST_ASSERT_FALSE(ap_credentials_ok("JIS-Chord", long_pass, placeholder));
-  TEST_ASSERT_TRUE(ap_credentials_ok("JIS-Chord", "12345678", placeholder));
+  TEST_ASSERT_FALSE(ap_credentials_ok("Kanade", long_pass, placeholder));
+  TEST_ASSERT_TRUE(ap_credentials_ok("Kanade", "12345678", placeholder));
 }
 
 int main(int argc, char **argv) {

@@ -36,7 +36,7 @@
 #endif
 
 #ifndef WIFI_AP_SSID
-#define WIFI_AP_SSID "JIS-Chord"
+#define WIFI_AP_SSID "Kanade"
 #endif
 #ifndef WIFI_AP_PASSWORD
 #define WIFI_AP_PASSWORD "replace-with-8-or-more-chars"

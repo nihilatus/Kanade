@@ -57,9 +57,9 @@ void hid_keyboard_begin() {
   // The stock keyboard descriptor already declares usages 0–255.
   USB.VID(0x303A);  // Espressif
   USB.PID(0x4004);  // local prototype — change before shipping
-  USB.productName("ESP32 JIS Chord KB");
-  USB.manufacturerName("JoystickWriter Lab");
-  USB.serialNumber("jis-kb-proto-1");
+  USB.productName("Kanade");
+  USB.manufacturerName("Kanade");
+  USB.serialNumber("kanade-1");
 
   Keyboard.begin(KeyboardLayout_ja_JP);
   USB.begin();
