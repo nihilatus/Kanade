@@ -928,7 +928,7 @@ static void poll_switch() {
     g_switch_raw = closed;
     g_switch_change_ms = now;
   }
-  if ((now - g_switch_change_ms) >= kWifiSwitchDebounceMs && g_switch_stable != g_switch_raw) {
+  if ((now - g_switch_change_ms) >= kSwitchDebounceMs && g_switch_stable != g_switch_raw) {
     g_switch_stable = g_switch_raw;
     if (!g_switch_stable) g_start_failed = false;
   }

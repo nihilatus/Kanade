@@ -5,7 +5,7 @@
 #include "output_policy.h"
 
 // GPIO16, INPUT_PULLUP, closed to GND. The boot level is the mode until restart.
-// output_switch_poll debounces with kWifiSwitchDebounceMs. A stable level that
+// output_switch_poll debounces with kSwitchDebounceMs. A stable level that
 // differs from boot makes output_switch_restart_requested() true; the caller
 // releases keys and restarts. The mode is not written to NVS or LittleFS.
 

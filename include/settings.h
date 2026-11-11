@@ -116,10 +116,12 @@ constexpr bool settings_origin_matches_ip() {
 }
 static_assert(settings_origin_matches_ip(), "kConfigOrigin must be http:// plus kApIp");
 
-// Longer than key debounce so a contact bounce does not flap the radio.
-static constexpr uint32_t kWifiSwitchDebounceMs = 50;
-static_assert(kWifiSwitchDebounceMs > kChordDebounceMs,
-              "wifi switch debounce must outlast a key bounce");
+// Shared by the Wi-Fi switch and the output switch.
+// Longer than key debounce so a contact bounce does not flap the radio
+// or request an output-mode restart.
+static constexpr uint32_t kSwitchDebounceMs = 50;
+static_assert(kSwitchDebounceMs > kChordDebounceMs,
+              "switch debounce must outlast a key bounce");
 // Bytes moved on one config_server_poll. A slow client must not delay
 // noticing the switch open for a whole bounce window.
 static constexpr size_t kHttpSlice = 512;

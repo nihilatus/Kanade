@@ -36,7 +36,7 @@ void output_switch_poll(uint32_t now_ms) {
     g_raw = closed;
     g_change_ms = now_ms;
   }
-  if ((now_ms - g_change_ms) >= kWifiSwitchDebounceMs && g_stable != g_raw) {
+  if ((now_ms - g_change_ms) >= kSwitchDebounceMs && g_stable != g_raw) {
     g_stable = g_raw;
   }
 }

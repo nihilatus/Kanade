@@ -25,7 +25,7 @@
 - 開關只接 GPIO 與 GND。不要接到 5 V、VIN 或其他電源腳。
 - 麵包板杜邦線盡量短於約 30 cm。
 
-14 顆和弦鍵每一腳要連續穩定 `kChordDebounceMs`（`include/settings.h`）才承認按下或放開。何時送出一組和弦見 [`chord-map-machine.md`](chord-map-machine.md)。熱點開關是 `include/pin_map.h` 的 `PinFn::WifiEnable`，另外用 `kWifiSwitchDebounceMs`，見下方。
+14 顆和弦鍵每一腳要連續穩定 `kChordDebounceMs`（`include/settings.h`）才承認按下或放開。何時送出一組和弦見 [`chord-map-machine.md`](chord-map-machine.md)。熱點開關是 `include/pin_map.h` 的 `PinFn::WifiEnable`，和輸出開關共用 `kSwitchDebounceMs`，見下方。
 
 ## 不可使用的腳
 
@@ -61,7 +61,7 @@ GPIO3 刻意空下（strapping）。順序與和弦表的鍵名順序相同：`L
 | 腳位 | **GPIO15**（不屬於上面 14 個和弦鍵，不會進和弦遮罩） |
 | 接法 | 一端接 GPIO15，另一端接 GND。`INPUT_PULLUP`，導通為 LOW |
 | 極性 | 導通 = 開熱點；沒接或開路 = 關熱點 |
-| 時機 | USB 模式運行中撥動就開關，不用重開機。藍牙模式見下方輸出開關：熱點要開或關都會重啟。穩態要連續 `kWifiSwitchDebounceMs`（`include/settings.h`）才承認，避免彈一下就把無線電開關一次 |
+| 時機 | USB 模式運行中撥動就開關，不用重開機。藍牙模式見下方輸出開關：熱點要開或關都會重啟。穩態要連續 `kSwitchDebounceMs`（`include/settings.h`）才承認，避免彈一下就把無線電開關一次 |
 
 上電時若 GPIO15 是開路，熱點不會自己出現。以前是密碼有效就上電開熱點；現在要這顆開關合上才開。熱點開著時不讀和弦鍵、不送鍵。USB 模式熱點關掉時，掃描與 USB HID 照常，不重啟。開關合上但熱點沒起來（密碼沒設）時，USB 模式鍵盤繼續；藍牙模式仍然不啟動藍牙。
 
@@ -72,7 +72,7 @@ GPIO3 刻意空下（strapping）。順序與和弦表的鍵名順序相同：`L
 | 腳位 | **GPIO16**（不屬於 14 個和弦鍵，也不進和弦遮罩） |
 | 接法 | 一端接 GPIO16，另一端接 GND。`INPUT_PULLUP`，導通為 LOW |
 | 極性 | 沒接或開路 = USB 有線鍵盤。導通 = BLE 鍵盤。開路讀到的是 HIGH |
-| 時機 | 開機讀一次。之後穩態和開機不同，先放開按鍵再重啟。消彈跳同 `kWifiSwitchDebounceMs` |
+| 時機 | 開機讀一次。之後穩態和開機不同，先放開按鍵再重啟。穩態要連續 `kSwitchDebounceMs`（`include/settings.h`）才承認 |
 
 一次只送一種鍵盤。這塊板是 ESP32-S3，藍牙是 BLE HID，沒有經典藍牙。模式不寫進 NVS，也不寫進 LittleFS。
 
