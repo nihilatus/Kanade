@@ -25,7 +25,7 @@
 - 開關只接 GPIO 與 GND。不要接到 5 V、VIN 或其他電源腳。
 - 麵包板杜邦線盡量短於約 30 cm。
 
-14 顆和弦鍵每一腳要連續穩定 `kChordDebounceMs`（`include/settings.h`）才承認按下或放開。何時送出一組和弦見 [`chord-map-machine.md`](chord-map-machine.md)。熱點開關、輸出開關、送出時機開關都在 `include/pin_map.h`，前兩顆和送出時機共用 `kSwitchDebounceMs`，見下方。
+14 顆和弦鍵每一腳要連續穩定 `kChordDebounceMs`（`include/settings.h`）才承認按下或放開。何時送出一組和弦見 [`chord-map-machine.md`](chord-map-machine.md)。熱點開關、輸出開關、送出時機開關都在 `include/pin_map.h`，前兩顆和送出時機共用 `kSwitchDebounceMs`，見下方。有幾顆行為開關、開路與導通各代表什麼、撥動後會不會重啟，見 `include/mode_switches.h`。
 
 ## 不可使用的腳
 

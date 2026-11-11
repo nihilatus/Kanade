@@ -56,7 +56,7 @@ curl.exe -s -H "Content-Type: application/json" --data-binary @table-a.json http
 
 - [ ] **1. 開機**
 
-  按 EN 重開，看 UART。沒有非預期的 `LittleFS 掛載失敗，格式化一次`。沒存檔印 `chords: factory table (N rows)`；有存檔印 `chords: loaded N rows from /chords.json`。送出模式那一行有印出。序列埠輸入 `fire` 再換行，回 `fire release` 或 `fire first`，與開機那一行一致。
+  按 EN 重開，看 UART。沒有非預期的 `LittleFS 掛載失敗，格式化一次`。沒存檔印 `chords: factory table (N rows)`；有存檔印 `chords: loaded N rows from /chords.json`。送出模式那一行有印出。序列埠輸入 `fire` 再換行，回 `fire release` 或 `fire first`，與開機那一行一致。序列埠輸入 `switches` 再換行，第一行是 `switches 3`。後面三列的腳位與 `open`／`closed` 跟實體開關一致：GPIO15 是熱點，GPIO16 是輸出，GPIO17 是送出時機。
 
 - [ ] **2. 出廠送鍵**
 

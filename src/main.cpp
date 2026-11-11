@@ -12,6 +12,7 @@
 #include "console_log.h"
 #include "fire_switch.h"
 #include "hid_keyboard.h"
+#include "mode_switches.h"
 #include "output_policy.h"
 #include "output_switch.h"
 
@@ -59,6 +60,44 @@ void setup() {
     if (!hid_keyboard_begin(OutputMode::Ble)) console_println("BLE keyboard failed");
   } else {
     console_println("BLE held, AP only");
+  }
+}
+
+static bool mode_switch_level_closed(ModeSwitch id) {
+  switch (id) {
+    case ModeSwitch::Wifi:
+      return config_server_wifi_closed();
+    case ModeSwitch::Output:
+      return output_switch_closed();
+    case ModeSwitch::Fire:
+      return fire_switch_mode() == ChordFireMode::FirstUp;
+    case ModeSwitch::Count:
+      break;
+  }
+  return false;
+}
+
+static void print_switches() {
+  char line[72];
+  snprintf(line, sizeof(line), "switches %d", kModeSwitchCount);
+  console_println(line);
+  const OutputMode boot = output_switch_mode();
+  for (int i = 0; i < kModeSwitchCount; ++i) {
+    const ModeSwitchDesc &row = kModeSwitches[i];
+    const bool closed = mode_switch_level_closed(row.id);
+    const char *label = closed ? row.closed_label : row.open_label;
+    if (row.id == ModeSwitch::Output) {
+      label = boot == OutputMode::Ble ? row.closed_label : row.open_label;
+    }
+    const char *edge = mode_switch_restarts(row.change, boot) ? "restart" : "live";
+    if (row.id == ModeSwitch::Wifi) {
+      snprintf(line, sizeof(line), "%s GPIO%d %s %s %s %s", row.key, pin_gpio(row.pin),
+               closed ? "closed" : "open", label, config_ap_is_up() ? "AP" : "AP down", edge);
+    } else {
+      snprintf(line, sizeof(line), "%s GPIO%d %s %s %s", row.key, pin_gpio(row.pin),
+               closed ? "closed" : "open", label, edge);
+    }
+    console_println(line);
   }
 }
 
@@ -196,6 +235,15 @@ static void poll_fire_cmd(CmdPort &port) {
       while (n > 0 && (rest[n - 1] == ' ' || rest[n - 1] == '\t')) rest[--n] = '\0';
       if (rest[0] != '\0') continue;
       dump_button_trace();
+      continue;
+    }
+    if (strncmp(arg, "switches", 8) == 0 && (arg[8] == '\0' || arg[8] == ' ' || arg[8] == '\t')) {
+      char *rest = arg + 8;
+      while (*rest == ' ' || *rest == '\t') ++rest;
+      size_t n = strlen(rest);
+      while (n > 0 && (rest[n - 1] == ' ' || rest[n - 1] == '\t')) rest[--n] = '\0';
+      if (rest[0] != '\0') continue;
+      print_switches();
       continue;
     }
     if (strncmp(arg, "fire", 4) != 0) continue;

@@ -66,9 +66,9 @@ GPIO16 開路時選 USB，接地時選 BLE；開機只啟用一種輸出。韌�
 | `src/hid_link.cpp`、`src/hid_ble.cpp` | 共用 USB／BLE 輸出介面與 BLE HID 傳送 |
 | `src/output_switch.cpp` | 開機讀取 GPIO16，選擇 USB 或 BLE；執行中切換需重啟 |
 | `src/config_server.cpp` | GPIO15、SoftAP、和弦 JSON API 與手機頁。熱點開著時不掃描、不送鍵 |
-| `src/main.cpp` | `setup`／`loop` 把上面串起來。序列埠指令是 `fire`（送出時機）、`keys`（印目前按鍵）、`drops`（開機後丟掉的配方、略過的 token、主機未就緒次數；UART0 也印）與 `trace`（傾印開機後最近 512 筆 raw 邊緣與穩定遮罩；傾印期間 `loop` 暫停） |
+| `src/main.cpp` | `setup`／`loop` 把上面串起來。序列埠指令是 `switches`（三顆行為開關的檔位與模式）、`fire`（送出時機）、`keys`（印目前按鍵）、`drops`（開機後丟掉的配方、略過的 token、主機未就緒次數；UART0 也印）與 `trace`（傾印開機後最近 512 筆 raw 邊緣與穩定遮罩；傾印期間 `loop` 暫停） |
 | `web/index.html` | 用電腦鍵盤試打。讀機器表，不燒錄、不送 USB HID |
-| `test/test_chord_core` | 和弦判斷、高峰、送出時機、配方。`pio test -e native` 也編譯設定模組，並執行 `test_config_http`、`test_config_job`、`test_output_policy`、`test_pin_map` |
+| `test/test_chord_core` | 和弦判斷、高峰、送出時機、配方。`pio test -e native` 也編譯設定模組，並執行 `test_config_http`、`test_config_job`、`test_output_policy`、`test_pin_map`、`test_mode_switches` |
 
 手機存檔會蓋過出廠表，直到網頁上還原出廠。送出時機寫在 NVS，與和弦表分開。試打頁的開關只存在那個瀏覽器。
 
@@ -208,6 +208,7 @@ src/output_switch.cpp     GPIO16 開機輸出選擇
 src/fire_switch.cpp       GPIO17 送出時機，運行中切換
 src/config_server.cpp     GPIO15 熱點與手機設定頁
 include/pin_map.h         和弦鍵、熱點、輸出開關與送出時機腳位
+include/mode_switches.h   行為開關的顆數、開路／導通意思與切換後果
 include/output_policy.h   USB／BLE／熱點啟動判斷
 include/chord_map.inc     出廠表，由機器表產生，勿手改
 include/secrets.h         本機熱點密碼，不進 git
@@ -225,6 +226,7 @@ test/test_config_http     設定頁 HTTP 請求檢查
 test/test_config_job      熱點工作在掃描之外的狀態
 test/test_output_policy   開機輸出與熱點政策
 test/test_pin_map         腳位表與和弦鍵位元對應
+test/test_mode_switches   行為開關清單與重啟顯示
 wasm/chord_api.cpp        試打頁用的匯出，PlatformIO 不編譯
 wasm/emsdk-version.txt    編成 wasm 的 emsdk 版本
 web/chord_core.wasm       試打頁載入的判讀模組

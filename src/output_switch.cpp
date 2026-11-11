@@ -55,6 +55,8 @@ void output_switch_begin() {
 
 OutputMode output_switch_mode() { return output_mode_from_closed(g_boot_closed); }
 
+bool output_switch_closed() { return g_stable; }
+
 void output_switch_poll(uint32_t now_ms) {
   const bool closed = closed_raw();
   if (closed != g_raw) {

@@ -17,5 +17,8 @@
 bool output_switch_boot_closed();
 void output_switch_begin();
 OutputMode output_switch_mode();
+// Debounced level. This can differ from output_switch_mode() in the loop
+// that notices the change, before the caller restarts. Closed to GND is true.
+bool output_switch_closed();
 void output_switch_poll(uint32_t now_ms);
 bool output_switch_restart_requested();
