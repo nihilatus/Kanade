@@ -17,3 +17,6 @@ include/secrets.h
 
 # Retired 32-key notes and tables. Not part of the current keyboard.
 docs/archive/
+
+# Local notes, not part of the firmware.
+docs/google_japaness_input/
