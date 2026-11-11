@@ -3,13 +3,14 @@
 #include <Arduino.h>
 
 // Native USB HID keyboard (6KRO boot-protocol style via Arduino USBHIDKeyboard).
-// ASCII uses the JIS layout. Romaji letters match a US keyboard; '[' and ']'
-// do not. The PC Japanese IME converts romaji. Henkan, Muhenkan, and Kana
-// are raw usages inside the stock descriptor (usages 0–255). Windows maps
-// those once its keyboard type is Japanese 106/109. Eisuu (LANG2, 0x91) is
-// the macOS 英数 key; Windows often ignores it. The USB country code stays
-// unset; it does not select that layout. Product
-// presents as a keyboard — not a gamepad.
+// ASCII uses the active HostLayout. Only JIS is implemented. Romaji letters
+// match a US keyboard; '[' and ']' do not. The PC Japanese IME converts
+// romaji. Henkan, Muhenkan, and Kana are raw usages inside the stock
+// descriptor (usages 0–255). Windows maps those once its keyboard type
+// matches Kanade's layout. Eisuu (LANG2, 0x91) is the macOS 英数 key;
+// Windows often ignores it. The USB country code stays unset; it does not
+// select that layout. Set the host keyboard type to Kanade's layout.
+// Product presents as a keyboard — not a gamepad.
 //
 // Recipes are queued. hid_keyboard_poll() sends at most one report when it
 // is due, so the key scan in loop() keeps running between keystrokes.
@@ -20,7 +21,7 @@ void hid_keyboard_begin();
 bool hid_keyboard_ready();
 void hid_keyboard_poll();
 
-// Type an ASCII/romaji string (a–z, space, punctuation the JIS layout maps).
+// Type an ASCII/romaji string (a–z, space, punctuation the active layout maps).
 // Each character is its own press report, a gap, then release. Keyboard.write()
 // would send both reports before a ~10 ms host poll, so a repeat such as "nn"
 // can collapse into one key. A byte at 0x80 or above is refused: Keyboard.press()

@@ -1,4 +1,5 @@
 #include "chord_core.h"
+#include "host_layout.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1714,6 +1715,82 @@ extern "C" void test_each_csv_output_parses(void) {
   }
 }
 
+static void assert_fold(unsigned char ascii, uint8_t usage, bool shift) {
+  const LayoutFold fold = layout_fold_ascii(&kLayoutJis, ascii);
+  char msg[32];
+  snprintf(msg, sizeof(msg), "fold %c", ascii);
+  TEST_ASSERT_TRUE_MESSAGE(fold.present, msg);
+  TEST_ASSERT_EQUAL_UINT8_MESSAGE(usage, fold.usage, msg);
+  if (shift) TEST_ASSERT_TRUE_MESSAGE(fold.shift, msg);
+  else TEST_ASSERT_FALSE_MESSAGE(fold.shift, msg);
+}
+
+static void assert_same_events(const HostLayout *layout, const char *recipe) {
+  ChordRecipe parsed;
+  TEST_ASSERT_TRUE_MESSAGE(chord_parse_recipe(recipe, &parsed), recipe);
+  ChordEvent out[kChordRecipeCap];
+  size_t count = 0;
+  TEST_ASSERT_TRUE_MESSAGE(layout_apply(layout, parsed.events, parsed.count, out, kChordRecipeCap, &count),
+                           recipe);
+  TEST_ASSERT_EQUAL_INT_MESSAGE(static_cast<int>(parsed.count), static_cast<int>(count), recipe);
+  for (size_t i = 0; i < count; ++i) {
+    char msg[48];
+    snprintf(msg, sizeof(msg), "%s [%u]", recipe, static_cast<unsigned>(i));
+    TEST_ASSERT_EQUAL_INT_MESSAGE(static_cast<int>(parsed.events[i].op), static_cast<int>(out[i].op), msg);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(static_cast<int>(parsed.events[i].key), static_cast<int>(out[i].key), msg);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(parsed.events[i].code, out[i].code, msg);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(parsed.events[i].gap_after_ms, out[i].gap_after_ms, msg);
+  }
+}
+
+extern "C" void test_jis_layout_fold_and_identity(void) {
+  assert_fold('a', 0x04, false);
+  assert_fold('[', 0x30, false);
+  assert_fold(']', 0x31, false);
+  assert_fold('8', 0x25, false);
+  assert_fold('(', 0x25, true);
+  TEST_ASSERT_EQUAL_INT(0, static_cast<int>(kLayoutJis.usage_count));
+  TEST_ASSERT_EQUAL_INT(0, static_cast<int>(kLayoutJis.combo_count));
+  assert_same_events(&kLayoutJis, "Shift+8");
+  assert_same_events(&kLayoutJis, "Henkan");
+
+  // A filled profile is not shipped. This only checks the rewrite tables are consulted.
+  static const LayoutUsageRewrite usages[] = {{0x8A, 0x35}};
+  static const LayoutComboRewrite combos[] = {{kLayoutModShift, '8', kLayoutModShift, '9'}};
+  HostLayout alt = kLayoutJis;
+  alt.name = "probe";
+  alt.usages = usages;
+  alt.usage_count = 1;
+  alt.combos = combos;
+  alt.combo_count = 1;
+
+  ChordRecipe shift8;
+  TEST_ASSERT_TRUE(chord_parse_recipe("Shift+8", &shift8));
+  ChordEvent shifted[kChordRecipeCap];
+  size_t shifted_count = 0;
+  TEST_ASSERT_TRUE(layout_apply(&alt, shift8.events, shift8.count, shifted, kChordRecipeCap, &shifted_count));
+  ChordRecipe shift9;
+  TEST_ASSERT_TRUE(chord_parse_recipe("Shift+9", &shift9));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(shift9.count), static_cast<int>(shifted_count));
+  for (size_t i = 0; i < shifted_count; ++i) {
+    TEST_ASSERT_EQUAL_INT(static_cast<int>(shift9.events[i].op), static_cast<int>(shifted[i].op));
+    TEST_ASSERT_EQUAL_INT(static_cast<int>(shift9.events[i].key), static_cast<int>(shifted[i].key));
+    TEST_ASSERT_EQUAL_INT(shift9.events[i].code, shifted[i].code);
+    TEST_ASSERT_EQUAL_INT(shift9.events[i].gap_after_ms, shifted[i].gap_after_ms);
+  }
+
+  ChordRecipe henkan;
+  TEST_ASSERT_TRUE(chord_parse_recipe("Henkan", &henkan));
+  ChordEvent raw[kChordRecipeCap];
+  size_t raw_count = 0;
+  TEST_ASSERT_TRUE(layout_apply(&alt, henkan.events, henkan.count, raw, kChordRecipeCap, &raw_count));
+  TEST_ASSERT_EQUAL_INT(2, static_cast<int>(raw_count));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordEvOp::Press), static_cast<int>(raw[0].op));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordKeyKind::Raw), static_cast<int>(raw[0].key));
+  TEST_ASSERT_EQUAL_INT(0x35, raw[0].code);
+  TEST_ASSERT_EQUAL_INT(0x8A, henkan.events[0].code);
+}
+
 int main(int argc, char **argv) {
   (void)argc;
   (void)argv;
@@ -1730,6 +1807,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_different_chord_inside_guard_sends_both);
   RUN_TEST(test_first_up_draining_ignores_presses);
   RUN_TEST(test_recipe_shapes);
+  RUN_TEST(test_jis_layout_fold_and_identity);
   RUN_TEST(test_skip_overflow_is_flagged);
   RUN_TEST(test_recipe_that_does_not_fit_fails);
   RUN_TEST(test_recipe_token_and_cap_bounds);

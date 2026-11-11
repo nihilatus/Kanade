@@ -13,7 +13,7 @@
 | | |
 | --- | --- |
 | 板子 | ESP32-S3-DevKitC-1 N16R8。UART 跑 `pio device monitor`。OTG 接到主機 |
-| 主機 | 鍵盤類型日文 106/109，記事本，日文 IME（羅馬字） |
+| 主機 | 鍵盤類型設成 Kanade 設定的配列。(目前只實作JIS)，記事本，日文 IME（羅馬字） |
 | 熱點 | GPIO15 用維持型開關接到 GND 才開。手機或第二台電腦連上後開 http://192.168.4.1/ |
 | 密碼 | `include/secrets.h`。序列埠只印熱點名稱與網址，不印密碼 |
 
@@ -149,7 +149,7 @@ curl.exe -s -H "Content-Type: application/json" --data-binary @table-a.json http
 
 - [ ] **日文配列**
 
-  出廠表。`LL+RT0+RT2` 是 `[`，`LR+RT0+RT2` 是 `]`，`LT0+LT2+RL` 是 `（`。主機鍵盤類型仍是美式時，這三組會對到美式符號，先改配列再判失敗。
+  出廠表。`LL+RT0+RT2` 是 `[`，`LR+RT0+RT2` 是 `]`，`LT0+LT2+RL` 是 `（`。主機鍵盤類型要與 Kanade 一致（目前是 JIS）。類型仍是美式時，這三組會對到美式符號，先改成同一套再判失敗。
 
 - [ ] **送鍵耗時**
 

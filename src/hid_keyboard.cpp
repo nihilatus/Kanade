@@ -9,6 +9,7 @@
 
 #include "chord_core.h"
 #include "console_log.h"
+#include "host_layout.h"
 
 static USBHIDKeyboard Keyboard;
 static bool g_begun = false;
@@ -46,11 +47,12 @@ static bool g_hold = false;
 static uint32_t g_next_ms = 0;
 
 void hid_keyboard_begin() {
-  // ASCII goes through the JIS map. a–z and the digits share usages with a
-  // US keyboard; the characters this table actually sends that do not are
-  // '[' (0x30) and ']' (0x31). Shift+8 / Shift+9 become （ ） only when the
-  // host keyboard type is Japanese. The USB country code stays unset: it
-  // does not switch Windows to the 106/109 layout.
+  // ASCII goes through the active HostLayout. Only JIS is implemented.
+  // a–z and the digits share usages with a US keyboard; the characters this
+  // table actually sends that do not are '[' (0x30) and ']' (0x31).
+  // Shift+8 / Shift+9 become （ ） when the host keyboard type matches
+  // Kanade's layout. The USB country code stays unset: it does not switch
+  // the host layout. Set the host keyboard type to Kanade's layout.
   // Hankaku (0x35), Henkan (0x8A), Muhenkan (0x8B), and Kana (0x88) are
   // pressRaw usages Windows maps under that keyboard type. Eisuu is LANG2
   // (0x91), which macOS uses for 英数 and Windows often ignores.
@@ -61,7 +63,7 @@ void hid_keyboard_begin() {
   USB.manufacturerName("Kanade");
   USB.serialNumber("kanade-1");
 
-  Keyboard.begin(KeyboardLayout_ja_JP);
+  Keyboard.begin(kLayoutJis.ascii);
   USB.begin();
   g_begun = true;
 }
@@ -263,6 +265,7 @@ static uint8_t press_code(const ChordEvent &event) {
 
 // One buffer for loop(). hid_type_recipe and hid_type_romaji must not be called reentrantly.
 static ChordRecipe g_parsed_recipe;
+static ChordEvent g_folded[kChordRecipeCap];
 static Stroke g_strokes[kChordRecipeCap];
 
 static Stroke stroke_from(const ChordEvent &event) {
@@ -322,12 +325,20 @@ void hid_type_recipe(const char *recipe) {
     return;
   }
 
-  if (parsed.count == 0 && !release_first) {
+  size_t folded_count = 0;
+  if (!layout_apply(&kLayoutJis, parsed.events, parsed.count, g_folded, kChordRecipeCap, &folded_count)) {
+    note_dropped();
+#if ARDUINO_USB_CDC_ON_BOOT
+    Serial.println(F("hid layout rewrite failed, skipped"));
+#endif
+    return;
+  }
+  if (folded_count == 0 && !release_first) {
     g_skip_tokens += static_cast<uint32_t>(parsed.skip_total);
     return;
   }
-  for (size_t i = 0; i < parsed.count; ++i) g_strokes[i] = stroke_from(parsed.events[i]);
-  if (!enqueue_strokes(g_strokes, parsed.count, release_first, "recipe skipped")) return;
+  for (size_t i = 0; i < folded_count; ++i) g_strokes[i] = stroke_from(g_folded[i]);
+  if (!enqueue_strokes(g_strokes, folded_count, release_first, "recipe skipped")) return;
   g_skip_tokens += static_cast<uint32_t>(parsed.skip_total);
 }
 

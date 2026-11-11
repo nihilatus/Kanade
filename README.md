@@ -4,7 +4,7 @@
 
 實體離散按鍵 → ESP32 和弦引擎 → USB HID 鍵盤 → PC 日文 IME。
 
-硬體適配器：把 14 顆實體鍵解讀成和弦，在 MCU 上產出羅馬字／鍵位。主機必須把鍵盤類型設成日文 106/109，再啟用日文 IME（羅馬字）。與同系列 Python 專案 `joystick writer` 分開。韌體依 14 鍵和弦表送出羅馬字與快捷鍵配方。板子是 ESP32-S3。
+硬體適配器：把 14 顆實體鍵解讀成和弦，在 MCU 上產出羅馬字／鍵位。主機必須把鍵盤類型設成 Kanade 設定的配列。(目前只實作JIS)，再啟用日文 IME（羅馬字）。與同系列 Python 專案 `joystick writer` 分開。韌體依 14 鍵和弦表送出羅馬字與快捷鍵配方。板子是 ESP32-S3。
 
 遠端倉庫（公開）：https://github.com/nihilatus/Kanade
 
@@ -17,7 +17,7 @@
 | 角色 | USB HID **鍵盤**（不是手把／不是類比搖桿） |
 | 板子 | ESP32-S3-DevKitC-1 **N16R8** |
 | 輸入 | **14 顆**離散按鍵（無類比 stick） |
-| 輸出 | 羅馬字／快捷鍵配方。主機鍵盤類型必須是日文 106/109，再交日文 IME |
+| 輸出 | 羅馬字／快捷鍵配方。主機鍵盤類型要設成 Kanade 設定的配列。(目前只實作JIS)，再交日文 IME |
 | 現況 | 14 鍵直連採樣、`kChordDebounceMs` 消彈跳；[送出時機](#輸入邏輯) |
 
 ---
@@ -39,12 +39,12 @@
   14 顆 GPIO
     → buttons        去彈跳，得到 14-bit 遮罩
     → chords         交給 chord_core：高峰、送出時機、比對活表
-    → hid_keyboard   配方排隊，到點才送一個 USB HID report
+    → hid_keyboard   配方先經過作用中的 HostLayout（目前是 JIS），再排隊，到點才送一個 USB HID report
   GPIO15
     → config_server  合上才開熱點；只在熱點開著時處理網頁與 JSON
 ```
 
-遮罩的 bit0..13 固定是 `LL LU LR LD LT0 LT1 LT2 RL RU RR RD RT0 RT1 RT2`。PC 收到的是一般鍵盤的羅馬字與少數特殊鍵，日文轉換交給 IME，韌體不做假名轉換。主機鍵盤類型必須設成日文 106/109。字元走 JIS 鍵位：`a`–`z` 與數字的用途碼和美式相同，出廠表裡不同的是 `[`（0x30）和 `]`（0x31）。`Shift+8`／`Shift+9` 在這個版面上才是（）。`Hankaku`、`Muhenkan`、`Henkan`、`Kana` 也要這個版面，Windows 才會當成半角/全角、無変換、変換、ひらがな。USB 國碼不設定，Windows 不會靠它切換版面。
+遮罩的 bit0..13 固定是 `LL LU LR LD LT0 LT1 LT2 RL RU RR RD RT0 RT1 RT2`。PC 收到的是一般鍵盤的羅馬字與少數特殊鍵，日文轉換交給 IME，韌體不做假名轉換。主機鍵盤類型要設成 Kanade 設定的配列。(目前只實作JIS)。字元走作用中的 HostLayout，目前是 JIS：`a`–`z` 與數字的用途碼和美式相同，出廠表裡不同的是 `[`（0x30）和 `]`（0x31）。`Shift+8`／`Shift+9` 在 JIS 上才是（）。`Hankaku`、`Muhenkan`、`Henkan`、`Kana` 也要與 Kanade 同一套配列，Windows 才會當成半角/全角、無変換、変換、ひらがな。USB 國碼不設定，Windows 不會靠它切換版面。
 
 | 模組 | 做什麼 |
 | --- | --- |
@@ -154,7 +154,7 @@ pio run -t upload
 pio device monitor
 ```
 
-燒錄走 **UART**。燒完把資料線改接 **USB（OTG）**，讓 Windows 列舉 HID 鍵盤。主機必須把鍵盤類型設成日文 106/109，再開記事本、啟用日文 IME（羅馬字），然後測按鍵。鍵盤類型仍是美式時，`[`、`]` 和 `Shift+8`／`Shift+9` 會對到美式符號，`Hankaku`、`Muhenkan`、`Henkan`、`Kana` 也不會被當成半角/全角、無変換、変換、ひらがな。沒反應時先看這項設定。`Eisuu`（0x91，LANG2）是 macOS 的英数，Windows 常常沒有反應。
+燒錄走 **UART**。燒完把資料線改接 **USB（OTG）**，讓 Windows 列舉 HID 鍵盤。主機必須把鍵盤類型設成 Kanade 設定的配列。(目前只實作JIS)，再開記事本、啟用日文 IME（羅馬字），然後測按鍵。鍵盤類型仍是美式時，`[`、`]` 和 `Shift+8`／`Shift+9` 會對到美式符號，`Hankaku`、`Muhenkan`、`Henkan`、`Kana` 也不會被當成半角/全角、無変換、変換、ひらがな。沒反應時先看這項設定。`Eisuu`（0x91，LANG2）是 macOS 的英数，Windows 常常沒有反應。
 
 若 OTG HID 佔住埠導致上傳失敗：按住 **BOOT** → 點 **EN/RST** → 放開 BOOT，再於 UART 重試。
 
@@ -171,7 +171,7 @@ pio device monitor
 | PlatformIO + Arduino + TinyUSB HID 鍵盤。描述符用途 0–255，已含 変換（0x8A）、無変換（0x8B）、カタカナひらがな（0x88）；配方裡的 `Henkan` 等走 `pressRaw` | 試作 VID `0x303A`、PID `0x4004`。有別人要用再向 Espressif 申請 PID，見 [設計取捨](docs/design-decisions.md) |
 | 14 鍵直連、每鍵 `kChordDebounceMs` 穩定消彈跳。機器表 `repeat=allow` 的列在高峰穩定 50ms 後送第一下，同一組按住到 400ms 後每 33ms 連發 | — |
 | [送出時機](#輸入邏輯)；手機熱點可改表並存進 LittleFS | 外殼／PCB |
-| 配方送出（羅馬字、`Shift+1`、`Backspace`、`Ctrl+i` 等），ASCII 走 JIS 配列（`KeyboardLayout_ja_JP`）。USB 國碼不設定；一般鍵盤試打頁 | — |
+| 配方送出（羅馬字、`Shift+1`、`Backspace`、`Ctrl+i` 等），ASCII 走作用中的 HostLayout（目前是 JIS）。USB 國碼不設定；一般鍵盤試打頁 | — |
 
 出廠表仍由 `include/chord_map.inc` 編譯進去。改人表後，下一次 `pio run` 會重建機器表，燒錄才會更新出廠內容；手機上儲存的表會蓋過它，直到在網頁還原出廠。
 
@@ -183,7 +183,8 @@ src/main.cpp              把採樣、和弦、HID、熱點串成 loop
 src/buttons.cpp           14 鍵直連與消彈跳
 src/chord_core.cpp        純邏輯，宿主測試也編譯這份
 src/chords.cpp            活表、送出模式、比對後送鍵
-src/hid_keyboard.cpp      配方 → USB HID
+src/host_layout.cpp       主機配列。目前只有 JIS：ASCII 表，以及空的用途碼與組合改寫
+src/hid_keyboard.cpp      配方先套用配列，再送 USB HID
 src/config_server.cpp     GPIO15 熱點與手機設定頁
 include/chord_map.inc     出廠表，由機器表產生，勿手改
 include/secrets.h         本機熱點密碼，不進 git
