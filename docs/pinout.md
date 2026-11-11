@@ -50,6 +50,8 @@
 
 GPIO3 刻意空下（strapping）。順序與和弦表的鍵名順序相同：`LL LU LR LD LT0 LT1 LT2 RL RU RR RD RT0 RT1 RT2`。
 
+還能再接哪些腳、現用腳佔走了哪些以後難補的功能，見 [`gpio-spare.md`](gpio-spare.md)。腳位先維持上表。
+
 ## WiFi 開關
 
 | 項目 | 值 |

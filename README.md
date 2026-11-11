@@ -140,7 +140,7 @@ python tools/build_chord_wasm.py
 | 燒錄／序列 | 接標示 **UART** 的口 |
 | 保留 | **GPIO19 / GPIO20**（USB 資料線，勿當按鍵腳） |
 
-**按鍵數量：14。** 每顆開關一腳接 GPIO、一腳接 GND（內部上拉，按下為 LOW）。另外一顆維持型開關接 **GPIO15** 與 GND，合上才開 Wi-Fi 設定熱點。腳位與零件見 [`docs/pinout.md`](docs/pinout.md)、[`docs/bom.md`](docs/bom.md)。
+**按鍵數量：14。** 每顆開關一腳接 GPIO、一腳接 GND（內部上拉，按下為 LOW）。另外一顆維持型開關接 **GPIO15** 與 GND，合上才開 Wi-Fi 設定熱點。腳位與零件見 [`docs/pinout.md`](docs/pinout.md)、[`docs/bom.md`](docs/bom.md)。空腳、以及現用腳佔走的 ADC／觸控，見 [`docs/gpio-spare.md`](docs/gpio-spare.md)。目前腳位先不改。
 
 ### 建置與燒錄（Windows）
 
@@ -203,6 +203,7 @@ web/chord_core.wasm       試打頁載入的判讀模組
 web/index.html            一般鍵盤試打，讀機器表與 wasm
 docs/chord-map-machine.md
 docs/pinout.md
+docs/gpio-spare.md         空腳與現用腳的能力；腳位先不改
 docs/bom.md
 docs/design-decisions.md  已決定、目前維持的取捨
 docs/device-acceptance.md 實機驗收；大改後照跑，不代替 pio test -e native
