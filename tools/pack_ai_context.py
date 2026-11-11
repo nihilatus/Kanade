@@ -9,7 +9,7 @@ def main():
     zip_filename = f'Kanade_AI_Context_{timestamp}.zip'
 
     exclude_dirs = {'.git', '.pio', '.vscode', 'node_modules', '__pycache__', 'build'}
-    exclude_files = {'secret.h', 'git_history.txt'}
+    exclude_files = {'secrets.h'}
 
     print(f'正在建立 AI 專案上下文壓縮檔: {zip_filename} ...')
 
