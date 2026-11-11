@@ -807,6 +807,11 @@ extern "C" void test_recipe_shapes(void) {
   const ChordEvent ctrl_f1[] = {ev_press(ChordKeyKind::Ctrl, 0, 0),
                                 ev_press(ChordKeyKind::Raw, 0x3A, 12), ev_release(12)};
   expect_events("Ctrl+F1", ctrl_f1, 3);
+  const ChordEvent four_mods[] = {
+      ev_press(ChordKeyKind::Ctrl, 0, 0),  ev_press(ChordKeyKind::Alt, 0, 0),
+      ev_press(ChordKeyKind::Shift, 0, 0), ev_press(ChordKeyKind::Gui, 0, 0),
+      ev_press(ChordKeyKind::Raw, 0x4E, 12), ev_release(12)};
+  expect_events("Ctrl+Alt+Shift+Gui+PageDown", four_mods, 6);
 }
 
 extern "C" void test_skip_overflow_is_flagged(void) {
@@ -822,6 +827,7 @@ extern "C" void test_skip_overflow_is_flagged(void) {
   TEST_ASSERT_TRUE(chord_parse_recipe(recipe, &got));
   TEST_ASSERT_FALSE(got.failed);
   TEST_ASSERT_EQUAL_INT(static_cast<int>(kChordSkipCap), static_cast<int>(got.skip_count));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(kChordSkipCap) + 1, static_cast<int>(got.skip_total));
   TEST_ASSERT_TRUE(got.overflow_skips);
 
   n = 0;
@@ -832,6 +838,7 @@ extern "C" void test_skip_overflow_is_flagged(void) {
   recipe[n] = '\0';
   TEST_ASSERT_TRUE(chord_parse_recipe(recipe, &got));
   TEST_ASSERT_EQUAL_INT(static_cast<int>(kChordSkipCap), static_cast<int>(got.skip_count));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(kChordSkipCap), static_cast<int>(got.skip_total));
   TEST_ASSERT_FALSE(got.overflow_skips);
 }
 
@@ -851,6 +858,7 @@ extern "C" void test_recipe_that_does_not_fit_fails(void) {
   TEST_ASSERT_TRUE(got.failed);
   TEST_ASSERT_EQUAL_INT(0, static_cast<int>(got.count));
   TEST_ASSERT_EQUAL_INT(0, static_cast<int>(got.skip_count));
+  TEST_ASSERT_EQUAL_INT(0, static_cast<int>(got.skip_total));
 
   n = 0;
   // 47 "aa" tokens fill 94 events. Shift+a needs 3 more and does not fit.
@@ -867,6 +875,8 @@ extern "C" void test_recipe_that_does_not_fit_fails(void) {
   TEST_ASSERT_FALSE(chord_parse_recipe(recipe, &got));
   TEST_ASSERT_TRUE(got.failed);
   TEST_ASSERT_EQUAL_INT(0, static_cast<int>(got.count));
+  TEST_ASSERT_EQUAL_INT(0, static_cast<int>(got.skip_count));
+  TEST_ASSERT_EQUAL_INT(0, static_cast<int>(got.skip_total));
 }
 
 extern "C" void test_recipe_token_and_cap_bounds(void) {
@@ -881,22 +891,65 @@ extern "C" void test_recipe_token_and_cap_bounds(void) {
   for (int i = 0; i < 23; ++i) want23[i] = ev_write('a');
   expect_events(plain23, want23, 23);
 
-  char long24[32];
-  memset(long24, 'b', 24);
-  long24[24] = ' ';
-  long24[25] = 'a';
-  long24[26] = '\0';
+  char plain24[28];
+  memset(plain24, 'b', 24);
+  plain24[24] = ' ';
+  plain24[25] = 'a';
+  plain24[26] = '\0';
   ChordRecipe got;
-  TEST_ASSERT_TRUE(chord_parse_recipe(long24, &got));
+  TEST_ASSERT_TRUE(chord_parse_recipe(plain24, &got));
+  TEST_ASSERT_FALSE(got.failed);
+  TEST_ASSERT_FALSE(got.overflow_skips);
+  TEST_ASSERT_EQUAL_INT(0, static_cast<int>(got.skip_count));
+  TEST_ASSERT_EQUAL_INT(0, static_cast<int>(got.skip_total));
+  TEST_ASSERT_EQUAL_INT(25, static_cast<int>(got.count));
+  for (int i = 0; i < 24; ++i) {
+    TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordEvOp::Write), static_cast<int>(got.events[i].op));
+    TEST_ASSERT_EQUAL_INT('b', got.events[i].code);
+  }
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordEvOp::Write), static_cast<int>(got.events[24].op));
+  TEST_ASSERT_EQUAL_INT('a', got.events[24].code);
+
+  char plain63[kChordTokenMax + 1];
+  memset(plain63, 'c', kChordTokenMax);
+  plain63[kChordTokenMax] = '\0';
+  TEST_ASSERT_TRUE(chord_parse_recipe(plain63, &got));
+  TEST_ASSERT_FALSE(got.failed);
+  TEST_ASSERT_EQUAL_INT(0, static_cast<int>(got.skip_count));
+  TEST_ASSERT_EQUAL_INT(0, static_cast<int>(got.skip_total));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(kChordTokenMax), static_cast<int>(got.count));
+  for (size_t i = 0; i < kChordTokenMax; ++i) {
+    TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordEvOp::Write), static_cast<int>(got.events[i].op));
+    TEST_ASSERT_EQUAL_INT('c', got.events[i].code);
+  }
+
+  char long64[kChordTokenMax + 4];
+  memset(long64, 'b', kChordTokenMax + 1);
+  long64[kChordTokenMax + 1] = ' ';
+  long64[kChordTokenMax + 2] = 'a';
+  long64[kChordTokenMax + 3] = '\0';
+  TEST_ASSERT_TRUE(chord_parse_recipe(long64, &got));
   TEST_ASSERT_FALSE(got.failed);
   TEST_ASSERT_FALSE(got.overflow_skips);
   TEST_ASSERT_EQUAL_INT(1, static_cast<int>(got.skip_count));
+  TEST_ASSERT_EQUAL_INT(1, static_cast<int>(got.skip_total));
   TEST_ASSERT_TRUE(got.skips[0].too_long);
-  TEST_ASSERT_EQUAL_INT(24, static_cast<int>(got.skips[0].length));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(kChordTokenMax) + 1, static_cast<int>(got.skips[0].length));
   TEST_ASSERT_EQUAL_STRING("", got.skips[0].text);
   TEST_ASSERT_EQUAL_INT(1, static_cast<int>(got.count));
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordEvOp::Write), static_cast<int>(got.events[0].op));
   TEST_ASSERT_EQUAL_INT('a', got.events[0].code);
+
+  char truncated[32];
+  memset(truncated, '\x7f', 30);
+  truncated[30] = '\0';
+  TEST_ASSERT_TRUE(chord_parse_recipe(truncated, &got));
+  TEST_ASSERT_EQUAL_INT(0, static_cast<int>(got.count));
+  TEST_ASSERT_EQUAL_INT(1, static_cast<int>(got.skip_count));
+  TEST_ASSERT_EQUAL_INT(1, static_cast<int>(got.skip_total));
+  TEST_ASSERT_FALSE(got.skips[0].too_long);
+  TEST_ASSERT_EQUAL_INT(30, static_cast<int>(got.skips[0].length));
+  TEST_ASSERT_EQUAL_INT(23, static_cast<int>(strlen(got.skips[0].text)));
 
   char fit[200];
   size_t n = 0;
@@ -936,6 +989,7 @@ extern "C" void test_recipe_token_and_cap_bounds(void) {
   TEST_ASSERT_FALSE(got.failed);
   TEST_ASSERT_TRUE(got.overflow_skips);
   TEST_ASSERT_EQUAL_INT(static_cast<int>(kChordSkipCap), static_cast<int>(got.skip_count));
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(kChordSkipCap) + 1, static_cast<int>(got.skip_total));
   TEST_ASSERT_FALSE(got.skips[0].too_long);
   TEST_ASSERT_EQUAL_INT(1, static_cast<int>(got.skips[0].length));
   TEST_ASSERT_EQUAL_INT(1, static_cast<int>(got.count));
@@ -1161,6 +1215,11 @@ static bool vector_line_ok(char *line, int line_no) {
   if (got.skip_count != want_skip_count) {
     snprintf(g_error, sizeof(g_error), "line %d %s: skip count %u want %u", line_no, name,
              static_cast<unsigned>(got.skip_count), static_cast<unsigned>(want_skip_count));
+    return false;
+  }
+  if (!want_overflow && got.skip_total != want_skip_count) {
+    snprintf(g_error, sizeof(g_error), "line %d %s: skip total %u want %u", line_no, name,
+             static_cast<unsigned>(got.skip_total), static_cast<unsigned>(want_skip_count));
     return false;
   }
   for (size_t i = 0; i < want_skip_count; ++i) {

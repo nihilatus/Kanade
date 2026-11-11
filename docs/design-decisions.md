@@ -47,7 +47,7 @@
 | 掃描與送鍵 | `loop` 不為了打完一串字而停住。配方排成佇列，到點最多送一個 HID report。重複字母（例如 `nn`）不用 `Keyboard.write()`：那會在主機一次 poll 之前把按下與放開都送出，兩下會併成一下。佇列最後一格留給 `release-all`，避免修飾鍵漏到下一組。 |
 | 純邏輯 | `chord_core` 不碰 Arduino、GPIO、檔案、USB。宿主測試 `pio test -e native` 編譯的就是這份。判斷規則要加在這裡，不要只寫進 `chords.cpp`。 |
 | 表的來源 | 唯一可手改的是 `esp32-jis-chordboard-premapping.csv`。機器表與 `include/chord_map.inc` 由腳本產生。出廠表編進韌體，不必上傳 LittleFS 映像。手機存檔 `chords.json` 蓋過出廠表，直到網頁還原出廠。 |
-| 配方裡認不得的 token | 裝置上略過那個 token，其餘仍送。略過紀錄溢位，或事件緩衝放不下，整份配方不送。出廠表不允許靠略過：建置時認不得的 token 會讓 `pio run` 失敗。 |
+| 配方裡認不得的 token | 裝置上略過那個 token，其餘仍送。略過紀錄溢位時仍送出其餘內容，只少記 token 文字。事件緩衝放不下，整份配方不送。出廠表不允許靠略過：建置時認不得的 token 會讓 `pio run` 失敗。 |
 | 熱點 | 只在 GPIO15 接到 GND 時開 SoftAP，不加入家裡的路由器，沒有 HTTPS。密碼是信任邊界。`WIFI_API_TOKEN` 非空時用那組，不印到序列埠。留空時第一次開機產生 token、寫進 NVS，並只印一次；之後 `/api/*` 都要 `X-Api-Token`。瀏覽器仍要 `Origin` 是 `http://192.168.4.1` 或沒有這個標頭。密碼不印到序列埠，`include/secrets.h` 不進 git。 |
 | 記憶體 | 活表與 JSON DOM 放 PSRAM，把內部 RAM 留給 Wi-Fi。 |
 | 試打頁 | `web/index.html` 用電腦鍵盤試規則，不送 USB HID。作業系統給的按下／放開已經是穩定邊緣，所以不做韌體的 `kChordDebounceMs`。送出時機、比對與連發呼叫由 `chord_core` 編成的 `web/chord_core.wasm`。 |

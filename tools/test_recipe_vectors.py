@@ -77,6 +77,7 @@ def _check_cpp_mirror(recipe) -> list[str]:
     expected = {
         "kChordRecipeCap": recipe.RECIPE_CAP,
         "kChordSkipCap": recipe.SKIP_CAP,
+        "kChordTokenMax": recipe.TOKEN_LIMIT,
         "kChordTapGapMs": recipe.TAP_GAP,
         "kChordGapNone": recipe.GAP_NONE,
     }
@@ -131,6 +132,10 @@ def _check_vectors(recipe) -> list[str]:
             errors.append(
                 f"{where}: skips\n  got  {_show_skips(got_skips)}\n  want {_show_skips(case.skips)}"
             )
+        if not case.overflow and got.skip_total != len(got.skips):
+            errors.append(
+                f"{where}: skip_total {got.skip_total} want {len(got.skips)}"
+            )
     return errors
 
 
@@ -158,8 +163,12 @@ def _check_build_helper(recipe) -> list[str]:
     skipped = recipe.recipe_build_error("Shift+Nope")
     if skipped is None or "Shift+Nope" not in skipped:
         errors.append(f"bad combo was not rejected: {skipped!r}")
-    long_token = recipe.recipe_build_error("b" * 24)
-    if long_token is None or "len 24" not in long_token:
+    if recipe.recipe_build_error("b" * 24) is not None:
+        errors.append("24-byte plain text was rejected")
+    if recipe.recipe_build_error("b" * recipe.TOKEN_LIMIT) is not None:
+        errors.append("token at kChordTokenMax was rejected")
+    long_token = recipe.recipe_build_error("b" * (recipe.TOKEN_LIMIT + 1))
+    if long_token is None or f"len {recipe.TOKEN_LIMIT + 1}" not in long_token:
         errors.append(f"long token was not rejected: {long_token!r}")
     return errors
 

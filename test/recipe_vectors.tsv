@@ -17,6 +17,7 @@ plain-bracket	[	0	0	W:Char:91:12
 plain-tilde	\x7e	0	0	W:Char:126:12	
 plain-backslash	\\	0	0	W:Char:92:12	
 plain-23	aaaaaaaaaaaaaaaaaaaaaaa	0	0	W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12	
+plain-63	aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa	0	0	W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12;W:Char:97:12	
 double-space	a  b	0	0	W:Char:97:12;W:Char:98:12	
 spaced-z-dot	z . z .	0	0	W:Char:122:12;W:Char:46:12;W:Char:122:12;W:Char:46:12	
 z-bracket	z [	0	0	W:Char:122:12;W:Char:91:12	
@@ -58,6 +59,7 @@ combo-gui-a	Gui+a	0	0	P:Gui:0:0;P:Char:97:12;R:Char:0:12
 combo-four-mods	Shift+Ctrl+Alt+Gui+a	0	0	P:Shift:0:0;P:Ctrl:0:0;P:Alt:0:0;P:Gui:0:0;P:Char:97:12;R:Char:0:12	
 combo-four-alt	Alt+Alt+Alt+Alt+a	0	0	P:Alt:0:0;P:Alt:0:0;P:Alt:0:0;P:Alt:0:0;P:Char:97:12;R:Char:0:12	
 combo-ctrl-alt-delete	Ctrl+Alt+Delete	0	0	P:Ctrl:0:0;P:Alt:0:0;P:Raw:76:12;R:Char:0:12	
+combo-four-mods-pagedown	Ctrl+Alt+Shift+Gui+PageDown	0	0	P:Ctrl:0:0;P:Alt:0:0;P:Shift:0:0;P:Gui:0:0;P:Raw:78:12;R:Char:0:12	
 letters-nope	Nope	0	0	W:Char:78:12;W:Char:111:12;W:Char:112:12;W:Char:101:12	
 letters-backspce	Backspce	0	0	W:Char:66:12;W:Char:97:12;W:Char:99:12;W:Char:107:12;W:Char:115:12;W:Char:112:12;W:Char:99:12;W:Char:101:12	
 skip-del	\x7f	0	0		1:0:\x7f
@@ -73,5 +75,5 @@ skip-five-mods	Alt+Alt+Alt+Alt+Alt+a	0	0		21:0:Alt+Alt+Alt+Alt+Alt+a
 skip-then-a	Shift+Nope a	0	0	W:Char:97:12	10:0:Shift+Nope
 skip-shift-backspce	Shift+Backspce	0	0		14:0:Shift+Backspce
 a-then-del	a \x7f	0	0	W:Char:97:12	1:0:\x7f
-too-long-then-a	bbbbbbbbbbbbbbbbbbbbbbbb a	0	0	W:Char:97:12	24:1:
+too-long-then-a	bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb a	0	0	W:Char:97:12	64:1:
 does-not-fit	a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a	1	0		

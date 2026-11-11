@@ -401,6 +401,7 @@ static bool modifier_kind(const char *word, ChordKeyKind *kind) {
 }
 
 static void add_skip(ChordRecipe *out, const char *token, size_t length, bool too_long) {
+  out->skip_total++;
   if (out->skip_count >= kChordSkipCap) {
     out->overflow_skips = true;
     return;
@@ -437,9 +438,9 @@ static bool take_combo(ChordRecipe *out, const char *token) {
   if (strchr(token, '+') == nullptr) return false;
   if (token[0] == '+' && token[1] == '\0') return false;
 
-  char buf[24];
+  char buf[kChordTokenMax + 1];
   const size_t len = strlen(token);
-  if (len == 0 || len >= sizeof(buf)) {
+  if (len == 0 || len > kChordTokenMax) {
     add_skip(out, token, len, true);
     return true;
   }
@@ -550,6 +551,7 @@ bool chord_parse_recipe(const char *recipe, ChordRecipe *out) {
   if (out == nullptr) return false;
   out->count = 0;
   out->skip_count = 0;
+  out->skip_total = 0;
   out->overflow_skips = false;
   out->failed = false;
   if (recipe == nullptr) return false;
@@ -561,7 +563,7 @@ bool chord_parse_recipe(const char *recipe, ChordRecipe *out) {
     const char *start = p;
     while (*p != '\0' && *p != ' ') ++p;
     const size_t len = static_cast<size_t>(p - start);
-    if (len == 0 || len >= 24) {
+    if (len == 0 || len > kChordTokenMax) {
       add_skip(out, nullptr, len, true);
       continue;
     }
@@ -570,7 +572,7 @@ bool chord_parse_recipe(const char *recipe, ChordRecipe *out) {
       out->count = 0;
       return false;
     }
-    char token[24];
+    char token[kChordTokenMax + 1];
     memcpy(token, start, len);
     token[len] = '\0';
     bool abort_recipe = false;

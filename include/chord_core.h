@@ -179,8 +179,12 @@ struct ChordEvent {
 
 static constexpr size_t kChordRecipeCap = 96;
 static constexpr size_t kChordSkipCap = 32;
+// One settings output field. A longer token is a too_long skip, not a send.
+static constexpr size_t kChordTokenMax = 63;
 
 struct ChordSkip {
+  // First 23 bytes of a skipped token. too_long leaves this empty; length
+  // still holds the full token size.
   char text[24];
   size_t length;
   bool too_long;
@@ -190,9 +194,12 @@ struct ChordRecipe {
   ChordEvent events[kChordRecipeCap];
   size_t count;
   ChordSkip skips[kChordSkipCap];
+  // Records stored in skips. Stops at kChordSkipCap.
   size_t skip_count;
-  // Skip storage filled up and later tokens were not recorded. Do not send:
-  // one unknown token is typed around, but missing records would be silent holes.
+  // Every skipped token, including ones whose text was not stored.
+  size_t skip_total;
+  // Skip storage filled up. Later tokens are still skipped and counted.
+  // The stored text is only the log; the rest of the recipe is still sent.
   bool overflow_skips;
   // A token needed more room than the event buffer. Nothing should be sent.
   // count is 0, so walking events sends nothing even if this flag is missed.
@@ -200,8 +207,8 @@ struct ChordRecipe {
 };
 
 // False when recipe or out is null, or when the recipe does not fit (failed,
-// count 0). An unknown token is a skip, not a failure. A token of 24 bytes or
-// more is a too_long skip. The rest of the recipe still parses.
+// count 0). An unknown token is a skip, not a failure. A token longer than
+// kChordTokenMax is a too_long skip. The rest of the recipe still parses.
 // tools/recipe.py matches this. test/recipe_vectors.tsv is the shared oracle,
 // and the chord-map build fails when a factory output would be skipped.
 bool chord_parse_recipe(const char *recipe, ChordRecipe *out);

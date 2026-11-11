@@ -217,6 +217,15 @@ static void log_long_token(size_t len) {
 #endif
 }
 
+static void log_unrecorded_skips(size_t count) {
+#if ARDUINO_USB_CDC_ON_BOOT
+  Serial.print(F("hid skip tokens not logged: "));
+  Serial.println(count);
+#else
+  (void)count;
+#endif
+}
+
 static uint8_t press_code(const ChordEvent &event) {
   switch (event.key) {
     case ChordKeyKind::Char:
@@ -297,27 +306,30 @@ void hid_type_recipe(const char *recipe) {
     if (skip.too_long) log_long_token(skip.length);
     else log_skip(skip.text);
   }
+  if (parsed.overflow_skips) {
+    const size_t stored = parsed.skip_count;
+    const size_t total = parsed.skip_total;
+    log_unrecorded_skips(total > stored ? total - stored : 0);
+  }
   // parsed_ok is already !failed, with count cleared. Name failed here so a
   // partial recipe cannot be queued if that return is missed.
-  // One unknown token stays in skips and the rest is typed. overflow_skips
-  // means a later unknown token was not stored, so the whole recipe is dropped
-  // instead of typed with a hole that was never recorded.
-  if (!parsed_ok || parsed.failed || parsed.overflow_skips) {
+  // Unknown tokens stay skipped and the rest is typed. overflow_skips only
+  // means later skip text was not stored; skip_total still counts those tokens.
+  if (!parsed_ok || parsed.failed) {
     note_dropped();
 #if ARDUINO_USB_CDC_ON_BOOT
-    if (parsed.failed) Serial.println(F("hid recipe too long, skipped"));
-    else Serial.println(F("hid recipe dropped tokens, skipped"));
+    Serial.println(F("hid recipe too long, skipped"));
 #endif
     return;
   }
 
   if (parsed.count == 0 && !release_first) {
-    g_skip_tokens += static_cast<uint32_t>(parsed.skip_count);
+    g_skip_tokens += static_cast<uint32_t>(parsed.skip_total);
     return;
   }
   for (size_t i = 0; i < parsed.count; ++i) g_strokes[i] = stroke_from(parsed.events[i]);
   if (!enqueue_strokes(g_strokes, parsed.count, release_first, "recipe skipped")) return;
-  g_skip_tokens += static_cast<uint32_t>(parsed.skip_count);
+  g_skip_tokens += static_cast<uint32_t>(parsed.skip_total);
 }
 
 void hid_type_romaji(const char *text) {

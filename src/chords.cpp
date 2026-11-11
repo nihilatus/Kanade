@@ -25,6 +25,7 @@ static constexpr size_t kFactoryCount = sizeof(kFactory) / sizeof(kFactory[0]);
 static constexpr size_t kKanaMax = 47;
 static constexpr size_t kOutputMax = 63;
 static constexpr size_t kPoolSize = 30 * 1024;
+static_assert(kOutputMax <= kChordTokenMax, "a saved output must fit in one recipe token");
 
 static_assert(kFactoryCount > 0, "factory chord table is empty");
 static_assert(kFactoryCount <= kChordsMaxRows, "factory chord table exceeds kChordsMaxRows");

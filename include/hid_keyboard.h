@@ -33,9 +33,11 @@ void hid_type_romaji(const char *text);
 //   "+"             the plus character; "Shift++" is Shift and plus
 //   "Backspace"     named HID key (also Space, Enter, Esc, [ESC], arrows)
 //   "Henkan"        raw HID usage (Hankaku, Muhenkan, Kana, Delete, F1–F12, …)
-// An unrecognized token is skipped and the rest is typed. If skip storage
-// overflows, the whole recipe is dropped. hid_print_drops() counts recipes
-// not queued, tokens skipped, and sends refused because the host was not ready.
+// An unrecognized token is skipped and the rest is typed. Skip storage keeps
+// the first kChordSkipCap tokens; further skips are counted and the rest of
+// the recipe is still typed. A token that does not fit in the event buffer
+// drops the whole recipe. hid_print_drops() counts recipes not queued, tokens
+// skipped, and sends refused because the host was not ready.
 // Not reentrant: the parser buffer is owned by this module. Call only from loop().
 // If a previous recipe is still playing, this one is appended after a
 // release-all so a modifier cannot leak into the next chord.

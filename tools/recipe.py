@@ -16,7 +16,8 @@ RECIPE_CAP = 96
 SKIP_CAP = 32
 TAP_GAP = 12
 GAP_NONE = 0
-TOKEN_LIMIT = 24
+TOKEN_LIMIT = 63  # kChordTokenMax; a longer token is a too_long skip
+SKIP_TEXT = 23  # ChordSkip::text[24] stores this many bytes
 
 # src/chord_core.cpp named_key / modifier_kind. tools/test_recipe_vectors.py
 # checks these tables against that file.
@@ -92,6 +93,7 @@ class Parsed:
     skips: list[Skip]
     overflow_skips: bool
     failed: bool
+    skip_total: int
 
 
 def _plain(value: int) -> bool:
@@ -138,6 +140,7 @@ class _Parser:
         self.skips: list[Skip] = []
         self.overflow_skips = False
         self.failed = False
+        self.skip_total = 0
 
     def _put(self, op: str, kind: str, code: int, gap: int) -> bool:
         if len(self.events) >= RECIPE_CAP:
@@ -147,12 +150,13 @@ class _Parser:
         return True
 
     def _add_skip(self, token: bytes | None, length: int, too_long: bool) -> None:
+        self.skip_total += 1
         if len(self.skips) >= SKIP_CAP:
             self.overflow_skips = True
             return
         text = b""
         if not too_long and token is not None:
-            text = token[: TOKEN_LIMIT - 1]
+            text = token[:SKIP_TEXT]
         self.skips.append(Skip(length, too_long, text))
 
     def _take_combo(self, token: bytes) -> bool:
@@ -162,7 +166,7 @@ class _Parser:
         if token == b"+":
             return False
         length = len(token)
-        if length == 0 or length >= TOKEN_LIMIT:
+        if length == 0 or length > TOKEN_LIMIT:
             self._add_skip(token, length, True)
             return True
 
@@ -264,7 +268,7 @@ class _Parser:
             while index < size and recipe[index] != 0x20:
                 index += 1
             length = index - start
-            if length == 0 or length >= TOKEN_LIMIT:
+            if length == 0 or length > TOKEN_LIMIT:
                 self._add_skip(None, length, True)
                 continue
             if len(self.events) >= RECIPE_CAP:
@@ -276,7 +280,9 @@ class _Parser:
                 self.failed = True
                 self.events.clear()
                 break
-        return Parsed(self.events, self.skips, self.overflow_skips, self.failed)
+        return Parsed(
+            self.events, self.skips, self.overflow_skips, self.failed, self.skip_total
+        )
 
 
 def parse_recipe_bytes(recipe: bytes) -> Parsed:
@@ -301,7 +307,7 @@ def recipe_build_error(output: str) -> str | None:
                 shown.append(skip.text.decode("utf-8", "backslashreplace"))
         detail = ", ".join(shown) if shown else "dropped tokens"
         if parsed.overflow_skips:
-            detail += "; further skips were dropped"
+            detail += "; further skip text was not recorded"
         return f"recipe would be skipped on device ({detail}): {output!r}"
     if output and not parsed.events:
         return f"recipe produces no keys: {output!r}"
