@@ -265,7 +265,7 @@ static ChordEvent ev_write(char c) {
   event.op = ChordEvOp::Write;
   event.key = ChordKeyKind::Char;
   event.code = static_cast<uint8_t>(c);
-  event.gap_after_ms = 12;
+  event.gap_after_ms = kChordTapGapMs;
   return event;
 }
 
@@ -380,7 +380,6 @@ extern "C" void test_snapshot_keeps_largest_then_later(void) {
 }
 
 extern "C" void test_release_mode_waits_ten_ms(void) {
-  TEST_ASSERT_EQUAL_INT(10, static_cast<int>(kChordReleaseGuardMs));
   ChordEngine engine;
   chord_engine_reset(&engine);
 
@@ -393,16 +392,17 @@ extern "C" void test_release_mode_waits_ten_ms(void) {
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::Holding), static_cast<int>(engine.phase));
   TEST_ASSERT_EQUAL_UINT16(0x0001, engine.peak.mask);
 
-  step = chord_engine_step(&engine, 0, 1500);
+  const uint32_t up = 1500;
+  step = chord_engine_step(&engine, 0, up);
   TEST_ASSERT_FALSE(step.fire);
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::ReleaseGuard), static_cast<int>(engine.phase));
   TEST_ASSERT_EQUAL_UINT16(0x0001, engine.peak.mask);
 
-  step = chord_engine_step(&engine, 0, 1509);
+  step = chord_engine_step(&engine, 0, up + kChordReleaseGuardMs - 1);
   TEST_ASSERT_FALSE(step.fire);
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::ReleaseGuard), static_cast<int>(engine.phase));
 
-  step = chord_engine_step(&engine, 0, 1510);
+  step = chord_engine_step(&engine, 0, up + kChordReleaseGuardMs);
   TEST_ASSERT_TRUE(step.fire);
   TEST_ASSERT_EQUAL_UINT16(0x0001, step.fire_mask);
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::Idle), static_cast<int>(engine.phase));
@@ -548,8 +548,6 @@ extern "C" void test_both_modes_send_a_chord_once(void) {
 }
 
 extern "C" void test_bounce_within_debounce_does_not_split(void) {
-  TEST_ASSERT_EQUAL_INT(8, static_cast<int>(kChordDebounceMs));
-  TEST_ASSERT_EQUAL_INT(10, static_cast<int>(kChordBounceMs));
   TEST_ASSERT_TRUE(kChordBounceMs > kChordDebounceMs);
   TEST_ASSERT_TRUE(kChordReleaseGuardMs >= kChordBounceMs);
   TEST_ASSERT_TRUE(kChordReleaseGuardMs > kChordDebounceMs);
@@ -737,7 +735,6 @@ extern "C" void test_first_up_draining_ignores_presses(void) {
 }
 
 extern "C" void test_recipe_shapes(void) {
-  TEST_ASSERT_EQUAL_INT(12, static_cast<int>(kChordTapGapMs));
   TEST_ASSERT_FALSE(chord_parse_recipe(nullptr, nullptr));
   ChordRecipe empty;
   TEST_ASSERT_FALSE(chord_parse_recipe(nullptr, &empty));
@@ -762,15 +759,15 @@ extern "C" void test_recipe_shapes(void) {
       {"Left", ChordKeyKind::Left},           {"Right", ChordKeyKind::Right},
   };
   for (const Named &item : named) {
-    const ChordEvent want[] = {ev_press(item.kind, 0, 12), ev_release(12)};
+    const ChordEvent want[] = {ev_press(item.kind, 0, kChordTapGapMs), ev_release(kChordTapGapMs)};
     expect_events(item.text, want, 2);
   }
 
   const ChordEvent shift1[] = {ev_press(ChordKeyKind::Shift, 0, 0),
-                               ev_press(ChordKeyKind::Char, '1', 12), ev_release(12)};
+                               ev_press(ChordKeyKind::Char, '1', kChordTapGapMs), ev_release(kChordTapGapMs)};
   expect_events("Shift+1", shift1, 3);
-  const ChordEvent ctrli[] = {ev_press(ChordKeyKind::Ctrl, 0, 0), ev_press(ChordKeyKind::Char, 'i', 12),
-                              ev_release(12)};
+  const ChordEvent ctrli[] = {ev_press(ChordKeyKind::Ctrl, 0, 0), ev_press(ChordKeyKind::Char, 'i', kChordTapGapMs),
+                              ev_release(kChordTapGapMs)};
   expect_events("Ctrl+i", ctrli, 3);
 
   const ChordEvent spaced[] = {ev_write('z'), ev_write('.'), ev_write('z'), ev_write('.')};
@@ -781,7 +778,7 @@ extern "C" void test_recipe_shapes(void) {
   const ChordEvent plus[] = {ev_write('+')};
   expect_events("+", plus, 1);
   const ChordEvent shift_plus[] = {ev_press(ChordKeyKind::Shift, 0, 0),
-                                   ev_press(ChordKeyKind::Char, '+', 12), ev_release(12)};
+                                   ev_press(ChordKeyKind::Char, '+', kChordTapGapMs), ev_release(kChordTapGapMs)};
   expect_events("Shift++", shift_plus, 3);
 
   struct RawKey {
@@ -798,19 +795,19 @@ extern "C" void test_recipe_shapes(void) {
       {"F11", 0x44},     {"F12", 0x45},
   };
   for (const RawKey &item : raw) {
-    const ChordEvent want[] = {ev_press(ChordKeyKind::Raw, item.usage, 12), ev_release(12)};
+    const ChordEvent want[] = {ev_press(ChordKeyKind::Raw, item.usage, kChordTapGapMs), ev_release(kChordTapGapMs)};
     expect_events(item.text, want, 2);
   }
   const ChordEvent shift_henkan[] = {ev_press(ChordKeyKind::Shift, 0, 0),
-                                     ev_press(ChordKeyKind::Raw, 0x8A, 12), ev_release(12)};
+                                     ev_press(ChordKeyKind::Raw, 0x8A, kChordTapGapMs), ev_release(kChordTapGapMs)};
   expect_events("Shift+Henkan", shift_henkan, 3);
   const ChordEvent ctrl_f1[] = {ev_press(ChordKeyKind::Ctrl, 0, 0),
-                                ev_press(ChordKeyKind::Raw, 0x3A, 12), ev_release(12)};
+                                ev_press(ChordKeyKind::Raw, 0x3A, kChordTapGapMs), ev_release(kChordTapGapMs)};
   expect_events("Ctrl+F1", ctrl_f1, 3);
   const ChordEvent four_mods[] = {
       ev_press(ChordKeyKind::Ctrl, 0, 0),  ev_press(ChordKeyKind::Alt, 0, 0),
       ev_press(ChordKeyKind::Shift, 0, 0), ev_press(ChordKeyKind::Gui, 0, 0),
-      ev_press(ChordKeyKind::Raw, 0x4E, 12), ev_release(12)};
+      ev_press(ChordKeyKind::Raw, 0x4E, kChordTapGapMs), ev_release(kChordTapGapMs)};
   expect_events("Ctrl+Alt+Shift+Gui+PageDown", four_mods, 6);
 }
 
@@ -881,7 +878,7 @@ extern "C" void test_recipe_that_does_not_fit_fails(void) {
 
 extern "C" void test_recipe_token_and_cap_bounds(void) {
   const ChordEvent shift_plus[] = {ev_press(ChordKeyKind::Shift, 0, 0),
-                                   ev_press(ChordKeyKind::Char, '+', 12), ev_release(12)};
+                                   ev_press(ChordKeyKind::Char, '+', kChordTapGapMs), ev_release(kChordTapGapMs)};
   expect_events("Shift++", shift_plus, 3);
 
   char plain23[24];
@@ -1348,20 +1345,23 @@ extern "C" void test_repeat_settle_then_interval(void) {
   RepeatLog log;
   repeat_begin(&engine, &rep, &log);
 
+  const uint32_t settle = kChordRepeatSettleMs;
+  const uint32_t delay = kChordRepeatDelayMs;
+  const uint32_t next = delay + kChordRepeatIntervalMs;
   repeat_poll(&engine, &rep, &log, 0x0001, 0, repeats_bit0);
-  repeat_poll(&engine, &rep, &log, 0x0001, 49, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0x0001, settle - 1, repeats_bit0);
   TEST_ASSERT_EQUAL_INT(0, log.taps);
-  repeat_poll(&engine, &rep, &log, 0x0001, 50, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0x0001, settle, repeats_bit0);
   TEST_ASSERT_EQUAL_INT(1, log.taps);
   TEST_ASSERT_EQUAL_UINT16(0x0001, log.last_tap);
-  repeat_poll(&engine, &rep, &log, 0x0001, 51, repeats_bit0);
-  repeat_poll(&engine, &rep, &log, 0x0001, 399, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0x0001, settle + 1, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0x0001, delay - 1, repeats_bit0);
   TEST_ASSERT_EQUAL_INT(1, log.taps);
-  repeat_poll(&engine, &rep, &log, 0x0001, 400, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0x0001, delay, repeats_bit0);
   TEST_ASSERT_EQUAL_INT(2, log.taps);
-  repeat_poll(&engine, &rep, &log, 0x0001, 432, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0x0001, next - 1, repeats_bit0);
   TEST_ASSERT_EQUAL_INT(2, log.taps);
-  repeat_poll(&engine, &rep, &log, 0x0001, 433, repeats_bit0);
+  repeat_poll(&engine, &rep, &log, 0x0001, next, repeats_bit0);
   TEST_ASSERT_EQUAL_INT(3, log.taps);
   TEST_ASSERT_EQUAL_INT(0, log.release_fires);
 }
@@ -1535,16 +1535,17 @@ extern "C" void test_dispatch_release_wakes_then_sends_once(void) {
   assert_no_send(sent);
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::Holding), static_cast<int>(engine.phase));
 
-  sent = chord_dispatch_step(&engine, &rep, 0, 1500, repeats_none);
+  const uint32_t up = 1500;
+  sent = chord_dispatch_step(&engine, &rep, 0, up, repeats_none);
   TEST_ASSERT_EQUAL_UINT8(0, sent.count);
-  TEST_ASSERT_EQUAL_UINT32(1510, sent.wake_ms);
+  TEST_ASSERT_EQUAL_UINT32(up + kChordReleaseGuardMs, sent.wake_ms);
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::ReleaseGuard), static_cast<int>(engine.phase));
 
-  sent = chord_dispatch_step(&engine, &rep, 0, 1509, repeats_none);
+  sent = chord_dispatch_step(&engine, &rep, 0, up + kChordReleaseGuardMs - 1, repeats_none);
   TEST_ASSERT_EQUAL_UINT8(0, sent.count);
-  TEST_ASSERT_EQUAL_UINT32(1510, sent.wake_ms);
+  TEST_ASSERT_EQUAL_UINT32(up + kChordReleaseGuardMs, sent.wake_ms);
 
-  sent = chord_dispatch_step(&engine, &rep, 0, 1510, repeats_none);
+  sent = chord_dispatch_step(&engine, &rep, 0, up + kChordReleaseGuardMs, repeats_none);
   TEST_ASSERT_EQUAL_UINT8(1, sent.count);
   TEST_ASSERT_EQUAL_UINT16(0x0001, sent.mask0);
   TEST_ASSERT_EQUAL_UINT16(0, sent.mask1);
@@ -1562,25 +1563,26 @@ extern "C" void test_dispatch_repeat_wake_follows_settle_delay_interval(void) {
   TEST_ASSERT_EQUAL_UINT8(0, sent.count);
   TEST_ASSERT_EQUAL_UINT32(kChordRepeatSettleMs, sent.wake_ms);
 
-  sent = chord_dispatch_step(&engine, &rep, 0x0001, 49, repeats_bit0);
+  sent = chord_dispatch_step(&engine, &rep, 0x0001, kChordRepeatSettleMs - 1, repeats_bit0);
   TEST_ASSERT_EQUAL_UINT8(0, sent.count);
   TEST_ASSERT_EQUAL_UINT32(kChordRepeatSettleMs, sent.wake_ms);
 
-  sent = chord_dispatch_step(&engine, &rep, 0x0001, 50, repeats_bit0);
+  sent = chord_dispatch_step(&engine, &rep, 0x0001, kChordRepeatSettleMs, repeats_bit0);
   TEST_ASSERT_EQUAL_UINT8(1, sent.count);
   TEST_ASSERT_EQUAL_UINT16(0x0001, sent.mask0);
   TEST_ASSERT_EQUAL_UINT16(0, sent.mask1);
   TEST_ASSERT_EQUAL_UINT32(kChordRepeatDelayMs, sent.wake_ms);
-  TEST_ASSERT_NOT_EQUAL(50, sent.wake_ms);
+  TEST_ASSERT_NOT_EQUAL(kChordRepeatSettleMs, sent.wake_ms);
 
-  sent = chord_dispatch_step(&engine, &rep, 0x0001, 400, repeats_bit0);
+  sent = chord_dispatch_step(&engine, &rep, 0x0001, kChordRepeatDelayMs, repeats_bit0);
   TEST_ASSERT_EQUAL_UINT8(1, sent.count);
   TEST_ASSERT_EQUAL_UINT16(0x0001, sent.mask0);
-  TEST_ASSERT_EQUAL_UINT32(400u + kChordRepeatIntervalMs, sent.wake_ms);
+  const uint32_t after_delay = kChordRepeatDelayMs + kChordRepeatIntervalMs;
+  TEST_ASSERT_EQUAL_UINT32(after_delay, sent.wake_ms);
 
-  sent = chord_dispatch_step(&engine, &rep, 0x0001, 433, repeats_bit0);
+  sent = chord_dispatch_step(&engine, &rep, 0x0001, after_delay, repeats_bit0);
   TEST_ASSERT_EQUAL_UINT8(1, sent.count);
-  TEST_ASSERT_EQUAL_UINT32(433u + kChordRepeatIntervalMs, sent.wake_ms);
+  TEST_ASSERT_EQUAL_UINT32(after_delay + kChordRepeatIntervalMs, sent.wake_ms);
 }
 
 extern "C" void test_dispatch_release_after_repeat_is_swallowed(void) {
@@ -1593,12 +1595,13 @@ extern "C" void test_dispatch_release_after_repeat_is_swallowed(void) {
   ChordDispatch sent = chord_dispatch_step(&engine, &rep, 0x0001, 50, repeats_bit0);
   TEST_ASSERT_EQUAL_UINT8(1, sent.count);
 
-  sent = chord_dispatch_step(&engine, &rep, 0, 60, repeats_bit0);
+  const uint32_t up = 60;
+  sent = chord_dispatch_step(&engine, &rep, 0, up, repeats_bit0);
   TEST_ASSERT_EQUAL_UINT8(0, sent.count);
-  TEST_ASSERT_EQUAL_UINT32(70, sent.wake_ms);
+  TEST_ASSERT_EQUAL_UINT32(up + kChordReleaseGuardMs, sent.wake_ms);
   TEST_ASSERT_EQUAL_INT(static_cast<int>(ChordPhase::ReleaseGuard), static_cast<int>(engine.phase));
 
-  sent = chord_dispatch_step(&engine, &rep, 0, 70, repeats_bit0);
+  sent = chord_dispatch_step(&engine, &rep, 0, up + kChordReleaseGuardMs, repeats_bit0);
   TEST_ASSERT_EQUAL_UINT8(0, sent.count);
   TEST_ASSERT_EQUAL_UINT16(0, sent.mask0);
   TEST_ASSERT_EQUAL_UINT32(0, sent.wake_ms);
@@ -1616,11 +1619,12 @@ extern "C" void test_dispatch_hold_without_repeat_wakes_only_on_release(void) {
   sent = chord_dispatch_step(&engine, &rep, 0x0001, 1000, repeats_none);
   assert_no_send(sent);
 
-  sent = chord_dispatch_step(&engine, &rep, 0, 1010, repeats_none);
+  const uint32_t up = 1010;
+  sent = chord_dispatch_step(&engine, &rep, 0, up, repeats_none);
   TEST_ASSERT_EQUAL_UINT8(0, sent.count);
-  TEST_ASSERT_EQUAL_UINT32(1020, sent.wake_ms);
+  TEST_ASSERT_EQUAL_UINT32(up + kChordReleaseGuardMs, sent.wake_ms);
 
-  sent = chord_dispatch_step(&engine, &rep, 0, 1020, repeats_none);
+  sent = chord_dispatch_step(&engine, &rep, 0, up + kChordReleaseGuardMs, repeats_none);
   TEST_ASSERT_EQUAL_UINT8(1, sent.count);
   TEST_ASSERT_EQUAL_UINT16(0x0001, sent.mask0);
   TEST_ASSERT_EQUAL_UINT32(0, sent.wake_ms);

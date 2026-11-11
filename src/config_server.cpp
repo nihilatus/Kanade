@@ -56,17 +56,6 @@ static constexpr size_t kApiTokenRandomBytes = 16;
 static char g_api_token[128];
 static constexpr char kApPlaceholder[] = "replace-with-8-or-more-chars";
 
-// Not one of the 14 chord keys. Closed to GND enables the AP.
-static constexpr int kWifiEnablePin = 15;
-// Longer than the 8 ms key debounce so a bounce does not flap the radio.
-static constexpr uint32_t kWifiSwitchDebounceMs = 50;
-// One slice per poll. The chord bounce window is 10 ms, so this stays a short copy.
-static constexpr size_t kHttpSlice = 512;
-static constexpr uint32_t kHttpStallMs = 5000;
-// Past this, answer and close instead of discarding. A normal save is under kChordsJsonMax.
-static constexpr long kDrainMax = 256 * 1024;
-static constexpr size_t kFireBodyMax = 256;
-
 static constexpr char kJsonType[] = "application/json; charset=utf-8";
 static constexpr char kFallbackJson[] = "{\"ok\":false,\"error\":\"失敗\"}";
 
@@ -952,7 +941,7 @@ static void start_ap() {
   WiFi.mode(WIFI_AP);
   WiFi.setSleep(false);
 
-  const IPAddress ip(192, 168, 4, 1);
+  const IPAddress ip(kApIp0, kApIp1, kApIp2, kApIp3);
   WiFi.softAPConfig(ip, ip, IPAddress(255, 255, 255, 0));
   const bool up = WiFi.softAP(kApSsid, kApPassword, 1, 0, 4);
 
@@ -968,7 +957,10 @@ static void start_ap() {
 
   snprintf(line, sizeof(line), "AP %s", kApSsid);
   console_println(line);
-  console_println("http://192.168.4.1/");
+  snprintf(line, sizeof(line), "http://%u.%u.%u.%u/", static_cast<unsigned>(kApIp0),
+           static_cast<unsigned>(kApIp1), static_cast<unsigned>(kApIp2),
+           static_cast<unsigned>(kApIp3));
+  console_println(line);
   g_server.begin();
   g_http = true;
 }
@@ -1001,7 +993,9 @@ void config_server_begin() {
       console_println("HTTP worker failed; chord save and load stay off");
     }
   }
-  console_println("WiFi switch GPIO15, closed to GND");
+  char line[48];
+  snprintf(line, sizeof(line), "WiFi switch GPIO%d, closed to GND", kWifiEnablePin);
+  console_println(line);
   if (g_switch_stable) start_ap();
 }
 

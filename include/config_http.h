@@ -3,10 +3,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// Pure request checks for the config AP. No sockets, so host tests can run them.
+#include "settings.h"
 
-static constexpr char kConfigOrigin[] = "http://192.168.4.1";
-static constexpr size_t kHttpHeaderMax = 1536;
+// Pure request checks for the config AP. No sockets, so host tests can run them.
+// kConfigOrigin and kHttpHeaderMax live in settings.h.
 
 struct HttpRequest {
   char method[8];

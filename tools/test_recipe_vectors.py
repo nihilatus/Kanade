@@ -38,11 +38,11 @@ def _import_recipe():
 
 def _constexpr(header: str, name: str) -> int:
     match = re.search(
-        rf"static constexpr (?:size_t|uint8_t) {name} = (\d+);",
+        rf"static constexpr (?:size_t|uint8_t|uint16_t|uint32_t|int) {name} = (\d+);",
         header,
     )
     if match is None:
-        raise ValueError(f"{name} missing from chord_core.h")
+        raise ValueError(f"{name} missing from include/settings.h")
     return int(match.group(1))
 
 
@@ -71,7 +71,7 @@ def _cpp_tables(source: str) -> tuple[list[tuple[str, str, int]], list[tuple[str
 
 def _check_cpp_mirror(recipe) -> list[str]:
     root = _root()
-    header = (root / "include" / "chord_core.h").read_text(encoding="utf-8")
+    header = (root / "include" / "settings.h").read_text(encoding="utf-8")
     source = (root / "src" / "chord_core.cpp").read_text(encoding="utf-8")
     errors = []
     expected = {
@@ -84,7 +84,7 @@ def _check_cpp_mirror(recipe) -> list[str]:
     for name, value in expected.items():
         got = _constexpr(header, name)
         if got != value:
-            errors.append(f"{name} is {got} in chord_core.h and {value} in recipe.py")
+            errors.append(f"{name} is {got} in settings.h and {value} in recipe.py")
     named, mods = _cpp_tables(source)
     if named != list(recipe.NAMED):
         errors.append(f"named keys differ:\n  cpp {named}\n  py  {list(recipe.NAMED)}")
@@ -180,6 +180,7 @@ def main() -> int:
     errors.extend(_check_vectors(recipe))
     errors.extend(_check_machine_csv(recipe))
     errors.extend(_check_build_helper(recipe))
+    errors.extend(recipe.check_config_page())
     if errors:
         print(f"recipe vectors: {len(errors)} error(s)")
         for error in errors:

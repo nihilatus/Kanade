@@ -39,7 +39,6 @@ struct Stroke {
 
 // Last slot is only for hid_release_all. Recipes, romaji, and taps stop at
 // kQueueCap - 1, so a full keystroke queue can still be closed.
-static constexpr size_t kQueueCap = 192;
 static HidEvent g_queue[kQueueCap];
 static size_t g_head = 0;
 static size_t g_count = 0;
@@ -340,8 +339,7 @@ void hid_type_romaji(const char *text) {
   }
   const bool release_first = queue_busy();
   const size_t len = strlen(text);
-  static_assert(80 <= kChordRecipeCap, "romaji shares g_strokes with recipes");
-  if (len > 80) {
+  if (len > kRomajiMax) {
     note_dropped();
 #if ARDUINO_USB_CDC_ON_BOOT
     Serial.println(F("hid romaji too long, skipped"));

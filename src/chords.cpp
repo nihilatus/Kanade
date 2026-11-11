@@ -22,10 +22,6 @@ static const ChordRule kFactory[] = {
 };
 
 static constexpr size_t kFactoryCount = sizeof(kFactory) / sizeof(kFactory[0]);
-static constexpr size_t kKanaMax = 47;
-static constexpr size_t kOutputMax = 63;
-static constexpr size_t kPoolSize = 30 * 1024;
-static_assert(kOutputMax <= kChordTokenMax, "a saved output must fit in one recipe token");
 
 static_assert(kFactoryCount > 0, "factory chord table is empty");
 static_assert(kFactoryCount <= kChordsMaxRows, "factory chord table exceeds kChordsMaxRows");
@@ -459,7 +455,7 @@ ChordStageStatus chords_stage_json(const char *json, size_t len, char *err, size
       repeat = repeat_value.as<bool>();
     }
     if (strlen(kana) > kKanaMax) return set_row_err(err, err_len, row_no, "的假名太長");
-    if (strlen(output) > kOutputMax) return set_row_err(err, err_len, row_no, "的 output 太長");
+    if (strlen(output) > kChordTokenMax) return set_row_err(err, err_len, row_no, "的 output 太長");
     if (!text_ok(kana, false)) return set_row_err(err, err_len, row_no, "的假名有無法顯示的字元");
     if (!text_ok(output, true)) return set_row_err(err, err_len, row_no, "的 output 只能用英數與符號");
 

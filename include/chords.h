@@ -3,6 +3,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "settings.h"
+
 // Chord engine. Tracks the largest simultaneous set while any key is down,
 // then matches the live table once.
 //
@@ -13,8 +15,7 @@
 //               A different chord pressed during that wait sends immediately.
 //   "first"   — after the peak, send when the first peak key goes up, then
 //               drain until every key is up before a new chord can start.
-// Each key is stable only after kChordDebounceMs. Both constants live in
-// chord_core.h.
+// Each key is stable only after kChordDebounceMs. Timings live in settings.h.
 //
 // Boot loads /chords.json from LittleFS when the file is valid. If that file
 // is missing, a complete /chords.json.tmp is checked first, then
@@ -34,8 +35,6 @@ void chords_poll();  // call after buttons_poll()
 const char *chords_fire_mode_name();
 bool chords_set_fire_mode_name(const char *name, bool dispatch = true);
 
-static constexpr size_t kChordsMaxRows = 256;
-static constexpr size_t kChordsJsonMax = 48 * 1024;
 static constexpr char kChordsPath[] = "/chords.json";
 static constexpr char kChordsTmpPath[] = "/chords.json.tmp";
 static constexpr char kChordsBakPath[] = "/chords.json.bak";

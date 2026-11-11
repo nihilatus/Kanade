@@ -3,38 +3,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "settings.h"
+
 // Pure chord logic: key bits, rule match, peak snapshot, send state machine,
 // one poll's masks and wake time, and recipe parsing. No Arduino, GPIO,
 // filesystem, or USB. Host tests and the firmware both call this.
-
-static constexpr int kChordKeyCount = 14;
-// Raw GPIO must hold this long before the chord mask changes.
-static constexpr uint8_t kChordDebounceMs = 8;
-// ReleaseAll waits this long after the debounced mask stays empty.
-static constexpr uint32_t kChordReleaseGuardMs = 10;
-// A subset or superset of the peak is the same chord only until this gap.
-// The engine sees debounced edges, so a contact that re-closes as the release
-// is accepted shows up about one debounce later. The practice page has no
-// GPIO debounce; rolls of 15 ms already clear the guard, and 1–9 ms drops a
-// nested chord such as あ after か. 10 ms keeps that bounce and still splits
-// a nested mask that arrives with the guard already elapsed (a stalled poll).
-static constexpr uint32_t kChordBounceMs = 10;
-static_assert(kChordBounceMs > kChordDebounceMs,
-              "bounce window must cover a debounced return");
-static_assert(kChordBounceMs <= kChordReleaseGuardMs,
-              "nested chords must split once the release guard has elapsed");
-static constexpr uint8_t kChordTapGapMs = 12;
-static constexpr uint8_t kChordGapNone = 0;
-// Rows with ChordRule::repeat: first tap after the peak stops growing, then
-// repeat. The delay is measured from the same moment as the settle. One poll
-// sends at most one tap, so a late poll does not catch up.
-static constexpr uint16_t kChordRepeatSettleMs = 50;
-static constexpr uint16_t kChordRepeatDelayMs = 400;
-static constexpr uint8_t kChordRepeatIntervalMs = 33;
-static_assert(kChordRepeatDelayMs > kChordRepeatSettleMs,
-              "repeat starts after the first tap");
-static_assert(kChordRepeatIntervalMs > kChordTapGapMs * 2,
-              "repeat gap must outlast one press and release");
+// Key count, timings, and recipe capacities are in settings.h.
 
 // Bit i is key i. Order is LL LU LR LD LT0 LT1 LT2 RL RU RR RD RT0 RT1 RT2.
 const char *chord_key_name(int index);
@@ -177,15 +151,10 @@ struct ChordEvent {
   uint8_t gap_after_ms;
 };
 
-static constexpr size_t kChordRecipeCap = 96;
-static constexpr size_t kChordSkipCap = 32;
-// One settings output field. A longer token is a too_long skip, not a send.
-static constexpr size_t kChordTokenMax = 63;
-
 struct ChordSkip {
-  // First 23 bytes of a skipped token. too_long leaves this empty; length
-  // still holds the full token size.
-  char text[24];
+  // First kChordSkipText bytes of a skipped token. too_long leaves this empty;
+  // length still holds the full token size.
+  char text[kChordSkipText + 1];
   size_t length;
   bool too_long;
 };

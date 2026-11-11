@@ -315,7 +315,11 @@ def main() -> int:
     for e in parse_errors:
         print(e)
 
-    if parse_errors or conflicts:
+    page_errors = recipe.check_config_page()
+    for error in page_errors:
+        print(error)
+
+    if parse_errors or conflicts or page_errors:
         return 1
     return 0
 

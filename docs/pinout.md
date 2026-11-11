@@ -25,7 +25,7 @@
 - 開關只接 GPIO 與 GND。不要接到 5 V、VIN 或其他電源腳。
 - 麵包板杜邦線盡量短於約 30 cm。
 
-14 顆和弦鍵每一腳要連續穩定 `kChordDebounceMs`（`include/chord_core.h`）才承認按下或放開。何時送出一組和弦見 [`chord-map-machine.md`](chord-map-machine.md)。GPIO15 的 WiFi 開關另外用約 50 ms，見下方。
+14 顆和弦鍵每一腳要連續穩定 `kChordDebounceMs`（`include/settings.h`）才承認按下或放開。何時送出一組和弦見 [`chord-map-machine.md`](chord-map-machine.md)。熱點開關 `kWifiEnablePin` 另外用 `kWifiSwitchDebounceMs`，見下方。
 
 ## 不可使用的腳
 
@@ -59,7 +59,7 @@ GPIO3 刻意空下（strapping）。順序與和弦表的鍵名順序相同：`L
 | 腳位 | **GPIO15**（不屬於上面 14 個和弦鍵，不會進和弦遮罩） |
 | 接法 | 一端接 GPIO15，另一端接 GND。`INPUT_PULLUP`，導通為 LOW |
 | 極性 | 導通 = 開熱點；沒接或開路 = 關熱點 |
-| 時機 | 運行中撥動就開關，不用重開機。穩態要連續約 **50 ms** 才承認，避免彈一下就把無線電開關一次 |
+| 時機 | 運行中撥動就開關，不用重開機。穩態要連續 `kWifiSwitchDebounceMs`（`include/settings.h`）才承認，避免彈一下就把無線電開關一次 |
 
 上電時若 GPIO15 是開路，熱點不會自己出現。以前是密碼有效就上電開熱點；現在要這顆開關合上才開。和弦與 USB HID 在熱點關掉時照常運作。
 

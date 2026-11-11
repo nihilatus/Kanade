@@ -8,16 +8,30 @@ parses with a skip, an overflow, or a failed fit.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
-# include/chord_core.h
-RECIPE_CAP = 96
-SKIP_CAP = 32
-TAP_GAP = 12
-GAP_NONE = 0
-TOKEN_LIMIT = 63  # kChordTokenMax; a longer token is a too_long skip
-SKIP_TEXT = 23  # ChordSkip::text[24] stores this many bytes
+
+def _settings_int(name: str) -> int:
+    """Read one constexpr from include/settings.h. That file is the only copy."""
+    header = Path(__file__).resolve().parents[1].joinpath("include", "settings.h")
+    text = header.read_text(encoding="utf-8")
+    match = re.search(
+        rf"static constexpr (?:size_t|uint8_t|uint16_t|uint32_t|int) {name} = (\d+);",
+        text,
+    )
+    if match is None:
+        raise ValueError(f"{name} missing from include/settings.h")
+    return int(match.group(1))
+
+
+RECIPE_CAP = _settings_int("kChordRecipeCap")
+SKIP_CAP = _settings_int("kChordSkipCap")
+TAP_GAP = _settings_int("kChordTapGapMs")
+GAP_NONE = _settings_int("kChordGapNone")
+TOKEN_LIMIT = _settings_int("kChordTokenMax")
+SKIP_TEXT = _settings_int("kChordSkipText")
 
 # src/chord_core.cpp named_key / modifier_kind. tools/test_recipe_vectors.py
 # checks these tables against that file.
@@ -396,6 +410,22 @@ def load_vectors(path: Path) -> list[VectorCase]:
 
 def project_root() -> Path:
     return Path(__file__).resolve().parents[1]
+
+
+def check_config_page() -> list[str]:
+    """The config page is one PROGMEM string, so it cannot include settings.h."""
+    text = (project_root() / "src" / "config_page.inc").read_text(encoding="utf-8")
+    limit = TOKEN_LIMIT
+    errors = []
+    if f"output.maxLength = {limit};" not in text:
+        errors.append(
+            f"src/config_page.inc output.maxLength must be kChordTokenMax ({limit})"
+        )
+    if f"row.output.length > {limit}" not in text:
+        errors.append(
+            f"src/config_page.inc output length check must be kChordTokenMax ({limit})"
+        )
+    return errors
 
 
 def vectors_path() -> Path:

@@ -19,8 +19,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-static constexpr uint32_t kChordWasmRuleCap = 512;
-
 struct ChordWasmRule {
   uint16_t id;
   uint16_t required;
