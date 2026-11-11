@@ -10,9 +10,11 @@
 // answer 503 and do not run on the key scan. The live chord table is swapped
 // only on this poll.
 //
-// The AP passphrase is the trust boundary. An empty WIFI_API_TOKEN allows
-// every station that has joined. A browser Origin other than the config page
-// is still rejected. Set the token when the passphrase is shared.
+// The AP passphrase is the trust boundary. A non-empty WIFI_API_TOKEN is the
+// API token and is not printed. When it is empty, the first boot generates a
+// token, stores it in NVS, and prints it once on the serial console. /api/*
+// then requires that token. A browser Origin other than the config page is
+// still rejected. If the generated token cannot be stored, /api/* stays closed.
 
 void config_server_begin();
 void config_server_poll();

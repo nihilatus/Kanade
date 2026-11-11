@@ -153,3 +153,25 @@ bool origin_allowed(const char *origin, bool has_origin) {
   if (origin == nullptr || origin[0] == '\0') return false;
   return strcmp(origin, kConfigOrigin) == 0;
 }
+
+static bool token_text_set(const char *text) { return text != nullptr && text[0] != '\0'; }
+
+ApiTokenAction api_token_action(const char *compile_time, const char *stored) {
+  if (token_text_set(compile_time)) return ApiTokenAction::UseCompile;
+  if (token_text_set(stored)) return ApiTokenAction::UseStored;
+  return ApiTokenAction::Generate;
+}
+
+bool format_token_hex(const uint8_t *raw, size_t raw_len, char *out, size_t out_len) {
+  if (out == nullptr) return false;
+  if (raw_len > 0 && raw == nullptr) return false;
+  if (raw_len > (SIZE_MAX - 1) / 2) return false;
+  if (out_len < raw_len * 2 + 1) return false;
+  static constexpr char kHex[] = "0123456789abcdef";
+  for (size_t i = 0; i < raw_len; ++i) {
+    out[i * 2] = kHex[raw[i] >> 4];
+    out[i * 2 + 1] = kHex[raw[i] & 0x0f];
+  }
+  out[raw_len * 2] = '\0';
+  return true;
+}

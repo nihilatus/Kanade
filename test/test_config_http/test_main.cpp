@@ -86,6 +86,32 @@ extern "C" void test_token_and_origin(void) {
   TEST_ASSERT_FALSE(origin_allowed("", true));
 }
 
+extern "C" void test_api_token_action_and_hex(void) {
+  TEST_ASSERT_TRUE(api_token_action("secret", "stored") == ApiTokenAction::UseCompile);
+  TEST_ASSERT_TRUE(api_token_action("secret", nullptr) == ApiTokenAction::UseCompile);
+  TEST_ASSERT_TRUE(api_token_action("secret", "") == ApiTokenAction::UseCompile);
+  TEST_ASSERT_TRUE(api_token_action("", "stored") == ApiTokenAction::UseStored);
+  TEST_ASSERT_TRUE(api_token_action(nullptr, "stored") == ApiTokenAction::UseStored);
+  TEST_ASSERT_TRUE(api_token_action("", "") == ApiTokenAction::Generate);
+  TEST_ASSERT_TRUE(api_token_action(nullptr, nullptr) == ApiTokenAction::Generate);
+  TEST_ASSERT_TRUE(api_token_action("", nullptr) == ApiTokenAction::Generate);
+
+  const uint8_t raw[16] = {0x00, 0x1a, 0xff, 0x0b, 0x10, 0x22, 0x7e, 0x99,
+                           0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89};
+  char hex[33];
+  TEST_ASSERT_TRUE(format_token_hex(raw, sizeof(raw), hex, sizeof(hex)));
+  TEST_ASSERT_EQUAL_STRING("001aff0b10227e99abcdef0123456789", hex);
+
+  char exact[33];
+  TEST_ASSERT_TRUE(format_token_hex(raw, sizeof(raw), exact, sizeof(exact)));
+  char short_buf[32];
+  TEST_ASSERT_FALSE(format_token_hex(raw, sizeof(raw), short_buf, sizeof(short_buf)));
+  TEST_ASSERT_FALSE(format_token_hex(raw, sizeof(raw), nullptr, 33));
+  TEST_ASSERT_FALSE(format_token_hex(nullptr, 1, hex, sizeof(hex)));
+  TEST_ASSERT_TRUE(format_token_hex(nullptr, 0, hex, 1));
+  TEST_ASSERT_EQUAL_STRING("", hex);
+}
+
 extern "C" void test_ap_credentials(void) {
   const char *placeholder = "replace-with-8-or-more-chars";
   TEST_ASSERT_FALSE(ap_credentials_ok("JIS-Chord", placeholder, placeholder));
@@ -112,6 +138,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_parse_rejects_duplicate_length_and_nul);
   RUN_TEST(test_parse_chunked_and_huge_length);
   RUN_TEST(test_token_and_origin);
+  RUN_TEST(test_api_token_action_and_hex);
   RUN_TEST(test_ap_credentials);
   return UNITY_END();
 }

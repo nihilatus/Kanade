@@ -87,7 +87,7 @@ R"HTML(
       <button id="save" type="button">儲存</button>
       <button id="reset" type="button">還原出廠</button>
     </div>
-    <input id="api-token" class="hidden" type="password" placeholder="API token" autocomplete="off">
+    <input id="api-token" class="hidden" type="password" placeholder="開機序列埠印過的 API token" autocomplete="off">
     <span id="status"></span>
   </header>
   <p id="none" class="hidden">沒有符合的列</p>

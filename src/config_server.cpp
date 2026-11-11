@@ -12,8 +12,10 @@
 #include <FS.h>
 #include <LittleFS.h>
 #include <Network.h>
+#include <Preferences.h>
 #include <WiFi.h>
 #include <esp_heap_caps.h>
+#include <esp_random.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <lwip/sockets.h>
@@ -46,6 +48,12 @@
 static const char kApSsid[] = WIFI_AP_SSID;
 static const char kApPassword[] = WIFI_AP_PASSWORD;
 static const char kApiToken[] = WIFI_API_TOKEN;
+// Same NVS namespace as the chord fire mode. The key is separate.
+static constexpr char kApiTokenNs[] = "jis";
+static constexpr char kApiTokenKey[] = "apitoken";
+static constexpr size_t kApiTokenRandomBytes = 16;
+// Same cap as HttpRequest::token, so a handwritten token is not truncated.
+static char g_api_token[128];
 static constexpr char kApPlaceholder[] = "replace-with-8-or-more-chars";
 
 // Not one of the 14 chord keys. Closed to GND enables the AP.
@@ -587,9 +595,73 @@ static void complete_drain() {
 
 static bool authorized(const HttpRequest &req) {
   if (req.token_overflow) return false;
-  if (kApiToken[0] == '\0') return true;
+  // token_matches treats an empty expected token as allow-all. An unresolved
+  // token must deny /api/* instead.
+  if (g_api_token[0] == '\0') return false;
   if (!req.has_token) return false;
-  return token_matches(kApiToken, req.token);
+  return token_matches(g_api_token, req.token);
+}
+
+static void clear_api_token() { g_api_token[0] = '\0'; }
+
+static bool copy_runtime_token(const char *src) {
+  if (src == nullptr) return false;
+  const size_t n = strlen(src);
+  if (n == 0 || n >= sizeof(g_api_token)) return false;
+  memcpy(g_api_token, src, n + 1);
+  return true;
+}
+
+static void token_store_failed() {
+  clear_api_token();
+  console_println("API token was not stored");
+}
+
+static void load_api_token() {
+  clear_api_token();
+  if (api_token_action(kApiToken, nullptr) == ApiTokenAction::UseCompile) {
+    if (!copy_runtime_token(kApiToken)) console_println("API token unavailable");
+    return;
+  }
+
+  char stored[sizeof(g_api_token)];
+  stored[0] = '\0';
+  Preferences prefs;
+  // Read-only open fails when the namespace does not exist yet. That is a
+  // first boot, not a broken store: fall through and create the key.
+  if (prefs.begin(kApiTokenNs, true)) {
+    prefs.getString(kApiTokenKey, stored, sizeof(stored));
+    prefs.end();
+  }
+
+  if (api_token_action(kApiToken, stored) == ApiTokenAction::UseStored) {
+    if (!copy_runtime_token(stored)) console_println("API token unavailable");
+    return;
+  }
+
+  uint8_t raw[kApiTokenRandomBytes];
+  esp_fill_random(raw, sizeof(raw));
+  const bool formatted = format_token_hex(raw, sizeof(raw), g_api_token, sizeof(g_api_token));
+  memset(raw, 0, sizeof(raw));
+  if (!formatted) {
+    token_store_failed();
+    return;
+  }
+
+  if (!prefs.begin(kApiTokenNs, false)) {
+    token_store_failed();
+    return;
+  }
+  const size_t wrote = prefs.putString(kApiTokenKey, g_api_token);
+  prefs.end();
+  if (wrote != strlen(g_api_token)) {
+    token_store_failed();
+    return;
+  }
+
+  char line[160];
+  snprintf(line, sizeof(line), "API token（只印這一次）: %s", g_api_token);
+  console_println(line);
 }
 
 static void on_headers(size_t end) {
@@ -916,6 +988,7 @@ static void stop_ap() {
 
 void config_server_begin() {
   console_ensure();
+  load_api_token();
   pinMode(kWifiEnablePin, INPUT_PULLUP);
   g_switch_raw = switch_closed_raw();
   g_switch_stable = g_switch_raw;

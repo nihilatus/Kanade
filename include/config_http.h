@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdint.h>
 
 // Pure request checks for the config AP. No sockets, so host tests can run them.
 
@@ -30,7 +31,18 @@ bool parse_http_request(const char *data, size_t len, HttpRequest *out);
 bool ap_credentials_ok(const char *ssid, const char *password, const char *placeholder);
 
 // An empty expected token allows every caller. A mismatch is false.
+// The config server must not use that empty case: an unresolved token denies /api/*.
 bool token_matches(const char *expected, const char *got);
+
+// Compile-time token wins. A stored value is used only when compile-time is empty.
+// Both empty means the board should generate one. nullptr is empty.
+enum class ApiTokenAction : uint8_t { UseCompile, UseStored, Generate };
+
+ApiTokenAction api_token_action(const char *compile_time, const char *stored);
+
+// Lowercase hex, two characters per byte, plus a NUL. False when the buffer
+// cannot hold that, or when raw is null and raw_len is not 0.
+bool format_token_hex(const uint8_t *raw, size_t raw_len, char *out, size_t out_len);
 
 // A missing Origin is a non-browser client on the AP. A browser sends Origin,
 // and only the config page itself is accepted.

@@ -17,7 +17,7 @@
 | 熱點 | GPIO15 用維持型開關接到 GND 才開。手機或第二台電腦連上後開 http://192.168.4.1/ |
 | 密碼 | `include/secrets.h`。序列埠只印熱點名稱與網址，不印密碼 |
 
-`WIFI_API_TOKEN` 不是空字串時，下面的 `curl.exe` 都要加 `-H "X-Api-Token: （你的 token）"`。token 不要寫進驗收紀錄。`curl.exe` 預設不帶 `Origin`，板上把這種請求當成熱點裡的非瀏覽器客戶端。
+下面的 `curl.exe` 都要加 `-H "X-Api-Token: （你的 token）"`。`WIFI_API_TOKEN` 留空時，token 是第一次開機序列埠印的那一行，之後不再印；手寫的非空 token 不會印出來。token 不要寫進驗收紀錄。要換掉板上產生的那組，清掉 NVS 命名空間 `jis` 的鍵 `apitoken` 再重開。`curl.exe` 預設不帶 `Origin`，板上把這種請求當成熱點裡的非瀏覽器客戶端。
 
 壞 JSON 與並行請求用連上熱點的電腦送。設定頁存不出截斷的內容。
 
