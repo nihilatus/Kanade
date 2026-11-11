@@ -86,7 +86,7 @@
 
 | 檔案 | 用途 |
 | --- | --- |
-| [`esp32-jis-chordboard-premapping.csv`](esp32-jis-chordboard-premapping.csv) | **人編**和弦表，唯一可手改的來源 |
+| [`esp32-jis-chordboard-premapping.csv`](esp32-jis-chordboard-premapping.csv) | **人編**和弦表，唯一可手改的來源。單行表頭 `section,label,output,left_fingers,right_fingers,left_thumb,right_thumb,repeat`，檔首要有 UTF-8 BOM。欄位說明見 [`docs/chord-map-machine.md`](docs/chord-map-machine.md) |
 | [`data/chord_map.machine.csv`](data/chord_map.machine.csv) | **機器**表，由下列腳本產生；韌體與試打頁讀這份 |
 | [`docs/chord-map-machine.md`](docs/chord-map-machine.md) | 欄位、RT0、觸發與比對 |
 | [`tools/build_chord_map_machine.py`](tools/build_chord_map_machine.py) | 人表 → 機器表與 [`include/chord_map.inc`](include/chord_map.inc) |

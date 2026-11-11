@@ -10,6 +10,29 @@ That command rewrites the machine CSV and [`../include/chord_map.inc`](../includ
 
 The browser practice page [`../web/index.html`](../web/index.html) fetches this same CSV (serve the repo root; see the README). “載入 CSV” can try another file with these columns; “改回機器表” loads this one again.
 
+## 人編 CSV
+
+手改的是 [`../esp32-jis-chordboard-premapping.csv`](../esp32-jis-chordboard-premapping.csv)。檔首要有 UTF-8 BOM，Excel 才會把中文和假名當 UTF-8 開啟。第一行固定是：
+
+```text
+section,label,output,left_fingers,right_fingers,left_thumb,right_thumb,repeat
+```
+
+| 欄 | 意義 |
+| --- | --- |
+| `section` | 區段名，例如 `單母音`、`傳統 た 行`、`符號`。空白表示沿用上一列。新區段寫在該區段第一列 |
+| `label` | 給人看的字：假名（`あ`）、符號（`「`、`★ ☆`），或功能名（`退格`、`空白（變換）`）。方向鍵、Enter 可以空白。腳本抄進機器表的 `kana` |
+| `output` | 實際送出的配方，例如 `a`、`[`、`Backspace`、`Shift+1` |
+| `left_fingers` / `right_fingers` | 拇指以外的四指（食指、中指、無名指、小指）。鍵名用 `+` 連接，例如 `LL+LU` |
+| `left_thumb` / `right_thumb` | 拇指。`(RT0)` 表示這顆可按可不按；裸 `RT0` 是必按 |
+| `repeat` | `allow` 或 `no`。`allow` 在高峰仍按著時可以連送 |
+
+`label` 和 `output` 都空的列是空位，留在人編表裡，機器表略過，也不檢查 `repeat`。有顯示字或配方的列，`repeat` 必須是 `allow` 或 `no`。
+
+儲存格裡不要換行。鍵名大小寫必須是 `LL` 這組。列的順序就是機器表 `id` 的順序，不要整表排序。`、` 的輸出是逗號，存檔時那一格要保持引號。
+
+Excel 請另存「CSV UTF-8 (逗號分隔)」。傳統「CSV (逗號分隔)」在繁中 Windows 會寫成 CP950，假名會壞。「Unicode 文字」是 UTF-16，建置會停。表頭少一欄、多一欄，或結尾多一個逗號，也會停。
+
 ## Columns
 
 | Column | Meaning |
@@ -19,10 +42,10 @@ The browser practice page [`../web/index.html`](../web/index.html) fetches this 
 | `output` | Romaji / key recipe sent on match (`a`, `nn`, `Shift+1`, `Backspace`, `Ctrl+i`, …) |
 | `keys_required` | Sorted unique **required** keys, `+`-joined. Does **not** include optional RT0 |
 | `keys_optional` | Sorted unique optional keys (`RT0` or empty) |
-| `category` | Short tag from human 摘要 (section label); may be empty |
-| `repeat` | `allow` or `no`. Copied from the human column 連射允許 (`允許` / `不允許`). `allow` may tap while that peak is still held (step 5) |
+| `category` | Short tag copied from the human `section` cell; blank there keeps the previous tag. May be empty |
+| `repeat` | `allow` or `no`, copied from the human `repeat` cell. `allow` may tap while that peak is still held (step 5) |
 
-Empty 假名 **and** empty 鍵位模擬 rows in the human CSV are spacing / reserved slots — they are **omitted** here (no no-op rows).
+Empty `label` **and** empty `output` rows in the human CSV are spacing / reserved slots — they are **omitted** here (no no-op rows).
 
 ## Physical key ids (14)
 

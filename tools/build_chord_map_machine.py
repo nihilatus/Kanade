@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import csv
+import io
 import re
 import sys
 from collections import defaultdict
@@ -33,6 +34,17 @@ KEY_ORDER = [
     "RT2",
 ]
 KEY_RANK = {k: i for i, k in enumerate(KEY_ORDER)}
+
+HUMAN_COLUMNS = [
+    "section",
+    "label",
+    "output",
+    "left_fingers",
+    "right_fingers",
+    "left_thumb",
+    "right_thumb",
+    "repeat",
+]
 
 
 def c_string(text: str) -> str:
@@ -102,38 +114,54 @@ def sort_keys(keys: set[str]) -> list[str]:
     return sorted(keys, key=lambda k: KEY_RANK.get(k, 1000 + hash(k)))
 
 
-def clean_category(raw: str) -> str | None:
-    """Return a short tag, '' to clear, or None to keep previous category.
+class HumanCsvError(Exception):
+    """The human CSV cannot be read as a table. Machine outputs stay untouched."""
 
-    Pure rank/percentage summaries (e.g. \"8\\n5.4%\") are ignored so they
-    do not pollute following rows. Named section headers update the tag.
-    """
-    if not raw:
-        return None
-    lines = [ln.strip() for ln in raw.replace("\r", "").split("\n") if ln.strip()]
-    if not lines:
-        return None
-    preferred = []
-    for ln in lines:
-        ln2 = ln
-        # Peel leading rank / percent crumbs: "12 2.9%單Y" → "單Y"
-        while True:
-            nxt = re.sub(r"^\d+(\.\d+)?%\s*", "", ln2)
-            nxt = re.sub(r"^\d+\s+", "", nxt).strip()
-            if nxt == ln2:
-                break
-            ln2 = nxt
-        if not ln2 or ln2 == "+":
-            continue
-        if re.fullmatch(r"\d+(\.\d+)?%?", ln2):
-            continue
-        preferred.append(ln2)
-    if not preferred:
-        # Rank-only cell: keep previous category
-        return None
-    # Prefer the first clearly descriptive label
-    text = preferred[0]
+
+def human_csv_text() -> str:
+    raw = SRC.read_bytes()
+    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+        raise HumanCsvError(
+            "Human CSV is UTF-16. In Excel, save as CSV UTF-8 (comma delimited)."
+        )
+    if not raw.startswith(b"\xef\xbb\xbf"):
+        raise HumanCsvError(
+            "Human CSV must start with a UTF-8 BOM so Excel opens it as UTF-8."
+        )
+    try:
+        return raw.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise HumanCsvError(f"Human CSV is not valid UTF-8: {exc}") from exc
+
+
+def normalize_section(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
+
+
+def iter_human_rows():
+    """Yield (lineno, eight stripped cells) from the human CSV."""
+    text = human_csv_text()
+    reader = csv.DictReader(io.StringIO(text), restkey="_extra")
+    if list(reader.fieldnames or []) != HUMAN_COLUMNS:
+        found = reader.fieldnames
+        raise HumanCsvError(
+            "Human CSV header must be "
+            + ",".join(HUMAN_COLUMNS)
+            + f", got {found!r}"
+        )
+    for lineno, row in enumerate(reader, start=2):
+        extra = row.get("_extra")
+        if extra:
+            raise ValueError(f"line {lineno}: extra column {extra!r}")
+        cells: list[str] = []
+        for name in HUMAN_COLUMNS:
+            value = row.get(name)
+            if value is None:
+                raise ValueError(f"line {lineno}: missing {name}")
+            if "\n" in value or "\r" in value:
+                raise ValueError(f"line {lineno}: {name} contains a newline")
+            cells.append(value.strip())
+        yield lineno, cells
 
 
 def parse_key_field(field: str) -> tuple[set[str], set[str]]:
@@ -165,63 +193,58 @@ def main() -> int:
     omitted_empty = 0
     parse_errors: list[str] = []
 
-    with SRC.open(encoding="utf-8-sig", newline="") as f:
-        reader = csv.reader(f)
-        next(reader)
-        # Expect 8 logical columns; tolerate trailing empties.
-        # Column 8 is 連射允許: 允許 or 不允許. Blank rows stay omitted.
-        for lineno, raw in enumerate(reader, start=2):
-            cells = (raw + [""] * 8)[:8]
-            summary, kana, output, left_f, right_f, left_t, right_t, repeat_cell = [
-                c.strip() for c in cells
-            ]
-            if summary:
-                cat = clean_category(summary)
-                if cat is not None:
-                    current_category = cat
+    try:
+        human_rows = list(iter_human_rows())
+    except HumanCsvError as exc:
+        print(exc)
+        return 1
+    except ValueError as exc:
+        print(exc)
+        return 1
 
-            if not kana and not output:
-                omitted_empty += 1
-                continue
+    for lineno, cells in human_rows:
+        section, label, output, left_f, right_f, left_t, right_t, repeat_cell = cells
+        if section:
+            current_category = normalize_section(section)
 
-            req: set[str] = set()
-            opt: set[str] = set()
-            try:
-                for field in (left_f, right_f, left_t, right_t):
-                    r, o = parse_key_field(field)
-                    req |= r
-                    opt |= o
-                # Tokens chord_parse_recipe would add_skip still send the rest
-                # of the recipe on device. Reject them before they ship.
-                reason = recipe.recipe_build_error(output)
-                if reason:
-                    raise ValueError(reason)
-                if repeat_cell == "允許":
-                    repeat = "allow"
-                elif repeat_cell == "不允許":
-                    repeat = "no"
-                else:
-                    raise ValueError(
-                        f"連射允許 must be 允許 or 不允許, got {repeat_cell!r}"
-                    )
-            except ValueError as e:
-                parse_errors.append(f"line {lineno}: {e}")
-                continue
+        if not label and not output:
+            omitted_empty += 1
+            continue
 
-            # Optional must not also be required
-            opt -= req
+        req: set[str] = set()
+        opt: set[str] = set()
+        try:
+            for field in (left_f, right_f, left_t, right_t):
+                r, o = parse_key_field(field)
+                req |= r
+                opt |= o
+            # Tokens chord_parse_recipe would add_skip still send the rest
+            # of the recipe on device. Reject them before they ship.
+            reason = recipe.recipe_build_error(output)
+            if reason:
+                raise ValueError(reason)
+            if repeat_cell not in ("allow", "no"):
+                raise ValueError(
+                    f"repeat must be allow or no, got {repeat_cell!r}"
+                )
+        except ValueError as e:
+            parse_errors.append(f"line {lineno}: {e}")
+            continue
 
-            rows_out.append(
-                {
-                    "id": str(len(rows_out) + 1),
-                    "kana": kana,
-                    "output": output,
-                    "keys_required": "+".join(sort_keys(req)),
-                    "keys_optional": "+".join(sort_keys(opt)),
-                    "category": current_category,
-                    "repeat": repeat,
-                }
-            )
+        # Optional must not also be required
+        opt -= req
+
+        rows_out.append(
+            {
+                "id": str(len(rows_out) + 1),
+                "kana": label,
+                "output": output,
+                "keys_required": "+".join(sort_keys(req)),
+                "keys_optional": "+".join(sort_keys(opt)),
+                "category": current_category,
+                "repeat": repeat_cell,
+            }
+        )
 
     # Conflict report: identical (required, optional) with different outputs
     by_keys: dict[tuple[str, str], list[dict[str, str]]] = defaultdict(list)

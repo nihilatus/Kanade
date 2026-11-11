@@ -1,288 +1,250 @@
-﻿摘要,"送出
-假名/符號","
-鍵位模擬",左手食指中指(無名指),右手食指中指(無名指),左手大拇指,右手大拇指,連射允許
-"8
-5.4%",ん,nn,,,LT1,,不允許
-"13
-2.2%",っ,ltu,,,,RT1,不允許
-"18
-0.9%",-,-,,,LT1,RT1,不允許
-,,Up,LT0,RU,,,允許
-,,Down,LT0,RD,,,允許
-,,Left,LT0,RL,,,允許
-,,Right,LT0,RR,,,允許
-符號,「,[,LL,RT0,,RT2,不允許
-,」,],LR,RT0,,RT2,不允許
-,！,Shift+1,LU,RT0,,RT2,不允許
-,？,Shift+/,LD,RT0,,RT2,不允許
-,『 ,z [,LL+LU,RT0,,RT2,不允許
-, 』,z ],LR+LU,RT0,,RT2,不允許
-,・,/,LL+LD,RT0,,RT2,不允許
-,……,z . z .,LR+LD,RT0,,RT2,不允許
-,（,Shift+8,LT0,RL,LT2,,不允許
-,）,Shift+9,LT0,RR,LT2,,不允許
-,※,kome,LT0,RU,LT2,,不允許
-,○,maru,LT0,RD,LT2,,不允許
-,★ ☆,hosi,LT0,RL+RU,LT2,,不允許
-,―,dassyu,LT0,RR+RU,LT2,,不允許
-,,kigou,LT0,RL+RD,LT2,,不允許
-,→,yajirushi,LT0,RR+RD,LT2,,不允許
-,、,",",LL+LD+LR,,,,不允許
-,。,.,,RL+RD+RR,,,不允許
-操作功能,退格,Backspace,,,LT2,,允許
-,空白（變換）,Space,,,,RT2,不允許
-,變片假名,Ctrl+i,LT0,,LT2,RT2,不允許
-,變平假名,Ctrl+u,,RT0+RL+RR,LT2,RT2,不允許
-,,[ESC],LU+LR+LT0,,,,不允許
-,,Enter,LL+LD+LR,RL+RD+RR,,,不允許
-"1 
-15.4%
-單母音
-+
-12 2.9%單Y
-15 2.0% 小Y",あ,a,,RT0,,,不允許
-,い,i,,RL,,,不允許
-,う,u,,RU,,,不允許
-,え,e,,RR,,,不允許
-,お,o,,RD,,,不允許
-,や,ya,,RR+RU,,,不允許
-,ゆ,yu,,RL+RU,,,不允許
-,よ,yo,,RL+RD,,,不允許
-消失又重出的Ye,いぇ,ye,,RR+RD,,,不允許
-小字 單母音+半母音,ぁ,la,,RT0,LT1,,不允許
-,ぃ,li,,RL,LT1,,不允許
-,ぅ,lu,,RU,LT1,,不允許
-,ぇ,le,,RR,LT1,,不允許
-,ぉ,lo,,RD,LT1,,不允許
-,ゃ,lya,,RR+RU,LT1,,不允許
-,ゅ,lyu,,RL+RU,LT1,,不允許
-,ょ,lyo,,RL+RD,LT1,,不允許
-小字ゎ,ゎ,lwa,,RR+RD,LT1,,不允許
-"2 
-11.4%
-傳統 た 行",た,ta,LD,(RT0),,,不允許
-,ち,ti,LD,RL,,,不允許
-,つ,tu,LD,RU,,,不允許
-,て,te,LD,RR,,,不允許
-,と,to,LD,RD,,,不允許
-,ちゃ,tya,LD,RR+RU,,,不允許
-,ちゅ,tyu,LD,RL+RU,,,不允許
-,ちょ,tyo,LD,RL+RD,,,不允許
-"3
-11.0%
-傳統 か 行",か,ka,LU,(RT0),,,不允許
-,き,ki,LU,RL,,,不允許
-,く,ku,LU,RU,,,不允許
-,け,ke,LU,RR,,,不允許
-,こ,ko,LU,RD,,,不允許
-,きゃ,kya,LU,RR+RU,,,不允許
-,きゅ,kyu,LU,RL+RU,,,不允許
-,きょ,kyo,LU,RL+RD,,,不允許
-"4
-9.7% 
-傳統 な 行",な,na,LL,(RT0),,,不允許
-,に,ni,LL,RL,,,不允許
-,ぬ,nu,LL,RU,,,不允許
-,ね,ne,LL,RR,,,不允許
-,の,no,LL,RD,,,不允許
-,にゃ,nya,LL,RR+RU,,,不允許
-,にゅ,nyu,LL,RL+RU,,,不允許
-,にょ,nyo,LL,RL+RD,,,不允許
-"5 
-8.3%
-傳統 さ 行",さ,sa,LR,(RT0),,,不允許
-,し,si,LR,RL,,,不允許
-,す,su,LR,RU,,,不允許
-,せ,se,LR,RR,,,不允許
-,そ,so,LR,RD,,,不允許
-,しゃ,sya,LR,RR+RU,,,不允許
-,しゅ,syu,LR,RL+RU,,,不允許
-,しょ,syo,LR,RL+RD,,,不允許
-"6
-7.2%
-傳統 ら 行",ら,ra,LL+LD,(RT0),,,不允許
-,り,ri,LL+LD,RL,,,不允許
-,る,ru,LL+LD,RU,,,不允許
-,れ,re,LL+LD,RR,,,不允許
-,ろ,ro,LL+LD,RD,,,不允許
-,りゃ,rya,LL+LD,RR+RU,,,不允許
-,りゅ,ryu,LL+LD,RL+RU,,,不允許
-,りょ,ryo,LL+LD,RL+RD,,,不允許
-"7
-5.4%
-傳統 ま 行",ま,ma,LR+LD,(RT0),,,不允許
-,み,mi,LR+LD,RL,,,不允許
-,む,mu,LR+LD,RU,,,不允許
-,め,me,LR+LD,RR,,,不允許
-,も,mo,LR+LD,RD,,,不允許
-,みゃ,mya,LR+LD,RR+RU,,,不允許
-,みゅ,myu,LR+LD,RL+RU,,,不允許
-,みょ,myo,LR+LD,RL+RD,,,不允許
-"外來語 w
-+ 
-14
-2.2%
-わ/を",わ,wa,LL+LU,(RT0),,,不允許
-,うぃ,whi,LL+LU,RL,,,不允許
-,う,whu,LL+LU,RU,,,不允許
-,うぇ,whe,LL+LU,RR,,,不允許
-,を,wo,LL+LU,RD,,,不允許
-,うぉ,who,LL+LU,RR+RU,,,不允許
+﻿section,label,output,left_fingers,right_fingers,left_thumb,right_thumb,repeat
+,ん,nn,,,LT1,,no
+,っ,ltu,,,,RT1,no
+,-,-,,,LT1,RT1,no
+,,Up,LT0,RU,,,allow
+,,Down,LT0,RD,,,allow
+,,Left,LT0,RL,,,allow
+,,Right,LT0,RR,,,allow
+符號,「,[,LL,RT0,,RT2,no
+,」,],LR,RT0,,RT2,no
+,！,Shift+1,LU,RT0,,RT2,no
+,？,Shift+/,LD,RT0,,RT2,no
+,『,z [,LL+LU,RT0,,RT2,no
+,』,z ],LR+LU,RT0,,RT2,no
+,・,/,LL+LD,RT0,,RT2,no
+,……,z . z .,LR+LD,RT0,,RT2,no
+,（,Shift+8,LT0,RL,LT2,,no
+,）,Shift+9,LT0,RR,LT2,,no
+,※,kome,LT0,RU,LT2,,no
+,○,maru,LT0,RD,LT2,,no
+,★ ☆,hosi,LT0,RL+RU,LT2,,no
+,―,dassyu,LT0,RR+RU,LT2,,no
+,,kigou,LT0,RL+RD,LT2,,no
+,→,yajirushi,LT0,RR+RD,LT2,,no
+,、,",",LL+LD+LR,,,,no
+,。,.,,RL+RD+RR,,,no
+操作功能,退格,Backspace,,,LT2,,allow
+,空白（變換）,Space,,,,RT2,no
+,變片假名,Ctrl+i,LT0,,LT2,RT2,no
+,變平假名,Ctrl+u,,RT0+RL+RR,LT2,RT2,no
+,,[ESC],LU+LR+LT0,,,,no
+,,Enter,LL+LD+LR,RL+RD+RR,,,no
+單母音,あ,a,,RT0,,,no
+,い,i,,RL,,,no
+,う,u,,RU,,,no
+,え,e,,RR,,,no
+,お,o,,RD,,,no
+,や,ya,,RR+RU,,,no
+,ゆ,yu,,RL+RU,,,no
+,よ,yo,,RL+RD,,,no
+消失又重出的Ye,いぇ,ye,,RR+RD,,,no
+小字 單母音+半母音,ぁ,la,,RT0,LT1,,no
+,ぃ,li,,RL,LT1,,no
+,ぅ,lu,,RU,LT1,,no
+,ぇ,le,,RR,LT1,,no
+,ぉ,lo,,RD,LT1,,no
+,ゃ,lya,,RR+RU,LT1,,no
+,ゅ,lyu,,RL+RU,LT1,,no
+,ょ,lyo,,RL+RD,LT1,,no
+小字ゎ,ゎ,lwa,,RR+RD,LT1,,no
+傳統 た 行,た,ta,LD,(RT0),,,no
+,ち,ti,LD,RL,,,no
+,つ,tu,LD,RU,,,no
+,て,te,LD,RR,,,no
+,と,to,LD,RD,,,no
+,ちゃ,tya,LD,RR+RU,,,no
+,ちゅ,tyu,LD,RL+RU,,,no
+,ちょ,tyo,LD,RL+RD,,,no
+傳統 か 行,か,ka,LU,(RT0),,,no
+,き,ki,LU,RL,,,no
+,く,ku,LU,RU,,,no
+,け,ke,LU,RR,,,no
+,こ,ko,LU,RD,,,no
+,きゃ,kya,LU,RR+RU,,,no
+,きゅ,kyu,LU,RL+RU,,,no
+,きょ,kyo,LU,RL+RD,,,no
+傳統 な 行,な,na,LL,(RT0),,,no
+,に,ni,LL,RL,,,no
+,ぬ,nu,LL,RU,,,no
+,ね,ne,LL,RR,,,no
+,の,no,LL,RD,,,no
+,にゃ,nya,LL,RR+RU,,,no
+,にゅ,nyu,LL,RL+RU,,,no
+,にょ,nyo,LL,RL+RD,,,no
+傳統 さ 行,さ,sa,LR,(RT0),,,no
+,し,si,LR,RL,,,no
+,す,su,LR,RU,,,no
+,せ,se,LR,RR,,,no
+,そ,so,LR,RD,,,no
+,しゃ,sya,LR,RR+RU,,,no
+,しゅ,syu,LR,RL+RU,,,no
+,しょ,syo,LR,RL+RD,,,no
+傳統 ら 行,ら,ra,LL+LD,(RT0),,,no
+,り,ri,LL+LD,RL,,,no
+,る,ru,LL+LD,RU,,,no
+,れ,re,LL+LD,RR,,,no
+,ろ,ro,LL+LD,RD,,,no
+,りゃ,rya,LL+LD,RR+RU,,,no
+,りゅ,ryu,LL+LD,RL+RU,,,no
+,りょ,ryo,LL+LD,RL+RD,,,no
+傳統 ま 行,ま,ma,LR+LD,(RT0),,,no
+,み,mi,LR+LD,RL,,,no
+,む,mu,LR+LD,RU,,,no
+,め,me,LR+LD,RR,,,no
+,も,mo,LR+LD,RD,,,no
+,みゃ,mya,LR+LD,RR+RU,,,no
+,みゅ,myu,LR+LD,RL+RU,,,no
+,みょ,myo,LR+LD,RL+RD,,,no
+外來語 w,わ,wa,LL+LU,(RT0),,,no
+,うぃ,whi,LL+LU,RL,,,no
+,う,whu,LL+LU,RU,,,no
+,うぇ,whe,LL+LU,RR,,,no
+,を,wo,LL+LU,RD,,,no
+,うぉ,who,LL+LU,RR+RU,,,no
 ,,,LL+LU,RL+RU,,,
-,うぁ,wha,LL+LU,RL+RD,,,不允許
-"10
-4.1%
-傳統 は 行",は,ha,LR+LU,(RT0),,,不允許
-,ひ,hi,LR+LU,RL,,,不允許
-,ふ,hu,LR+LU,RU,,,不允許
-,へ,he,LR+LU,RR,,,不允許
-,ほ,ho,LR+LU,RD,,,不允許
-,ひゃ,hya,LR+LU,RR+RU,,,不允許
-,ひゅ,hyu,LR+LU,RL+RU,,,不允許
-,ひょ,hyo,LR+LU,RL+RD,,,不允許
-"9
-4.5%
-傳統 だ 行",だ,da,LD,(RT0),,RT1,不允許
-,ぢ,di,LD,RL,,RT1,不允許
-,づ,du,LD,RU,,RT1,不允許
-,で,de,LD,RR,,RT1,不允許
-,ど,do,LD,RD,,RT1,不允許
-,ぢゃ,dya,LD,RR+RU,,RT1,不允許
-,ぢゅ,dyu,LD,RL+RU,,RT1,不允許
-,ぢょ,dyo,LD,RL+RD,,RT1,不允許
-"11
-3.3%
-傳統 が 行",が,ga,LU,(RT0),,RT1,不允許
-,ぎ,gi,LU,RL,,RT1,不允許
-,ぐ,gu,LU,RU,,RT1,不允許
-,げ,ge,LU,RR,,RT1,不允許
-,ご,go,LU,RD,,RT1,不允許
-,ぎゃ,gya,LU,RR+RU,,RT1,不允許
-,ぎゅ,gyu,LU,RL+RU,,RT1,不允許
-,ぎょ,gyo,LU,RL+RD,,RT1,不允許
-"16
-1.8%
-傳統 ざ 行",ざ,za,LR,(RT0),,RT1,不允許
-,じ,zi,LR,RL,,RT1,不允許
-,ず,zu,LR,RU,,RT1,不允許
-,ぜ,ze,LR,RR,,RT1,不允許
-,ぞ,zo,LR,RD,,RT1,不允許
-,じゃ,zya,LR,RR+RU,,RT1,不允許
-,じゅ,zyu,LR,RL+RU,,RT1,不允許
-,じょ,zyo,LR,RL+RD,,RT1,不允許
-"17
-1.7%
-傳統 ば 行",ば,ba,LR+LU,(RT0),,RT1,不允許
-,び,bi,LR+LU,RL,,RT1,不允許
-,ぶ,bu,LR+LU,RU,,RT1,不允許
-,べ,be,LR+LU,RR,,RT1,不允許
-,ぼ,bo,LR+LU,RD,,RT1,不允許
-,びゃ,bya,LR+LU,RR+RU,,RT1,不允許
-,びゅ,byu,LR+LU,RL+RU,,RT1,不允許
-,びょ,byo,LR+LU,RL+RD,,RT1,不允許
-"19
-0.6%
-傳統 ぱ 行",ぱ,pa,LR+LU,(RT0),LT1,,不允許
-,ぴ,pi,LR+LU,RL,LT1,,不允許
-,ぷ,pu,LR+LU,RU,LT1,,不允許
-,ぺ,pe,LR+LU,RR,LT1,,不允許
-,ぽ,po,LR+LU,RD,LT1,,不允許
-,ぴゃ,pya,LR+LU,RR+RU,LT1,,不允許
-,ぴゅ,pyu,LR+LU,RL+RU,LT1,,不允許
-,ぴょ,pyo,LR+LU,RL+RD,LT1,,不允許
-外來語 f,ふぁ,fa,LL+LU,(RT0),LT1,,不允許
-,ふぃ,fi,LL+LU,RL,LT1,,不允許
-,ふ,fu,LL+LU,RU,LT1,,不允許
-,ふぇ,fe,LL+LU,RR,LT1,,不允許
-,ふぉ,fo,LL+LU,RD,LT1,,不允許
-,ふゃ,fya,LL+LU,RR+RU,LT1,,不允許
-,ふゅ,fyu,LL+LU,RL+RU,LT1,,不允許
-,ふょ,fyo,LL+LU,RL+RD,LT1,,不允許
-外來語 v,ゔぁ,va,LL+LU,(RT0),LT1,RT1,不允許
-,ゔぃ,vi,LL+LU,RL,LT1,RT1,不允許
-,ゔ,vu,LL+LU,RU,LT1,RT1,不允許
-,ゔぇ,ve,LL+LU,RR,LT1,RT1,不允許
-,ゔぉ,vo,LL+LU,RD,LT1,RT1,不允許
-,ゔゃ,vya,LL+LU,RR+RU,LT1,RT1,不允許
-,ゔゅ,vyu,LL+LU,RL+RU,LT1,RT1,不允許
-,ゔょ,vyo,LL+LU,RL+RD,LT1,RT1,不允許
-外來語 kw,くぁ,qa,LU,(RT0),LT1,,不允許
-,くぃ,qi,LU,RL,LT1,,不允許
-,く,qu,LU,RU,LT1,,不允許
-,くぇ,qe,LU,RR,LT1,,不允許
-,くぉ,qo,LU,RD,LT1,,不允許
+,うぁ,wha,LL+LU,RL+RD,,,no
+傳統 は 行,は,ha,LR+LU,(RT0),,,no
+,ひ,hi,LR+LU,RL,,,no
+,ふ,hu,LR+LU,RU,,,no
+,へ,he,LR+LU,RR,,,no
+,ほ,ho,LR+LU,RD,,,no
+,ひゃ,hya,LR+LU,RR+RU,,,no
+,ひゅ,hyu,LR+LU,RL+RU,,,no
+,ひょ,hyo,LR+LU,RL+RD,,,no
+傳統 だ 行,だ,da,LD,(RT0),,RT1,no
+,ぢ,di,LD,RL,,RT1,no
+,づ,du,LD,RU,,RT1,no
+,で,de,LD,RR,,RT1,no
+,ど,do,LD,RD,,RT1,no
+,ぢゃ,dya,LD,RR+RU,,RT1,no
+,ぢゅ,dyu,LD,RL+RU,,RT1,no
+,ぢょ,dyo,LD,RL+RD,,RT1,no
+傳統 が 行,が,ga,LU,(RT0),,RT1,no
+,ぎ,gi,LU,RL,,RT1,no
+,ぐ,gu,LU,RU,,RT1,no
+,げ,ge,LU,RR,,RT1,no
+,ご,go,LU,RD,,RT1,no
+,ぎゃ,gya,LU,RR+RU,,RT1,no
+,ぎゅ,gyu,LU,RL+RU,,RT1,no
+,ぎょ,gyo,LU,RL+RD,,RT1,no
+傳統 ざ 行,ざ,za,LR,(RT0),,RT1,no
+,じ,zi,LR,RL,,RT1,no
+,ず,zu,LR,RU,,RT1,no
+,ぜ,ze,LR,RR,,RT1,no
+,ぞ,zo,LR,RD,,RT1,no
+,じゃ,zya,LR,RR+RU,,RT1,no
+,じゅ,zyu,LR,RL+RU,,RT1,no
+,じょ,zyo,LR,RL+RD,,RT1,no
+傳統 ば 行,ば,ba,LR+LU,(RT0),,RT1,no
+,び,bi,LR+LU,RL,,RT1,no
+,ぶ,bu,LR+LU,RU,,RT1,no
+,べ,be,LR+LU,RR,,RT1,no
+,ぼ,bo,LR+LU,RD,,RT1,no
+,びゃ,bya,LR+LU,RR+RU,,RT1,no
+,びゅ,byu,LR+LU,RL+RU,,RT1,no
+,びょ,byo,LR+LU,RL+RD,,RT1,no
+傳統 ぱ 行,ぱ,pa,LR+LU,(RT0),LT1,,no
+,ぴ,pi,LR+LU,RL,LT1,,no
+,ぷ,pu,LR+LU,RU,LT1,,no
+,ぺ,pe,LR+LU,RR,LT1,,no
+,ぽ,po,LR+LU,RD,LT1,,no
+,ぴゃ,pya,LR+LU,RR+RU,LT1,,no
+,ぴゅ,pyu,LR+LU,RL+RU,LT1,,no
+,ぴょ,pyo,LR+LU,RL+RD,LT1,,no
+外來語 f,ふぁ,fa,LL+LU,(RT0),LT1,,no
+,ふぃ,fi,LL+LU,RL,LT1,,no
+,ふ,fu,LL+LU,RU,LT1,,no
+,ふぇ,fe,LL+LU,RR,LT1,,no
+,ふぉ,fo,LL+LU,RD,LT1,,no
+,ふゃ,fya,LL+LU,RR+RU,LT1,,no
+,ふゅ,fyu,LL+LU,RL+RU,LT1,,no
+,ふょ,fyo,LL+LU,RL+RD,LT1,,no
+外來語 v,ゔぁ,va,LL+LU,(RT0),LT1,RT1,no
+,ゔぃ,vi,LL+LU,RL,LT1,RT1,no
+,ゔ,vu,LL+LU,RU,LT1,RT1,no
+,ゔぇ,ve,LL+LU,RR,LT1,RT1,no
+,ゔぉ,vo,LL+LU,RD,LT1,RT1,no
+,ゔゃ,vya,LL+LU,RR+RU,LT1,RT1,no
+,ゔゅ,vyu,LL+LU,RL+RU,LT1,RT1,no
+,ゔょ,vyo,LL+LU,RL+RD,LT1,RT1,no
+外來語 kw,くぁ,qa,LU,(RT0),LT1,,no
+,くぃ,qi,LU,RL,LT1,,no
+,く,qu,LU,RU,LT1,,no
+,くぇ,qe,LU,RR,LT1,,no
+,くぉ,qo,LU,RD,LT1,,no
 ,,,LU,RR+RU,LT1,,
 ,,,LU,RL+RU,LT1,,
 ,,,LU,RL+RD,LT1,,
-外來語 gw,ぐぁ,gwa,LU,(RT0),LT1,RT1,不允許
-,ぐぃ,gwi,LU,RL,LT1,RT1,不允許
-,ぐぅ,gwu,LU,RU,LT1,RT1,不允許
-,ぐぇ,gwe,LU,RR,LT1,RT1,不允許
-,ぐぉ,gwo,LU,RD,LT1,RT1,不允許
+外來語 gw,ぐぁ,gwa,LU,(RT0),LT1,RT1,no
+,ぐぃ,gwi,LU,RL,LT1,RT1,no
+,ぐぅ,gwu,LU,RU,LT1,RT1,no
+,ぐぇ,gwe,LU,RR,LT1,RT1,no
+,ぐぉ,gwo,LU,RD,LT1,RT1,no
 ,,,LU,RR+RU,LT1,RT1,
 ,,,LU,RL+RU,LT1,RT1,
 ,,,LU,RL+RD,LT1,RT1,
-外來語 sh,しゃ,sya,LR,(RT0),LT1,,不允許
-,しぃ,syi,LR,RL,LT1,,不允許
-,しゅ,syu,LR,RU,LT1,,不允許
-,しぇ,sye,LR,RR,LT1,,不允許
-,しょ,syo,LR,RD,LT1,,不允許
-,しゃ,sya,LR,RR+RU,LT1,,不允許
-,しゅ,syu,LR,RL+RU,LT1,,不允許
-,しょ,syo,LR,RL+RD,LT1,,不允許
-外來語 j,じゃ,ja,LR,(RT0),LT1,RT1,不允許
-,じ,ji,LR,RL,LT1,RT1,不允許
-,じゅ,ju,LR,RU,LT1,RT1,不允許
-,じぇ,je,LR,RR,LT1,RT1,不允許
-,じょ,jo,LR,RD,LT1,RT1,不允許
-,じゃ,jya,LR,RR+RU,LT1,RT1,不允許
-,じゅ,jyu,LR,RL+RU,LT1,RT1,不允許
-,じょ,jyo,LR,RL+RD,LT1,RT1,不允許
-外來語 ch,ちゃ,cha,LL,(RT0),LT1,,不允許
-,ち,chi,LL,RL,LT1,,不允許
+外來語 sh,しゃ,sya,LR,(RT0),LT1,,no
+,しぃ,syi,LR,RL,LT1,,no
+,しゅ,syu,LR,RU,LT1,,no
+,しぇ,sye,LR,RR,LT1,,no
+,しょ,syo,LR,RD,LT1,,no
+,しゃ,sya,LR,RR+RU,LT1,,no
+,しゅ,syu,LR,RL+RU,LT1,,no
+,しょ,syo,LR,RL+RD,LT1,,no
+外來語 j,じゃ,ja,LR,(RT0),LT1,RT1,no
+,じ,ji,LR,RL,LT1,RT1,no
+,じゅ,ju,LR,RU,LT1,RT1,no
+,じぇ,je,LR,RR,LT1,RT1,no
+,じょ,jo,LR,RD,LT1,RT1,no
+,じゃ,jya,LR,RR+RU,LT1,RT1,no
+,じゅ,jyu,LR,RL+RU,LT1,RT1,no
+,じょ,jyo,LR,RL+RD,LT1,RT1,no
+外來語 ch,ちゃ,cha,LL,(RT0),LT1,,no
+,ち,chi,LL,RL,LT1,,no
 ,,,LL,RU,LT1,,
-,ちぇ,che,LL,RR,LT1,,不允許
-,ちょ,cho,LL,RD,LT1,,不允許
+,ちぇ,che,LL,RR,LT1,,no
+,ちょ,cho,LL,RD,LT1,,no
 ,,,LL,RR+RU,LT1,,
-,ちゅ,chu,LL,RL+RU,LT1,,不允許
+,ちゅ,chu,LL,RL+RU,LT1,,no
 ,,,LL,RL+RD,LT1,,
-外來語 ts,つぁ,tsa,LD,(RT0),LT1,,不允許
-,つぃ,tsi,LD,RL,LT1,,不允許
-,つ,tsu,LD,RU,LT1,,不允許
-,つぇ,tse,LD,RR,LT1,,不允許
-,つぉ,tso,LD,RD,LT1,,不允許
+外來語 ts,つぁ,tsa,LD,(RT0),LT1,,no
+,つぃ,tsi,LD,RL,LT1,,no
+,つ,tsu,LD,RU,LT1,,no
+,つぇ,tse,LD,RR,LT1,,no
+,つぉ,tso,LD,RD,LT1,,no
 ,,,LD,RR+RU,LT1,,
 ,,,LD,RL+RU,LT1,,
 ,,,LD,RL+RD,LT1,,
-外來語 ti,てゃ,tha,LR+LD,(RT0),LT1,,不允許
-,てぃ,thi,LR+LD,RL,LT1,,不允許
+外來語 ti,てゃ,tha,LR+LD,(RT0),LT1,,no
+,てぃ,thi,LR+LD,RL,LT1,,no
 ,,,LR+LD,RU,LT1,,
-,てぇ,the,LR+LD,RR,LT1,,不允許
-,てょ,tho,LR+LD,RD,LT1,,不允許
+,てぇ,the,LR+LD,RR,LT1,,no
+,てょ,tho,LR+LD,RD,LT1,,no
 ,,,LR+LD,RR+RU,LT1,,
-,てゅ,thu,LR+LD,RL+RU,LT1,,不允許
+,てゅ,thu,LR+LD,RL+RU,LT1,,no
 ,,,LR+LD,RL+RD,LT1,,
-外來語 di,でゃ,dha,LR+LD,(RT0),LT1,RT1,不允許
-,でぃ,dhi,LR+LD,RL,LT1,RT1,不允許
+外來語 di,でゃ,dha,LR+LD,(RT0),LT1,RT1,no
+,でぃ,dhi,LR+LD,RL,LT1,RT1,no
 ,,,LR+LD,RU,LT1,RT1,
-,でぇ,dhe,LR+LD,RR,LT1,RT1,不允許
-,でょ,dho,LR+LD,RD,LT1,RT1,不允許
+,でぇ,dhe,LR+LD,RR,LT1,RT1,no
+,でょ,dho,LR+LD,RD,LT1,RT1,no
 ,,,LR+LD,RR+RU,LT1,RT1,
-,でゅ,dhu,LR+LD,RL+RU,LT1,RT1,不允許
+,でゅ,dhu,LR+LD,RL+RU,LT1,RT1,no
 ,,,LR+LD,RL+RD,LT1,RT1,
-外來語 tu,とぁ,twa,LL+LD,(RT0),LT1,,不允許
-,とぃ,twi,LL+LD,RL,LT1,,不允許
-,とぅ,twu,LL+LD,RU,LT1,,不允許
-,とぇ,twe,LL+LD,RR,LT1,,不允許
-,とぉ,two,LL+LD,RD,LT1,,不允許
+外來語 tu,とぁ,twa,LL+LD,(RT0),LT1,,no
+,とぃ,twi,LL+LD,RL,LT1,,no
+,とぅ,twu,LL+LD,RU,LT1,,no
+,とぇ,twe,LL+LD,RR,LT1,,no
+,とぉ,two,LL+LD,RD,LT1,,no
 ,,,LL+LD,RR+RU,LT1,,
 ,,,LL+LD,RL+RU,LT1,,
 ,,,LL+LD,RL+RD,LT1,,
-外來語 du,どぁ,dwa,LL+LD,(RT0),LT1,RT1,不允許
-,どぃ,dwi,LL+LD,RL,LT1,RT1,不允許
-,どぅ,dwu,LL+LD,RU,LT1,RT1,不允許
-,どぇ,dwe,LL+LD,RR,LT1,RT1,不允許
-,どぉ,dwo,LL+LD,RD,LT1,RT1,不允許
+外來語 du,どぁ,dwa,LL+LD,(RT0),LT1,RT1,no
+,どぃ,dwi,LL+LD,RL,LT1,RT1,no
+,どぅ,dwu,LL+LD,RU,LT1,RT1,no
+,どぇ,dwe,LL+LD,RR,LT1,RT1,no
+,どぉ,dwo,LL+LD,RD,LT1,RT1,no
 ,,,LL+LD,RR+RU,LT1,RT1,
 ,,,LL+LD,RL+RU,LT1,RT1,
 ,,,LL+LD,RL+RD,LT1,RT1,
