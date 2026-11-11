@@ -6,8 +6,9 @@
 #include "chord_core.h"
 
 // Host keyboard layout, applied to a parsed recipe before HID reports.
-// The chord table stays as written. A second layout fills these tables;
-// only JIS exists, and its rewrite lists are empty.
+// The chord table stays as written. kLayoutUs exists and is not selected.
+// The active layout is still kLayoutJis: hid_keyboard, hid_link, and hid_ble
+// pass that table. JIS rewrite lists are empty. US rewrites Shift+8 and Shift+9.
 //
 // ascii is 128 bytes in Arduino's layout encoding: bit 7 means Shift,
 // the low 7 bits are a HID Keyboard usage. 0 means the character has no key.
@@ -50,6 +51,8 @@ struct HostLayout {
 
 extern const uint8_t kLayoutJisAscii[128];
 extern const HostLayout kLayoutJis;
+extern const uint8_t kLayoutUsAscii[128];
+extern const HostLayout kLayoutUs;
 
 struct LayoutFold {
   uint8_t usage;

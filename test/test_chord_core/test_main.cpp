@@ -1791,6 +1791,58 @@ extern "C" void test_jis_layout_fold_and_identity(void) {
   TEST_ASSERT_EQUAL_INT(0x8A, henkan.events[0].code);
 }
 
+static void assert_applied_matches(const HostLayout *layout, const char *recipe, const char *expect_recipe) {
+  ChordRecipe parsed;
+  TEST_ASSERT_TRUE_MESSAGE(chord_parse_recipe(recipe, &parsed), recipe);
+  ChordEvent out[kChordRecipeCap];
+  size_t count = 0;
+  TEST_ASSERT_TRUE_MESSAGE(layout_apply(layout, parsed.events, parsed.count, out, kChordRecipeCap, &count),
+                           recipe);
+  ChordRecipe expect;
+  TEST_ASSERT_TRUE_MESSAGE(chord_parse_recipe(expect_recipe, &expect), expect_recipe);
+  TEST_ASSERT_EQUAL_INT_MESSAGE(static_cast<int>(expect.count), static_cast<int>(count), recipe);
+  for (size_t i = 0; i < count; ++i) {
+    char msg[64];
+    snprintf(msg, sizeof(msg), "%s -> %s [%u]", recipe, expect_recipe, static_cast<unsigned>(i));
+    TEST_ASSERT_EQUAL_INT_MESSAGE(static_cast<int>(expect.events[i].op), static_cast<int>(out[i].op), msg);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(static_cast<int>(expect.events[i].key), static_cast<int>(out[i].key), msg);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(expect.events[i].code, out[i].code, msg);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(expect.events[i].gap_after_ms, out[i].gap_after_ms, msg);
+  }
+}
+
+extern "C" void test_us_layout_fold_and_shift_row(void) {
+  const LayoutFold bracket = layout_fold_ascii(&kLayoutUs, '[');
+  TEST_ASSERT_TRUE(bracket.present);
+  TEST_ASSERT_EQUAL_UINT8(0x2f, bracket.usage);
+  TEST_ASSERT_FALSE(bracket.shift);
+  const LayoutFold close_bracket = layout_fold_ascii(&kLayoutUs, ']');
+  TEST_ASSERT_TRUE(close_bracket.present);
+  TEST_ASSERT_EQUAL_UINT8(0x30, close_bracket.usage);
+  TEST_ASSERT_FALSE(close_bracket.shift);
+
+  const unsigned char shared[] = {'a', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'};
+  for (unsigned char ascii : shared) {
+    const LayoutFold us = layout_fold_ascii(&kLayoutUs, ascii);
+    const LayoutFold jis = layout_fold_ascii(&kLayoutJis, ascii);
+    char msg[32];
+    snprintf(msg, sizeof(msg), "shared %c", ascii);
+    TEST_ASSERT_TRUE_MESSAGE(us.present, msg);
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(jis.usage, us.usage, msg);
+    if (jis.shift) TEST_ASSERT_TRUE_MESSAGE(us.shift, msg);
+    else TEST_ASSERT_FALSE_MESSAGE(us.shift, msg);
+  }
+
+  TEST_ASSERT_EQUAL_INT(0, static_cast<int>(kLayoutUs.usage_count));
+  TEST_ASSERT_EQUAL_INT(2, static_cast<int>(kLayoutUs.combo_count));
+  assert_applied_matches(&kLayoutUs, "Shift+8", "Shift+9");
+  assert_applied_matches(&kLayoutUs, "Shift+9", "Shift+0");
+  assert_same_events(&kLayoutUs, "Shift+1");
+  assert_same_events(&kLayoutUs, "Shift+/");
+  assert_same_events(&kLayoutUs, "[");
+  assert_same_events(&kLayoutUs, "Henkan");
+}
+
 int main(int argc, char **argv) {
   (void)argc;
   (void)argv;
@@ -1808,6 +1860,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_first_up_draining_ignores_presses);
   RUN_TEST(test_recipe_shapes);
   RUN_TEST(test_jis_layout_fold_and_identity);
+  RUN_TEST(test_us_layout_fold_and_shift_row);
   RUN_TEST(test_skip_overflow_is_flagged);
   RUN_TEST(test_recipe_that_does_not_fit_fails);
   RUN_TEST(test_recipe_token_and_cap_bounds);
