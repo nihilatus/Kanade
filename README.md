@@ -41,7 +41,7 @@ loop（熱點開）
   不掃描、不送鍵；只服務設定頁
 ```
 
-遮罩 bit0..13 固定為 `LL LU LR LD LT0 LT1 LT2 RL RU RR RD RT0 RT1 RT2`。韌體送羅馬字／快捷鍵配方，不做假名轉換。
+遮罩 bit0..13 固定為 `LL LU LR LD LT0 LT1 LT2 RL RU RR RD RT0 RT1 RT2`。韌體依配方送出字元組合／功能鍵／修飾鍵複合，不做假名轉換。
 
 | 該改什麼 | 看哪裡 |
 | --- | --- |
