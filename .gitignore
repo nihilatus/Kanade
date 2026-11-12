@@ -12,6 +12,9 @@ Thumbs.db
 *.bak
 *.swp
 
+# Local env (e.g. PYTHONDONTWRITEBYTECODE); keep out of git.
+.env
+
 # Wi-Fi password for the chord editor. Copy include/secrets.h.example.
 include/secrets.h
 
