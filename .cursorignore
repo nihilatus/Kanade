@@ -1,0 +1,9 @@
+# PlatformIO build/cache — already in .gitignore; keep explicit for Cursor
+.pio/
+
+# Local dump (path corrected from review); already in .gitignore
+tools/git_history.txt
+git_history.txt
+
+# Binary artifact — tiny, but useless as LLM context
+web/chord_core.wasm
