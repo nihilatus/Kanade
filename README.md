@@ -2,166 +2,66 @@
 
 日文輸入用的 14 鍵和弦鍵盤，名字取自日文「奏」。
 
-實體按鍵 → ESP32 和弦引擎 → USB HID 或 BLE HID 鍵盤 → 主機日文 IME。
+個人作品：人出主意，實作交給 AI。這份 README 優先讓後續 AI 快速對齊專案，而不是當產品手冊。
 
-GPIO16 開路時選 USB，接地時選 BLE；開機只啟用一種輸出。韌體依和弦表送出羅馬字與快捷鍵配方。主機鍵盤類型須設為 Kanade 使用的配列（目前只實作 JIS），並啟用日文 IME（羅馬字）。
-
-遠端倉庫（公開）：https://github.com/nihilatus/Kanade
-
-專案演進紀錄見 [`docs/history.md`](docs/history.md)。
-
----
-
-## 這是什麼
+```text
+實體 14 鍵 → ESP32 和弦引擎 → USB HID 或 BLE HID → 主機日文 IME（羅馬字）
+```
 
 | | |
 | --- | --- |
-| 角色 | USB HID 或 BLE HID **鍵盤**（不是手把／不是類比搖桿） |
 | 板子 | ESP32-S3-DevKitC-1 **N16R8** |
-| 輸入 | **14 顆**離散按鍵（無類比 stick） |
-| 輸出 | USB 或 BLE 二選一；GPIO16 開路為 USB、接地為 BLE。送出羅馬字／快捷鍵配方 |
-| 主機 | 鍵盤類型設為 Kanade 使用的配列（目前只實作 JIS），再交由日文 IME 處理 |
-| 現況 | 14 鍵直連採樣、`kChordDebounceMs` 消彈跳；[送出時機](#輸入邏輯) |
+| 角色 | HID **鍵盤**（不是手把、沒有類比 stick） |
+| 輸出 | 開機二選一：GPIO16 開路 = USB，接地 = BLE |
+| 送出時機 | GPIO17 開路 = 全放再送，接地 = 首鍵放開就送（運行中可切） |
+| 主機 | 鍵盤類型設成 Kanade 的配列（目前只實作 **JIS**），再啟用日文 IME |
+| 遠端 | https://github.com/nihilatus/Kanade |
+
+已決定、不要順手改的取捨 → [`docs/design-decisions.md`](docs/design-decisions.md)  
+想法還沒定案、不要照著開工 → [`docs/動嘴容易.md`](docs/動嘴容易.md)
 
 ---
 
-## 架構
+## 架構（給 AI）
 
-採樣、和弦判斷、送鍵、改表分開。判斷本身在 `chord_core`，不碰 GPIO、檔案或 HID 輸出連線，所以宿主測試不用燒板。
+採樣、判斷、送鍵、改表分開。`chord_core` 是純邏輯：不碰 GPIO、檔案、HID，宿主測試與試打頁共用同一份。
 
 ```text
 人編 CSV
   └─ 編譯前 → data/chord_map.machine.csv
-              include/chord_map.inc   出廠表，編進韌體
+              include/chord_map.inc   （出廠表，編進韌體）
 
-開機 chords_begin
-  LittleFS /chords.json 有效 → 用這份活表
-  否則用出廠表
+開機
+  LittleFS /chords.json 有效 → 活表；否則出廠表
+  GPIO16 → USB 或 BLE（執行中切換會重啟）
 
-開機讀 GPIO16
-  開路 → USB HID
-  接地 → BLE HID（GPIO15 接地時先處理熱點，不啟動 BLE）
-
-每一圈 loop
-  GPIO15
-    → config_server  消抖開關；熱點開著才處理網頁與 JSON
-  熱點未開
-    14 顆 GPIO
-      → buttons        去彈跳，得到 14-bit 遮罩
-      → chords         交給 chord_core：高峰、送出時機、比對活表
-      → hid_keyboard   配方先經過作用中的 HostLayout（目前是 JIS），再排隊
-      → hid_link       送到開機選定的 USB 或 BLE 鍵盤；BLE 等前一包通知完成再送下一包
-  熱點已開
-    不讀 14 鍵、不走和弦、不送 HID
+loop（熱點關）
+  14 GPIO → buttons（遮罩）→ chords / chord_core → hid_keyboard（HostLayout）→ hid_link
+loop（熱點開）
+  不掃描、不送鍵；只服務設定頁
 ```
 
-遮罩的 bit0..13 固定是 `LL LU LR LD LT0 LT1 LT2 RL RU RR RD RT0 RT1 RT2`。PC 收到的是一般鍵盤的羅馬字與少數特殊鍵，日文轉換交給 IME，韌體不做假名轉換。主機鍵盤類型要設成 Kanade 設定的配列。(目前只實作JIS)。字元走作用中的 HostLayout，目前是 JIS：`a`–`z` 與數字的用途碼和美式相同，出廠表裡不同的是 `[`（0x30）和 `]`（0x31）。`Shift+8`／`Shift+9` 在 JIS 上才是（）。`Hankaku`、`Muhenkan`、`Henkan`、`Kana` 也要與 Kanade 同一套配列，Windows 才會當成半角/全角、無変換、変換、ひらがな。USB 國碼不設定，Windows 不會靠它切換版面。
+遮罩 bit0..13 固定為 `LL LU LR LD LT0 LT1 LT2 RL RU RR RD RT0 RT1 RT2`。韌體送羅馬字／快捷鍵配方，不做假名轉換。
 
-| 模組 | 做什麼 |
+| 該改什麼 | 看哪裡 |
 | --- | --- |
-| `src/buttons.cpp` | 一鍵一 GPIO，按下為 LOW。去彈跳後的遮罩給和弦引擎；raw 邊緣與穩定遮罩同時寫進 512 筆 RAM 環形緩衝 |
-| `src/chord_core.cpp` | 鍵名、高峰快照、全放／首鍵放開、規則比對、配方解析 |
-| `src/chords.cpp` | 出廠表與 LittleFS 活表、NVS 裡的送出模式。比對成功才呼叫送鍵；比對不到時序列埠印「無符合規則」與遮罩，不送鍵 |
-| `src/hid_keyboard.cpp` | 把配方排進同一條時間軸，套用作用中的 HostLayout，再交給輸出連結 |
-| `src/hid_link.cpp`、`src/hid_ble.cpp` | 共用 USB／BLE 輸出介面與 BLE HID 傳送 |
-| `src/output_switch.cpp` | 開機讀取 GPIO16，選擇 USB 或 BLE；執行中切換需重啟 |
-| `src/config_server.cpp` | GPIO15、SoftAP、和弦 JSON API 與手機頁。熱點開著時不掃描、不送鍵 |
-| `src/main.cpp` | `setup`／`loop` 把上面串起來。序列埠指令是 `switches`（三顆行為開關的檔位與模式）、`fire`（送出時機）、`keys`（印目前按鍵）、`drops`（開機後丟掉的配方、略過的 token、主機未就緒次數；UART0 也印）與 `trace`（傾印開機後最近 512 筆 raw 邊緣與穩定遮罩；傾印期間 `loop` 暫停） |
-| `web/index.html` | 用電腦鍵盤試打。讀機器表，不燒錄、不送 USB HID |
-| `test/test_chord_core` | 和弦判斷、高峰、送出時機、配方。`pio test -e native` 也編譯設定模組，並執行 `test_config_http`、`test_config_job`、`test_output_policy`、`test_pin_map`、`test_mode_switches` |
+| 和弦表（唯一可手改來源） | `esp32-jis-chordboard-premapping.csv` → `tools/build_chord_map_machine.py` |
+| 判斷／高峰／送出時機／配方 | `src/chord_core.cpp`；常數在 `include/settings.h` |
+| 活表、比對後送鍵 | `src/chords.cpp` |
+| 主機配列（目前 JIS） | `src/host_layout.cpp` |
+| 腳位與行為開關 | `include/pin_map.h`、`include/mode_switches.h` |
+| USB／BLE 輸出 | `src/hid_link.cpp`、`src/hid_ble.cpp`、`src/output_switch.cpp` |
+| 熱點與改表 API | `src/config_server.cpp` |
+| 串起來 | `src/main.cpp` |
 
-手機存檔會蓋過出廠表，直到網頁上還原出廠。送出時機寫在 NVS，與和弦表分開。試打頁的開關只存在那個瀏覽器。
+為什麼是「左手行、右手段、拇指修飾」→ [`docs/chorded-kana.md`](docs/chorded-kana.md)  
+表欄位、RT0、比對規則 → [`docs/chord-map-machine.md`](docs/chord-map-machine.md)
 
 ---
 
-## 按鍵
+## 建置
 
-14 個實體鍵 ID（左／右各 7）：
-
-| 側 | 鍵 |
-| --- | --- |
-| 左 | `LL` `LU` `LR` `LD` `LT0` `LT1` `LT2` |
-| 右 | `RL` `RU` `RR` `RD` `RT0` `RT1` `RT2` |
-
-沒有類比 stick。手怎麼放、字什麼時候出去，見 [`docs/playing.md`](docs/playing.md)。為什麼是「左手行、右手段、拇指修飾」，見 [`docs/chorded-kana.md`](docs/chorded-kana.md)。
-
----
-
-## 輸入邏輯
-
-按住期間取同時按下數量最大的一組，送出一次。時機是全放再送，或首鍵放開就送。`(RT0)`、比對與候選優先序見 [`docs/chord-map-machine.md`](docs/chord-map-machine.md)。設計骨架見 [`docs/chorded-kana.md`](docs/chorded-kana.md)。
-
-沒有另存的送出模式。開機與運行中都看 GPIO17：開路是全放再送，接到 GND 是首鍵放開就送。撥動後消抖就換，不重啟。熱點頁和序列埠 `fire` 只顯示目前模式。試打頁的開關只影響瀏覽器。每鍵要先穩定 `kChordDebounceMs` 才算按下或放開。
-
-機器表 `repeat=allow` 的列（目前是方向鍵和 `Backspace`）由韌體自己定時送出按下再放開，間隔 `kChordRepeatIntervalMs`，不跟 Windows 的鍵盤重複速度走。
-
----
-
-## 設定檔
-
-| 檔案 | 用途 |
-| --- | --- |
-| [`esp32-jis-chordboard-premapping.csv`](esp32-jis-chordboard-premapping.csv) | **人編**和弦表，唯一可手改的來源。單行表頭 `section,label,output,left_fingers,right_fingers,left_thumb,right_thumb,repeat`，檔首要有 UTF-8 BOM。欄位說明見 [`docs/chord-map-machine.md`](docs/chord-map-machine.md) |
-| [`data/chord_map.machine.csv`](data/chord_map.machine.csv) | **機器**表，由下列腳本產生；韌體與試打頁讀這份 |
-| [`docs/chord-map-machine.md`](docs/chord-map-machine.md) | 欄位、RT0、觸發與比對 |
-| [`tools/build_chord_map_machine.py`](tools/build_chord_map_machine.py) | 人表 → 機器表與 [`include/chord_map.inc`](include/chord_map.inc) |
-| [`tools/prebuild_chord_map.py`](tools/prebuild_chord_map.py) | PlatformIO 編譯前掛鉤，只呼叫上一支 |
-
-`build_chord_map_machine.py` 做轉換；`prebuild_chord_map.py` 不做轉換，只在 `pio run` 編譯前轉呼叫它。`pio run` 與 `pio run -t upload` 會因此重建機器表與韌體用的 include。人表有未知鍵名、同一組鍵對到不同輸出，或輸出裡有裝置會略過的配方 token 時，建置會失敗。只想更新 CSV、還不編譯時，在專案根目錄執行：
-
-```bat
-python tools/build_chord_map_machine.py
-```
-
-手機改表、熱點密碼與 GPIO15 開關見 [`docs/pinout.md`](docs/pinout.md)。`include/secrets.h` 不進 git。
-
----
-
-## 用一般鍵盤試打
-
-[`web/index.html`](web/index.html) 用電腦鍵盤模擬 14 顆和弦鍵，不必接開發板，也不送 USB HID。判讀載入 [`web/chord_core.wasm`](web/chord_core.wasm)，由 [`src/chord_core.cpp`](src/chord_core.cpp) 編成：高峰、全放 `kChordReleaseGuardMs`、彈回 `kChordBounceMs`、首鍵放開、`required`／`optional`、較具體的列優先，以及 `repeat=allow` 的連發。頁面沒有自己的一份狀態機。電腦鍵盤的按下／放開已經是穩定邊緣，所以不做韌體的 `kChordDebounceMs` GPIO 消彈跳。頁首「全放再送／首鍵放開就送」會呼叫同一個模組，用來對照手感。連發時語音和逐項驗證只認這一次按住的第一下。
-
-頁面用相對路徑讀 [`data/chord_map.machine.csv`](data/chord_map.machine.csv)，並載入同目錄的 wasm。在專案根目錄開一個本機伺服器，直接用檔案開啟讀不到：
-
-```bat
-python -m http.server 8765
-```
-
-瀏覽器開 [http://127.0.0.1:8765/web/](http://127.0.0.1:8765/web/)。改完人表並重建機器表之後，重新整理就會用新表。
-
-改了守衛、彈跳、比對或連發之後，要用 [`wasm/emsdk-version.txt`](wasm/emsdk-version.txt) 裡寫的 emsdk 版本重編 wasm，否則試打頁還是舊的判讀：
-
-```bat
-python tools/build_chord_wasm.py
-```
-
-| | |
-| --- | --- |
-| 預設對應 | 左 `A W D S Q E Z`＝`LL LU LR LD LT0 LT1 LT2`；右 `J I L K U O`＝`RL RU RR RD RT0 RT1`；空白鍵＝`RT2` |
-| 改綁 | 點某個和弦鍵再按實體鍵。指定中再點一次會清掉。同一顆實體鍵不能綁兩個和弦鍵 |
-| 語音 | 有假名就用日文念；方向鍵、Enter 這類沒有假名的列用中文念功能名。右上角可關 |
-| 逐項驗證 | 依機器表一列一列要求打出該輸出。打對才算通過，可跳過或重來一輪 |
-| 換表 | 「載入 CSV」暫時試另一份同格式的機器表；「改回機器表」回到專案裡那份 |
-| 記住 | 按鍵對應與語音開關存在這個瀏覽器。也可下載／載入 `chord-keymap.json` |
-
----
-
-## 硬體／燒錄
-
-| | |
-| --- | --- |
-| 板子 | ESP32-S3-DevKitC-1 N16R8 |
-| HID | 接標示 **USB** 的 OTG 口 |
-| 燒錄／序列 | 接標示 **UART** 的口 |
-| 輸出選擇 | GPIO16 開路 = USB；接 GND = BLE。開機讀取，執行中切換會先靜音再重啟 |
-| 送出時機 | GPIO17 開路 = 全放再送；接 GND = 首鍵放開就送。運行中切換，不重啟 |
-| 保留 | **GPIO19 / GPIO20**（USB 資料線，勿當按鍵腳） |
-
-**按鍵數量：14。** 每顆開關一腳接 GPIO、一腳接 GND（內部上拉，按下為 LOW）。另外兩顆維持型開關： **GPIO15** 與 GND 合上才開 Wi-Fi 設定熱點；**GPIO17** 與 GND 合上是首鍵放開就送，開路是全放再送。腳位與零件見 [`docs/pinout.md`](docs/pinout.md)、[`docs/bom.md`](docs/bom.md)。空腳、以及現用腳佔走的 ADC／觸控，見 [`docs/gpio-spare.md`](docs/gpio-spare.md)。目前腳位先不改。
-
-### 建置與燒錄（Windows）
-
-需 [PlatformIO Core](https://platformio.org/install/cli) 或 VS Code／Cursor 的 PlatformIO 擴充。在專案根目錄執行：
+需 PlatformIO。改人表後，`pio run` 會經 `tools/prebuild_chord_map.py` 重建機器表與 `chord_map.inc`。
 
 ```bat
 pio run
@@ -169,73 +69,35 @@ pio run -t upload
 pio device monitor
 ```
 
-燒錄走 **UART**。燒完把資料線改接 **USB（OTG）**，讓 Windows 列舉 HID 鍵盤。主機必須把鍵盤類型設成 Kanade 設定的配列。(目前只實作JIS)，再開記事本、啟用日文 IME（羅馬字），然後測按鍵。鍵盤類型仍是美式時，`[`、`]` 和 `Shift+8`／`Shift+9` 會對到美式符號，`Hankaku`、`Muhenkan`、`Henkan`、`Kana` 也不會被當成半角/全角、無変換、変換、ひらがな。沒反應時先看這項設定。`Eisuu`（0x91，LANG2）是 macOS 的英数，Windows 常常沒有反應。
+燒錄走 **UART**；HID 用 **USB（OTG）**。上傳被 OTG 擋住時：按住 BOOT → 按 EN/RST → 放開 BOOT，再從 UART 重試。
 
-GPIO16 開路時使用上方的 USB OTG 鍵盤；接地時選 BLE，首次使用須在主機藍牙設定中配對 `Kanade`。兩種模式不會同時輸出；BLE 尚未連線或主機未訂閱輸入報告時，不會補送該期間按下的和弦。GPIO15 熱點開關與 BLE 模式的重啟行為見 [`docs/pinout.md`](docs/pinout.md)。
+只更新 CSV、不編譯：
 
-若 OTG HID 佔住埠導致上傳失敗：按住 **BOOT** → 點 **EN/RST** → 放開 BOOT，再於 UART 重試。
+```bat
+python tools/build_chord_map_machine.py
+```
 
-`platformio.ini` 重點：`ARDUINO_USB_MODE=0`（OTG TinyUSB HID）；`ARDUINO_USB_CDC_ON_BOOT=1` 可選（序列日誌；有干擾可改 `0`）。
+宿主測試（不燒板）：`pio test -e native`  
+實機大改後照 [`docs/device-acceptance.md`](docs/device-acceptance.md) 跑一輪。
 
-韌體若改了活表、USB／BLE 送鍵或熱點，燒錄後照 [`docs/device-acceptance.md`](docs/device-acceptance.md) 跑一輪。`pio test -e native` 只覆蓋純邏輯，不能代替這份清單。
+一般鍵盤試打（不接板、不送 HID）：根目錄 `python -m http.server 8765`，開 <http://127.0.0.1:8765/web/>。判讀來自 `web/chord_core.wasm`（`src/chord_core.cpp`）；改判斷後重編：`python tools/build_chord_wasm.py`。
+
+硬體腳位／零件／空腳 → [`docs/pinout.md`](docs/pinout.md)、[`docs/bom.md`](docs/bom.md)、[`docs/gpio-spare.md`](docs/gpio-spare.md)  
+手機熱點改表 → 同見 pinout；`include/secrets.h` 不進 git。
 
 ---
 
-## 現況與待辦
+## 文件索引
 
-| 已有 | 尚未 |
+| 文件 | 用途 |
 | --- | --- |
-| PlatformIO + Arduino；USB HID 與 BLE HID 輸出，開機二選一。USB 描述符用途 0–255，已含 変換（0x8A）、無変換（0x8B）、カタカナひらがな（0x88）；配方裡的 `Henkan` 等走 `pressRaw` | 試作 VID `0x303A`、PID `0x4004`。有別人要用再向 Espressif 申請 PID，見 [設計取捨](docs/design-decisions.md) |
-| 14 鍵直連、每鍵 `kChordDebounceMs` 穩定消彈跳。機器表 `repeat=allow` 的列在高峰穩定 50ms 後送第一下，同一組按住到 400ms 後每 33ms 連發 | — |
-| [送出時機](#輸入邏輯)；手機熱點可改表並存進 LittleFS | 外殼／PCB |
-| 配方送出（羅馬字、`Shift+1`、`Backspace`、`Ctrl+i` 等），ASCII 走作用中的 HostLayout（目前是 JIS）。BLE 每包等待控制器完成通知後再送下一包；一般鍵盤試打頁只模擬和弦邏輯，不送 HID | — |
+| [`docs/design-decisions.md`](docs/design-decisions.md) | 已決定、目前維持（改韌體前先讀） |
+| [`docs/動嘴容易.md`](docs/動嘴容易.md) | 未定案想法；有空 `答：` 的不要開工 |
+| [`docs/chord-map-machine.md`](docs/chord-map-machine.md) | 人和機器表、比對、送出 |
+| [`docs/chorded-kana.md`](docs/chorded-kana.md) | 假名和弦設計骨架 |
+| [`docs/playing.md`](docs/playing.md) | 指法與打字習慣 |
+| [`docs/pinout.md`](docs/pinout.md) | 腳位、熱點、開關 |
+| [`docs/device-acceptance.md`](docs/device-acceptance.md) | 實機驗收 |
+| [`docs/history.md`](docs/history.md) | 演進紀錄 |
 
-出廠表仍由 `include/chord_map.inc` 編譯進去。改人表後，下一次 `pio run` 會重建機器表，燒錄才會更新出廠內容；手機上儲存的表會蓋過它，直到在網頁還原出廠。
-
-### 目錄速覽
-
-```
-platformio.ini
-src/main.cpp              把採樣、和弦、HID、熱點串成 loop
-src/buttons.cpp           14 鍵直連與消彈跳
-src/chord_core.cpp        純邏輯，宿主測試也編譯這份
-src/chords.cpp            活表、送出模式、比對後送鍵
-src/host_layout.cpp       主機配列。目前只有 JIS：ASCII 表，以及空的用途碼與組合改寫
-src/hid_keyboard.cpp      配方先套用配列，再交給 USB／BLE 輸出
-src/hid_link.cpp          輸出連結共用介面
-src/hid_ble.cpp           BLE HID 輸出
-src/output_switch.cpp     GPIO16 開機輸出選擇
-src/fire_switch.cpp       GPIO17 送出時機，運行中切換
-src/config_server.cpp     GPIO15 熱點與手機設定頁
-include/pin_map.h         和弦鍵、熱點、輸出開關與送出時機腳位
-include/mode_switches.h   行為開關的顆數、開路／導通意思與切換後果
-include/output_policy.h   USB／BLE／熱點啟動判斷
-include/chord_map.inc     出廠表，由機器表產生，勿手改
-include/secrets.h         本機熱點密碼，不進 git
-esp32-jis-chordboard-premapping.csv
-data/chord_map.machine.csv
-tools/build_chord_map_machine.py
-tools/recipe.py           配方解析，與 chord_core 同一套規則，由配方向量鎖住
-tools/prebuild_chord_map.py
-tools/test_recipe_vectors.py
-tools/build_chord_wasm.py 把 chord_core 編成 web/chord_core.wasm
-tools/test_chord_wasm.mjs 檢查 wasm 匯出有接到 chord_core
-test/recipe_vectors.tsv   C++ 與 Python 共用的配方向量
-test/test_chord_core      和弦判斷；pio test -e native
-test/test_config_http     設定頁 HTTP 請求檢查
-test/test_config_job      熱點工作在掃描之外的狀態
-test/test_output_policy   開機輸出與熱點政策
-test/test_pin_map         腳位表與和弦鍵位元對應
-test/test_mode_switches   行為開關清單與重啟顯示
-wasm/chord_api.cpp        試打頁用的匯出，PlatformIO 不編譯
-wasm/emsdk-version.txt    編成 wasm 的 emsdk 版本
-web/chord_core.wasm       試打頁載入的判讀模組
-web/index.html            一般鍵盤試打，讀機器表與 wasm
-docs/chord-map-machine.md
-docs/playing.md            打法：指法，以及現在與尚未做成的送出習慣
-docs/pinout.md
-docs/gpio-spare.md         空腳與現用腳的能力；腳位先不改
-docs/bom.md
-docs/design-decisions.md  已決定、目前維持的取捨
-docs/device-acceptance.md 實機驗收；大改後照跑，不代替 pio test -e native
-```
+尚未：外殼／PCB。試作 VID/PID，有別人要用再申請（見設計取捨）。
