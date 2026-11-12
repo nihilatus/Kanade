@@ -1,6 +1,6 @@
 # Machine chord map
 
-Source of truth (human / editable): [`../esp32-jis-chordboard-premapping.csv`](../esp32-jis-chordboard-premapping.csv)
+Source of truth (human / editable): [`../esp32-jis-chordboard-premapping.csv`](../esp32-jis-chordboard-premapping.csv). Design intent (gyō / dan / thumb modifiers): [`chorded-kana.md`](chorded-kana.md).
 
 Generated machine table: [`../data/chord_map.machine.csv`](../data/chord_map.machine.csv)
 

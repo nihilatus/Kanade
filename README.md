@@ -83,13 +83,13 @@ GPIO16 開路時選 USB，接地時選 BLE；開機只啟用一種輸出。韌�
 | 左 | `LL` `LU` `LR` `LD` `LT0` `LT1` `LT2` |
 | 右 | `RL` `RU` `RR` `RD` `RT0` `RT1` `RT2` |
 
-沒有類比 stick。手怎麼放、字什麼時候出去，見 [`docs/playing.md`](docs/playing.md)。
+沒有類比 stick。手怎麼放、字什麼時候出去，見 [`docs/playing.md`](docs/playing.md)。為什麼是「左手行、右手段、拇指修飾」，見 [`docs/chorded-kana.md`](docs/chorded-kana.md)。
 
 ---
 
 ## 輸入邏輯
 
-按住期間取同時按下數量最大的一組，送出一次。時機是全放再送，或首鍵放開就送。`(RT0)`、比對與候選優先序見 [`docs/chord-map-machine.md`](docs/chord-map-machine.md)。
+按住期間取同時按下數量最大的一組，送出一次。時機是全放再送，或首鍵放開就送。`(RT0)`、比對與候選優先序見 [`docs/chord-map-machine.md`](docs/chord-map-machine.md)。設計骨架見 [`docs/chorded-kana.md`](docs/chorded-kana.md)。
 
 沒有另存的送出模式。開機與運行中都看 GPIO17：開路是全放再送，接到 GND 是首鍵放開就送。撥動後消抖就換，不重啟。熱點頁和序列埠 `fire` 只顯示目前模式。試打頁的開關只影響瀏覽器。每鍵要先穩定 `kChordDebounceMs` 才算按下或放開。
 
