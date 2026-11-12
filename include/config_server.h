@@ -8,7 +8,8 @@
 // While the AP is up the caller does not scan chord keys or send USB HID.
 // This poll still reads and writes at most a small slice of one HTTP client
 // and returns, so a slow or oversized request cannot delay noticing the
-// switch open and resuming the keyboard. JSON parsing, LittleFS, and timing
+// switch open, calling stop_ap (or requesting a BLE restart), or serving
+// serial commands in the same loop. JSON parsing, LittleFS, and timing
 // NVS writes run on the other core. If that task cannot start, chord GET,
 // POST, and reset, and timing POST and reset, answer 503 and do not run on
 // this poll. GET /api/timing reads the values already loaded at boot. The

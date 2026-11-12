@@ -24,11 +24,11 @@
 
 熱點開著時本來就不掃描、不送 USB HID，藍牙輸出也還沒有。設定頁因此不必跟鍵盤或藍牙搶同一圈。這不夠成為換套件的理由，不要用「設定頁已經獨立」回頭改這一條。
 
-要守的是熱點開關。GPIO15 撥開之後，鍵盤要在消抖後恢復。`config_server_poll()` 每一圈先看這個開關，HTTP 最多搬一小段（`kHttpSlice`）。慢的 POST、過大的 body、或卡住的客戶端不能把這一圈拖到收完整個請求，否則關熱點會被一筆沒傳完的 HTTP 堵住。同一圈還要收序列埠的 `switches`、`fire`、`drops`、`keys`、`trace`，堵住 HTTP 也會堵住這些指令。
+要守的是主迴圈還趕得上處理熱點開關與序列埠。`config_server_poll()` 每一圈先看 GPIO15，再決定關熱點或（藍牙模式下）設重啟旗標；HTTP 最多搬一小段（`kHttpSlice`）。關熱點時 `stop_ap()` 會 `softAPdisconnect` 強制斷線，不必等請求傳完——但若某一圈卡在阻塞的 HTTP 讀寫裡，就永遠走不到 `poll_switch()`，也呼叫不到切斷或重啟。分片是為了趕得上那一步，不是為了優雅收完 body。同一圈還要收序列埠的 `switches`、`fire`、`drops`、`keys`、`trace`，堵住 HTTP 也會堵住這些指令。
 
-路由只有設定頁、`/api/chords`、還原、`/api/fire`，一次只收一個連線。標頭檢查、token、Origin 在 `include/config_http.h`，宿主測試不碰 Arduino。套件吃掉的只是 socket 狀態機，下面這些仍要自己寫，所以不換：
+路由只有設定頁、`/api/chords`、還原、`/api/fire`，一次只收一個連線。標頭檢查、token、Origin 在 `include/config_http.h`，工作協定在 `include/config_job.h`；宿主測試覆蓋這兩層純邏輯，不碰 Arduino，也**測不到** socket 狀態機。手刻不是為了「比較好測」：套件吃掉的只是 socket 狀態機，下面這些仍要自己寫，所以不換：
 
-- `config_server_poll()` 每一圈最多搬 `kHttpSlice`。慢請求或過大的 body 不能拖住關熱點。
+- `config_server_poll()` 每一圈最多搬 `kHttpSlice`。慢請求或過大的 body 不能拖住開關處理與序列埠。
 - 和弦 JSON 的解析與 LittleFS 讀寫在另一個核心。那個工作開不起來時，GET／POST／還原回答 503，不要退回在這圈 loop 裡做。
 - 活表只在這次 poll 換上。先 stage，成功才 commit。上一筆還沒結束不接下一筆。斷線不能留下半截表。
 - 熱點開著時不掃描、不送鍵。USB 模式熱點關掉時，掃描與 USB HID 照常，不重啟。藍牙模式見下面的輸出開關：熱點開關再變就重啟，不在同一次開機裡改走藍牙。

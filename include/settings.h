@@ -126,7 +126,7 @@ static constexpr uint32_t kSwitchDebounceMs = 50;
 static_assert(kSwitchDebounceMs > kChordDebounceMs,
               "switch debounce must outlast a key bounce");
 // Bytes moved on one config_server_poll. A slow client must not delay
-// noticing the switch open for a whole bounce window.
+// noticing the switch open, stop_ap / restart, or serial commands.
 static constexpr size_t kHttpSlice = 512;
 // Drop a config connection that makes no progress for this long.
 static constexpr uint32_t kHttpStallMs = 5000;
