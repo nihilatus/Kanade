@@ -13,7 +13,7 @@
 | 板子 | ESP32-S3-DevKitC-1 **N16R8** |
 | 角色 | HID **鍵盤**（不是手把、沒有類比 stick） |
 | 輸出 | 開機二選一：GPIO16 開路 = USB，接地 = BLE |
-| 送出時機 | GPIO17 開路 = 全放再送，接地 = 首鍵放開就送（運行中可切） |
+| 送出時機 | GPIO21 開路 = 全放再送，接地 = 首鍵放開就送（運行中可切） |
 | 主機 | 鍵盤類型設成 Kanade 的配列（目前只實作 **JIS**），再啟用日文 IME |
 | 遠端 | https://github.com/nihilatus/Kanade |
 

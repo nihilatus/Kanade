@@ -37,17 +37,18 @@ struct PinRow {
   int gpio;
 };
 
-// Active-low to GND. Chord order matches docs/pinout.md. GPIO3 is skipped.
+// Active-low to GND. Chord order matches docs/pinout.md.
+// Left hand on DevKit J1, right hand on J3. ADC1 / default I2C (1,2,4-9) left free.
 static constexpr PinRow kPinMap[] = {
-    {PinFn::LL, 1},          {PinFn::LU, 2},
-    {PinFn::LR, 4},          {PinFn::LD, 5},
-    {PinFn::LT0, 6},         {PinFn::LT1, 7},
-    {PinFn::LT2, 8},         {PinFn::RL, 9},
-    {PinFn::RU, 10},         {PinFn::RR, 11},
-    {PinFn::RD, 12},         {PinFn::RT0, 13},
-    {PinFn::RT1, 14},        {PinFn::RT2, 21},
+    {PinFn::LL, 17},         {PinFn::LU, 18},
+    {PinFn::LR, 10},         {PinFn::LD, 11},
+    {PinFn::LT0, 12},        {PinFn::LT1, 13},
+    {PinFn::LT2, 14},        {PinFn::RL, 42},
+    {PinFn::RU, 41},         {PinFn::RR, 40},
+    {PinFn::RD, 39},         {PinFn::RT0, 38},
+    {PinFn::RT1, 48},        {PinFn::RT2, 47},
     {PinFn::WifiEnable, 15}, {PinFn::OutputMode, 16},
-    {PinFn::FireTiming, 17},
+    {PinFn::FireTiming, 21},
 };
 
 static constexpr int kPinRowCount = static_cast<int>(sizeof(kPinMap) / sizeof(kPinMap[0]));

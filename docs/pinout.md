@@ -38,21 +38,23 @@
 
 ## 按鍵 → GPIO
 
-| 鍵 | GPIO | 鍵 | GPIO |
-| --- | ---: | --- | ---: |
-| LL | 1 | RL | 9 |
-| LU | 2 | RU | 10 |
-| LR | 4 | RR | 11 |
-| LD | 5 | RD | 12 |
-| LT0 | 6 | RT0 | 13 |
-| LT1 | 7 | RT1 | 14 |
-| LT2 | 8 | RT2 | 21 |
+左手 7 鍵在 DevKit **J1**（左排），右手 7 鍵在 **J3**（右排）。USB 朝下時 J1 在左、J3 在右。
 
-GPIO3 刻意空下（strapping）。順序與和弦表的鍵名順序相同：`LL LU LR LD LT0 LT1 LT2 RL RU RR RD RT0 RT1 RT2`。
+| 鍵 | GPIO | 排針 | 鍵 | GPIO | 排針 |
+| --- | ---: | --- | --- | ---: | --- |
+| LL | 17 | J1 | RL | 42 | J3 |
+| LU | 18 | J1 | RU | 41 | J3 |
+| LR | 10 | J1 | RR | 40 | J3 |
+| LD | 11 | J1 | RD | 39 | J3 |
+| LT0 | 12 | J1 | RT0 | 38 | J3 |
+| LT1 | 13 | J1 | RT1 | 48 | J3 |
+| LT2 | 14 | J1 | RT2 | 47 | J3 |
+
+順序與和弦表的鍵名順序相同：`LL LU LR LD LT0 LT1 LT2 RL RU RR RD RT0 RT1 RT2`。GPIO1、2、4–9 刻意空下（ADC1／預設 I2C）；strapping／USB／UART／PSRAM 見上方「不可使用的腳」。RT0／RT1 用到 GPIO38／48：韌體不當 RGB 用；板子版本不同時，其中一隻可能是板載 LED 資料線。
 
 程式只經 [`include/pin_map.h`](../include/pin_map.h) 查腳。和弦判斷用功能符號與位元，不寫 GPIO 號碼。改腳或加一顆輸入只改那張表。移動腳加一列，不要放進這 14 個和弦位元。
 
-還能再接哪些腳、現用腳佔走了哪些以後難補的功能，見 [`gpio-spare.md`](gpio-spare.md)。腳位先維持上表。
+還能再接哪些腳、現用腳佔走了哪些以後難補的功能，見 [`gpio-spare.md`](gpio-spare.md)。
 
 ## WiFi 開關
 
@@ -88,8 +90,8 @@ GPIO3 刻意空下（strapping）。順序與和弦表的鍵名順序相同：`L
 
 | 項目 | 值 |
 | --- | --- |
-| 腳位 | **GPIO17**（不屬於 14 個和弦鍵，也不進和弦遮罩） |
-| 接法 | 一端接 GPIO17，另一端接 GND。`INPUT_PULLUP`，導通為 LOW |
+| 腳位 | **GPIO21**（不屬於 14 個和弦鍵，也不進和弦遮罩；在 J3） |
+| 接法 | 一端接 GPIO21，另一端接 GND。`INPUT_PULLUP`，導通為 LOW |
 | 極性 | 沒接或開路 = 全放再送。導通 = 首鍵放開就送。開路讀到的是 HIGH |
 | 時機 | 開機讀一次。之後穩態連續 `kSwitchDebounceMs` 不同就立刻換，不重啟，也不寫進 NVS 或 LittleFS |
 

@@ -105,7 +105,7 @@ R"HTML(
       <button id="fire-release" class="mode" type="button" disabled>全放再送</button>
       <button id="fire-first" class="mode" type="button" disabled>首鍵放開就送</button>
     </div>
-    <p class="hint">送出時機由 GPIO17 開關決定，這頁只顯示。開路是全放再送，接到 GND 是首鍵放開就送。全放再送：這組全部放開並再確認空檔才送出。下一組若在前一組還沒放完就按下，兩組會併成一個對不到的集合。首鍵放開就送：高峰後第一顆放開就送出，其餘鍵要全部放開才接下一個。請同時按下、再放開。</p>
+    <p class="hint">送出時機由 GPIO21 開關決定，這頁只顯示。開路是全放再送，接到 GND 是首鍵放開就送。全放再送：這組全部放開並再確認空檔才送出。下一組若在前一組還沒放完就按下，兩組會併成一個對不到的集合。首鍵放開就送：高峰後第一顆放開就送出，其餘鍵要全部放開才接下一個。請同時按下、再放開。</p>
     <details id="timing">
       <summary>時間（進階）</summary>
       <p id="timing-hint" class="hint">去彈跳、放開保護、連發延遲、連發間隔。儲存後下一輪按鍵就用新值。</p>

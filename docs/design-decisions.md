@@ -67,6 +67,6 @@
 | 配方裡認不得的 token | 裝置上略過那個 token，其餘仍送。略過紀錄溢位時仍送出其餘內容，只少記 token 文字。事件緩衝放不下，整份配方不送。出廠表不允許靠略過：建置時認不得的 token 會讓 `pio run` 失敗。 |
 | 熱點 | 只在 GPIO15 接到 GND 時開 SoftAP，不加入家裡的路由器，沒有 HTTPS。密碼是信任邊界。`WIFI_API_TOKEN` 非空時用那組，不印到序列埠。留空時第一次開機產生 token、寫進 NVS，並只印一次；之後 `/api/*` 都要 `X-Api-Token`。瀏覽器仍要 `Origin` 是 `http://192.168.4.1` 或沒有這個標頭。密碼不印到序列埠，`include/secrets.h` 不進 git。 |
 | 輸出開關 | GPIO16 開路是 USB HID，導通到 GND 是 BLE HID，一次一種。這塊板的 Arduino 預編是 NimBLE，不是經典藍牙。模式不寫進 NVS 或 LittleFS，切換消彈跳後先放開按鍵再重啟。配對是 Just Works bonding，金鑰在 NimBLE 自己的 NVS；切換不清 bond、不強制重新配對。藍牙模式若 GPIO15 也導通，不啟動 BLE，只服務熱點；這個開關再變也重啟。USB 模式的熱點仍是運行中開關。藍牙模式不呼叫 `Keyboard.begin()`，OTG 不列舉成鍵盤；既有 USB CDC 日誌不變。 |
-| 送出時機 | GPIO17 開路是全放再送，導通到 GND 是首鍵放開就送。消抖後立刻換，不重啟，不寫進 NVS 或 LittleFS。熱點頁與序列埠 `fire` 只顯示；`POST /api/fire` 與 `fire release`／`fire first` 不改模式。試打頁的按鈕只影響瀏覽器。 |
+| 送出時機 | GPIO21 開路是全放再送，導通到 GND 是首鍵放開就送。消抖後立刻換，不重啟，不寫進 NVS 或 LittleFS。熱點頁與序列埠 `fire` 只顯示；`POST /api/fire` 與 `fire release`／`fire first` 不改模式。試打頁的按鈕只影響瀏覽器。 |
 | 記憶體 | 活表與 JSON DOM 放 PSRAM，把內部 RAM 留給 Wi-Fi。 |
 | 試打頁 | `web/index.html` 用電腦鍵盤試規則，不送 USB HID。作業系統給的按下／放開已經是穩定邊緣，所以不做韌體的 `kChordDebounceMs`。送出時機、比對與連發呼叫由 `chord_core` 編成的 `web/chord_core.wasm`。 |

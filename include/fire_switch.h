@@ -4,7 +4,7 @@
 
 #include "chord_core.h"
 
-// GPIO17, INPUT_PULLUP, closed to GND. Open is ReleaseAll. Closed is FirstUp.
+// GPIO21, INPUT_PULLUP, closed to GND. Open is ReleaseAll. Closed is FirstUp.
 // The debounced level is the live send timing. A change applies in this
 // process and does not restart. The mode is not written to NVS or LittleFS.
 // A failed pin config counts as open (release-all).

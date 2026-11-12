@@ -12,7 +12,7 @@ extern "C" void tearDown(void) {}
 extern "C" void test_pin_map_matches_wiring(void) {
   static const char *kNames[kChordKeyCount] = {
       "LL", "LU", "LR", "LD", "LT0", "LT1", "LT2", "RL", "RU", "RR", "RD", "RT0", "RT1", "RT2"};
-  static const int kChordGpio[kChordKeyCount] = {1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 21};
+  static const int kChordGpio[kChordKeyCount] = {17, 18, 10, 11, 12, 13, 14, 42, 41, 40, 39, 38, 48, 47};
 
   TEST_ASSERT_EQUAL_INT(kChordKeyCount, static_cast<int>(PinFn::RT2) + 1);
   for (int i = 0; i < kChordKeyCount; ++i) {
@@ -30,7 +30,7 @@ extern "C" void test_pin_map_matches_wiring(void) {
   TEST_ASSERT_FALSE(pin_fn_is_chord(PinFn::FireTiming));
   TEST_ASSERT_EQUAL_INT(15, pin_gpio(PinFn::WifiEnable));
   TEST_ASSERT_EQUAL_INT(16, pin_gpio(PinFn::OutputMode));
-  TEST_ASSERT_EQUAL_INT(17, pin_gpio(PinFn::FireTiming));
+  TEST_ASSERT_EQUAL_INT(21, pin_gpio(PinFn::FireTiming));
   TEST_ASSERT_EQUAL_INT(-1, pin_gpio(PinFn::Count));
 
   const int extra[] = {pin_gpio(PinFn::WifiEnable), pin_gpio(PinFn::OutputMode),

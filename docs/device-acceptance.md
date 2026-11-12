@@ -56,11 +56,11 @@ curl.exe -s -H "Content-Type: application/json" --data-binary @table-a.json http
 
 - [ ] **1. 開機**
 
-  按 EN 重開，看 UART。沒有非預期的 `LittleFS 掛載失敗，格式化一次`。沒存檔印 `chords: factory table (N rows)`；有存檔印 `chords: loaded N rows from /chords.json`。送出模式那一行有印出。序列埠輸入 `fire` 再換行，回 `fire release` 或 `fire first`，與開機那一行一致。序列埠輸入 `switches` 再換行，第一行是 `switches 3`。後面三列的腳位與 `open`／`closed` 跟實體開關一致：GPIO15 是熱點，GPIO16 是輸出，GPIO17 是送出時機。
+  按 EN 重開，看 UART。沒有非預期的 `LittleFS 掛載失敗，格式化一次`。沒存檔印 `chords: factory table (N rows)`；有存檔印 `chords: loaded N rows from /chords.json`。送出模式那一行有印出。序列埠輸入 `fire` 再換行，回 `fire release` 或 `fire first`，與開機那一行一致。序列埠輸入 `switches` 再換行，第一行是 `switches 3`。後面三列的腳位與 `open`／`closed` 跟實體開關一致：GPIO15 是熱點，GPIO16 是輸出，GPIO21 是送出時機。
 
 - [ ] **2. 出廠送鍵**
 
-  先還原出廠（第 5 項的做法），或確認開機是 factory。只按 `LT1` 再放開，記事本是 `nn`。這次若改了送出時機：GPIO17 開路再打一次 `LT1`，然後 GPIO17 接到 GND 再打一次。撥動不重啟。兩次都是 `nn`，放開後不再多出字。導通之後那一行是首鍵放開就送。
+  先還原出廠（第 5 項的做法），或確認開機是 factory。只按 `LT1` 再放開，記事本是 `nn`。這次若改了送出時機：GPIO21 開路再打一次 `LT1`，然後 GPIO21 接到 GND 再打一次。撥動不重啟。兩次都是 `nn`，放開後不再多出字。導通之後那一行是首鍵放開就送。
 
 - [ ] **3. 壞 JSON 不蓋活表**
 
@@ -85,13 +85,13 @@ curl.exe -s -H "Content-Type: application/json" --data-binary @table-a.json http
 
 - [ ] **5. 還原出廠**
 
-  還原前把 GPIO17 接到 GND，確認印出首鍵放開就送，而且板子不重啟。然後：
+  還原前把 GPIO21 接到 GND，確認印出首鍵放開就送，而且板子不重啟。然後：
 
   ```bat
   curl.exe -i -X POST http://192.168.4.1/api/chords/reset
   ```
 
-  回應 200，JSON 裡 `"source":"factory"`。只按 `LL` 是 `na`，只按 `LT1` 是 `nn`。重開機印 `chords: factory table (N rows)`，沒有 `loaded`。GPIO17 仍導通時，送出模式仍是首鍵放開；序列埠 `fire` 回 `fire first`。測完把 GPIO17 開路，改回全放再送。序列埠 `fire release` 或 `fire first` 不再改模式。
+  回應 200，JSON 裡 `"source":"factory"`。只按 `LL` 是 `na`，只按 `LT1` 是 `nn`。重開機印 `chords: factory table (N rows)`，沒有 `loaded`。GPIO21 仍導通時，送出模式仍是首鍵放開；序列埠 `fire` 回 `fire first`。測完把 GPIO21 開路，改回全放再送。序列埠 `fire release` 或 `fire first` 不再改模式。
 
 - [ ] **6. 存檔中途斷電**
 
