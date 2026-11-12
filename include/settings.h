@@ -11,6 +11,9 @@
 // No Arduino types: host tests and the practice-page wasm include this too.
 
 // --- Key timing ---
+// Factory defaults. The hotspot can store another debounce, release guard,
+// repeat delay, and repeat interval; clearing that store returns these.
+// The running bounce window is that debounce plus (kChordBounceMs - kChordDebounceMs).
 // How long a raw GPIO level must hold before the chord mask changes.
 // Raise this when a noisy switch splits one chord or repeats a key.
 static constexpr uint8_t kChordDebounceMs = 8;
@@ -135,3 +138,5 @@ static_assert(kChordsJsonMax < static_cast<size_t>(kDrainMax),
               "a chord save must fit under the drain cap");
 // POST /api/fire body. The switch decides the mode, so the body is ignored.
 static constexpr size_t kFireBodyMax = 256;
+// POST /api/timing body. Four millisecond fields.
+static constexpr size_t kTimingBodyMax = 256;

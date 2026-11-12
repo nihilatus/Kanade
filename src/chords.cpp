@@ -1,4 +1,5 @@
 #include "chords.h"
+#include "chord_timing.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -44,7 +45,7 @@ static size_t g_stage_pool_used = 0;
 static bool g_staged = false;
 
 // Debounce has already required the raw level to hold before this mask
-// goes empty. ReleaseAll waits kChordReleaseGuardMs after that. FirstUp
+// goes empty. ReleaseAll waits the running release guard after that. FirstUp
 // sends on the first peak-key release and does not use this wait.
 // The GPIO switch chooses which one. Nothing here is stored.
 
@@ -243,7 +244,7 @@ static void log_fire_mode() {
              "送出模式：首鍵放開就送（高峰後第一顆放開即送，其餘放開前不接新和弦）");
   } else {
     snprintf(line, sizeof(line), "送出模式：全放再送（全部放開並維持 %u ms）",
-             static_cast<unsigned>(kChordReleaseGuardMs));
+             static_cast<unsigned>(chord_timing_current().release_guard_ms));
   }
   console_println(line);
 }

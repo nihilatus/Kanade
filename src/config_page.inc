@@ -52,6 +52,28 @@ R"HTML(
   #status { display: block; min-height: 1.3em; margin-top: 8px; font-size: 14px; }
   #status.bad { color: #ff8d8d; }
   #status.ok { color: #8ee0a8; }
+  details { margin: 8px 0 4px; }
+  summary { cursor: pointer; font-size: 16px; }
+  .timing-field {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    font-size: 15px;
+  }
+  .timing-field input {
+    width: 7em;
+    font-size: 16px;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid #444;
+    background: #0e0e0e;
+    color: #eee;
+  }
+  #timing-status { display: block; min-height: 1.3em; margin-top: 8px; font-size: 14px; }
+  #timing-status.bad { color: #ff8d8d; }
+  #timing-status.ok { color: #8ee0a8; }
   .row { padding: 12px; border-bottom: 1px solid #2a2a2a; }
   .row.hidden, .hidden { display: none; }
   .kana { font-size: 22px; margin-right: 8px; }
@@ -84,6 +106,19 @@ R"HTML(
       <button id="fire-first" class="mode" type="button" disabled>首鍵放開就送</button>
     </div>
     <p class="hint">送出時機由 GPIO17 開關決定，這頁只顯示。開路是全放再送，接到 GND 是首鍵放開就送。全放再送：這組全部放開並再確認空檔才送出。下一組若在前一組還沒放完就按下，兩組會併成一個對不到的集合。首鍵放開就送：高峰後第一顆放開就送出，其餘鍵要全部放開才接下一個。請同時按下、再放開。</p>
+    <details id="timing">
+      <summary>時間（進階）</summary>
+      <p id="timing-hint" class="hint">去彈跳、放開保護、連發延遲、連發間隔。儲存後下一輪按鍵就用新值。</p>
+      <label class="timing-field">去彈跳 <input id="timing-debounce" type="number" inputmode="numeric" min="0" step="1"></label>
+      <label class="timing-field">放開保護 <input id="timing-release" type="number" inputmode="numeric" min="0" step="1"></label>
+      <label class="timing-field">連發延遲 <input id="timing-delay" type="number" inputmode="numeric" min="0" step="1"></label>
+      <label class="timing-field">連發間隔 <input id="timing-interval" type="number" inputmode="numeric" min="0" step="1"></label>
+      <div class="actions">
+        <button id="timing-save" type="button">儲存時間</button>
+        <button id="timing-reset" type="button">還原時間預設</button>
+      </div>
+      <span id="timing-status"></span>
+    </details>
     <input id="q" type="search" placeholder="搜尋假名或 output" autocomplete="off">
     <div class="actions">
       <button id="save" type="button">儲存</button>
@@ -433,12 +468,90 @@ tokenInput.addEventListener("change", () => {
   withBusy(async () => {
     await load();
     await loadFire();
+    await loadTiming();
   });
 });
+
+const timingSaveBtn = document.getElementById("timing-save");
+const timingResetBtn = document.getElementById("timing-reset");
+let timingBusy = false;
+
+function setTimingStatus(text, kind) {
+  const node = document.getElementById("timing-status");
+  node.textContent = text;
+  node.className = kind || "";
+}
+
+function applyTiming(data) {
+  document.getElementById("timing-debounce").value = data.debounce_ms;
+  document.getElementById("timing-release").value = data.release_guard_ms;
+  document.getElementById("timing-delay").value = data.repeat_delay_ms;
+  document.getElementById("timing-interval").value = data.repeat_interval_ms;
+  const defaults = data.defaults || {};
+  const limits = data.limits || {};
+  const debounceMax = Number(limits.debounce_max);
+  const delayMin = Number(limits.repeat_delay_min);
+  const intervalMin = Number(limits.repeat_interval_min);
+  document.getElementById("timing-hint").textContent =
+    "預設去彈跳 " + defaults.debounce_ms + "、放開保護 " + defaults.release_guard_ms +
+    "、連發延遲 " + defaults.repeat_delay_ms + "、連發間隔 " + defaults.repeat_interval_ms +
+    "。去彈跳小於 " + (debounceMax + 1) +
+    "。放開保護至少是去彈跳加 " + limits.bounce_margin_ms + "，而且不超過 " + limits.release_max +
+    "。連發延遲大於 " + (delayMin - 1) + "，而且不超過 " + limits.repeat_delay_max +
+    "。連發間隔大於 " + (intervalMin - 1) + "，而且不超過 " + limits.repeat_interval_max + "。";
+}
+
+function timingPayload() {
+  return {
+    debounce_ms: Number(document.getElementById("timing-debounce").value),
+    release_guard_ms: Number(document.getElementById("timing-release").value),
+    repeat_delay_ms: Number(document.getElementById("timing-delay").value),
+    repeat_interval_ms: Number(document.getElementById("timing-interval").value)
+  };
+}
+
+async function loadTiming() {
+  const data = await readBody(await apiFetch("/api/timing"));
+  applyTiming(data);
+}
+
+async function withTiming(fn) {
+  if (timingBusy) return;
+  timingBusy = true;
+  timingSaveBtn.disabled = true;
+  timingResetBtn.disabled = true;
+  try {
+    await fn();
+  } catch (err) {
+    setTimingStatus(err && err.message ? err.message : "失敗", "bad");
+  } finally {
+    timingBusy = false;
+    timingSaveBtn.disabled = false;
+    timingResetBtn.disabled = false;
+  }
+}
+
+timingSaveBtn.addEventListener("click", () => withTiming(async () => {
+  const data = await readBody(await apiFetch("/api/timing", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(timingPayload())
+  }));
+  applyTiming(data);
+  setTimingStatus("已儲存，下一輪按鍵就用新值", "ok");
+}));
+
+timingResetBtn.addEventListener("click", () => withTiming(async () => {
+  if (!window.confirm("還原成燒錄時的時間？存過的去彈跳、放開保護、連發會刪掉。")) return;
+  const data = await readBody(await apiFetch("/api/timing/reset", { method: "POST" }));
+  applyTiming(data);
+  setTimingStatus("已回到出廠時間", "ok");
+}));
 
 paintFire();
 load().catch((err) => setStatus(err && err.message ? err.message : "讀不到和弦表", "bad"));
 loadFire().catch((err) => setStatus(err && err.message ? err.message : "讀不到送出模式", "bad"));
+loadTiming().catch((err) => setTimingStatus(err && err.message ? err.message : "讀不到時間參數", "bad"));
 </script>
 </body>
 </html>

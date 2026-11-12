@@ -15,11 +15,27 @@
 
 enum class ConfigJobPhase : uint8_t { Idle = 0, Queued = 1, NeedMain = 2, Resume = 3, Done = 4 };
 
-enum class ConfigJobKind : uint8_t { None = 0, Get = 1, Post = 2, Reset = 3 };
+// TimingPost and TimingReset finish on the worker. They do not enter NeedMain.
+enum class ConfigJobKind : uint8_t {
+  None = 0,
+  Get = 1,
+  Post = 2,
+  Reset = 3,
+  TimingPost = 4,
+  TimingReset = 5
+};
 
 enum class ConfigJobQueue : uint8_t { Ok = 0, Busy, NoWorker };
 
-enum class ConfigJobAction : uint8_t { None = 0, RunGet, RunPost, RunReset, RunResume };
+enum class ConfigJobAction : uint8_t {
+  None = 0,
+  RunGet,
+  RunPost,
+  RunReset,
+  RunTimingPost,
+  RunTimingReset,
+  RunResume
+};
 
 struct ConfigJobView {
   ConfigJobPhase phase;

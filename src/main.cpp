@@ -7,6 +7,8 @@
 
 #include "buttons.h"
 #include "chord_core.h"
+#include "chord_timing.h"
+#include "chord_timing_store.h"
 #include "chords.h"
 #include "config_server.h"
 #include "console_log.h"
@@ -30,12 +32,13 @@
 
 void setup() {
   console_ensure();
+  chord_timing_store_load();
 #if ARDUINO_USB_CDC_ON_BOOT
   delay(200);
   Serial.println();
   Serial.println(F("Kanade"));
   Serial.print(F("14 direct keys, active-low, "));
-  Serial.print(kChordDebounceMs);
+  Serial.print(chord_timing_current().debounce_ms);
   Serial.println(F(" ms debounce"));
   Serial.print(F("pins"));
   for (uint8_t i = 0; i < BTN_COUNT; ++i) {

@@ -8,7 +8,9 @@
 // Pure chord logic: key bits, rule match, peak snapshot, send state machine,
 // one poll's masks and wake time, and recipe parsing. No Arduino, GPIO,
 // filesystem, or USB. Host tests and the firmware both call this.
-// Key count, timings, and recipe capacities are in settings.h.
+// Key count and recipe capacities are in settings.h.
+// Release guard, bounce, repeat delay, and repeat interval follow chord_timing.
+// Settle and the tap gap stay the constants in settings.h.
 
 // Bit i is key i. Order is LL LU LR LD LT0 LT1 LT2 RL RU RR RD RT0 RT1 RT2.
 const char *chord_key_name(int index);
@@ -59,10 +61,11 @@ void chord_engine_reset(ChordEngine *engine);
 
 // One poll. now_ms is the caller's clock. fire is set only when the mask
 // that would be sent is non-empty.
-// ReleaseAll: an empty mask waits kChordReleaseGuardMs. A mask that returns
-// before kChordBounceMs and is a subset or superset of the peak stays one
-// chord. Any later mask, including a nested one, sends the waiting peak on
-// this step and starts a new hold.
+// ReleaseAll: an empty mask waits the running release guard. A mask that
+// returns before the running bounce window and is a subset or superset of the
+// peak stays one chord. Any later mask, including a nested one, sends the
+// waiting peak on this step and starts a new hold. Factory defaults are
+// kChordReleaseGuardMs and kChordBounceMs.
 ChordStep chord_engine_step(ChordEngine *engine, uint16_t mask, uint32_t now_ms);
 
 // Switching to FirstUp while ReleaseGuard is waiting sends immediately.

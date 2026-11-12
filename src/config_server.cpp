@@ -20,6 +20,8 @@
 #include <freertos/task.h>
 #include <lwip/sockets.h>
 
+#include "chord_timing.h"
+#include "chord_timing_store.h"
 #include "chords.h"
 #include "config_files.h"
 #include "config_http.h"
@@ -84,10 +86,10 @@ static size_t g_body_len = 0;
 static size_t g_body_got = 0;
 static bool g_cors = false;
 
-enum class Route : uint8_t { None, Page, Chords, Reset, Fire };
+enum class Route : uint8_t { None, Page, Chords, Reset, Fire, Timing, TimingReset };
 static Route g_route = Route::None;
 
-enum class After : uint8_t { Error, Status, Reset };
+enum class After : uint8_t { Error, Status, Reset, TimingReset };
 static After g_after = After::Error;
 static int g_after_code = 400;
 static const char *g_after_msg = "失敗";
@@ -130,7 +132,8 @@ static bool api_path(const char *path) { return strncmp(path, "/api/", 5) == 0; 
 
 static bool known_path(const char *path) {
   return strcmp(path, "/") == 0 || strcmp(path, "/api/chords") == 0 ||
-         strcmp(path, "/api/chords/reset") == 0 || strcmp(path, "/api/fire") == 0;
+         strcmp(path, "/api/chords/reset") == 0 || strcmp(path, "/api/fire") == 0 ||
+         strcmp(path, "/api/timing") == 0 || strcmp(path, "/api/timing/reset") == 0;
 }
 
 static Route route_of(const char *path) {
@@ -138,6 +141,8 @@ static Route route_of(const char *path) {
   if (strcmp(path, "/api/chords") == 0) return Route::Chords;
   if (strcmp(path, "/api/chords/reset") == 0) return Route::Reset;
   if (strcmp(path, "/api/fire") == 0) return Route::Fire;
+  if (strcmp(path, "/api/timing") == 0) return Route::Timing;
+  if (strcmp(path, "/api/timing/reset") == 0) return Route::TimingReset;
   return Route::None;
 }
 
@@ -348,6 +353,126 @@ static void remember_error(int code, const char *msg) {
   mark_done();
 }
 
+static bool fail_msg(char *err, size_t err_len, const char *msg) {
+  if (err != nullptr && err_len > 0 && msg != nullptr) snprintf(err, err_len, "%s", msg);
+  return false;
+}
+
+static bool read_ms(JsonVariantConst v, uint16_t *out, char *err, size_t err_len) {
+  if (v.is<bool>() || !v.is<long>()) return fail_msg(err, err_len, "時間參數必須是整數");
+  const long value = v.as<long>();
+  if (value < 0 || value > 65535) return fail_msg(err, err_len, "時間參數超出範圍");
+  *out = static_cast<uint16_t>(value);
+  return true;
+}
+
+static bool read_named_ms(JsonObject obj, const char *key, const char *missing, uint16_t *out, char *err,
+                          size_t err_len) {
+  const JsonVariantConst v = obj[key];
+  if (v.isNull()) return fail_msg(err, err_len, missing);
+  return read_ms(v, out, err, err_len);
+}
+
+static bool parse_timing_json(const char *body, size_t len, ChordTiming *out, char *err, size_t err_len) {
+  if (out == nullptr || body == nullptr) return fail_msg(err, err_len, "JSON 格式不對");
+  JsonDocument doc;
+  if (deserializeJson(doc, body, len) != DeserializationError::Ok) {
+    return fail_msg(err, err_len, "JSON 格式不對");
+  }
+  const JsonObject obj = doc.as<JsonObject>();
+  if (obj.isNull()) return fail_msg(err, err_len, "JSON 格式不對");
+  ChordTiming timing;
+  if (!read_named_ms(obj, "debounce_ms", "缺少去彈跳", &timing.debounce_ms, err, err_len) ||
+      !read_named_ms(obj, "release_guard_ms", "缺少放開保護", &timing.release_guard_ms, err, err_len) ||
+      !read_named_ms(obj, "repeat_delay_ms", "缺少連發延遲", &timing.repeat_delay_ms, err, err_len) ||
+      !read_named_ms(obj, "repeat_interval_ms", "缺少連發間隔", &timing.repeat_interval_ms, err, err_len)) {
+    return false;
+  }
+  *out = timing;
+  return true;
+}
+
+static char *format_timing_json(bool with_ok) {
+  const ChordTiming cur = chord_timing_current();
+  const ChordTiming factory = chord_timing_factory();
+  const ChordTimingLimits limits = chord_timing_limits();
+  JsonDocument doc;
+  if (with_ok) doc["ok"] = true;
+  doc["debounce_ms"] = cur.debounce_ms;
+  doc["release_guard_ms"] = cur.release_guard_ms;
+  doc["repeat_delay_ms"] = cur.repeat_delay_ms;
+  doc["repeat_interval_ms"] = cur.repeat_interval_ms;
+  JsonObject defaults = doc["defaults"].to<JsonObject>();
+  defaults["debounce_ms"] = factory.debounce_ms;
+  defaults["release_guard_ms"] = factory.release_guard_ms;
+  defaults["repeat_delay_ms"] = factory.repeat_delay_ms;
+  defaults["repeat_interval_ms"] = factory.repeat_interval_ms;
+  JsonObject caps = doc["limits"].to<JsonObject>();
+  caps["debounce_max"] = limits.debounce_max;
+  caps["release_max"] = limits.release_max;
+  caps["bounce_margin_ms"] = limits.bounce_margin_ms;
+  caps["repeat_delay_min"] = limits.repeat_delay_min;
+  caps["repeat_delay_max"] = limits.repeat_delay_max;
+  caps["repeat_interval_min"] = limits.repeat_interval_min;
+  caps["repeat_interval_max"] = limits.repeat_interval_max;
+  const size_t need = measureJson(doc) + 1;
+  char *buf = alloc_chars(need);
+  if (buf == nullptr) return nullptr;
+  const size_t wrote = serializeJson(doc, buf, need);
+  if (wrote == 0 || wrote >= need) {
+    chords_release(buf);
+    return nullptr;
+  }
+  return buf;
+}
+
+static void run_timing_post() {
+  char err[120];
+  err[0] = '\0';
+  ChordTiming timing;
+  if (!parse_timing_json(g_job_body, g_job_len, &timing, err, sizeof(err))) {
+    chords_release(g_job_body);
+    g_job_body = nullptr;
+    remember_error(400, err[0] != '\0' ? err : "JSON 格式不對");
+    return;
+  }
+  chords_release(g_job_body);
+  g_job_body = nullptr;
+  if (!chord_timing_accept(timing, err, sizeof(err))) {
+    remember_error(400, err[0] != '\0' ? err : "時間參數不對");
+    return;
+  }
+  if (!chord_timing_store_save(timing)) {
+    remember_error(500, "存檔失敗");
+    return;
+  }
+  chord_timing_apply(timing);
+  char *json = format_timing_json(true);
+  if (json == nullptr) {
+    remember_error(500, "記憶體不足");
+    return;
+  }
+  g_job_resp = json;
+  g_job_code = 200;
+  mark_done();
+}
+
+static void run_timing_reset() {
+  if (!chord_timing_store_clear()) {
+    remember_error(500, "存檔失敗");
+    return;
+  }
+  chord_timing_use_factory();
+  char *json = format_timing_json(true);
+  if (json == nullptr) {
+    remember_error(500, "記憶體不足");
+    return;
+  }
+  g_job_resp = json;
+  g_job_code = 200;
+  mark_done();
+}
+
 static void run_queued() {
   if (g_job_kind == ConfigJobKind::Get) {
     char *json = chords_format_json();
@@ -447,6 +572,12 @@ static void worker_fn(void *) {
       case ConfigJobAction::RunReset:
         run_queued();
         break;
+      case ConfigJobAction::RunTimingPost:
+        run_timing_post();
+        break;
+      case ConfigJobAction::RunTimingReset:
+        run_timing_reset();
+        break;
       case ConfigJobAction::RunResume:
         run_resume();
         break;
@@ -463,7 +594,7 @@ static void apply_main(bool wake) {
     ok = chords_commit_staged();
     if (!ok) chords_drop_staged();
     else g_job_count = static_cast<unsigned>(chords_count());
-  } else {
+  } else if (view.kind == ConfigJobKind::Reset) {
     ok = chords_load_factory();
   }
   if (!config_job_applied(&view, ok)) return;
@@ -545,6 +676,10 @@ static void finish_body() {
     handle_fire(body, len);
     return;
   }
+  if (g_route == Route::Timing) {
+    queue_or_error(ConfigJobKind::TimingPost, body, len);
+    return;
+  }
   if (g_route == Route::Chords) {
     queue_or_error(ConfigJobKind::Post, body, len);
     return;
@@ -560,6 +695,10 @@ static void complete_drain() {
   }
   if (g_after == After::Reset) {
     queue_or_error(ConfigJobKind::Reset, nullptr, 0);
+    return;
+  }
+  if (g_after == After::TimingReset) {
+    queue_or_error(ConfigJobKind::TimingReset, nullptr, 0);
     return;
   }
   begin_error(g_after_code, g_after_msg, g_cors);
@@ -701,6 +840,19 @@ static void on_headers(size_t end) {
     return;
   }
 
+  if (g_route == Route::TimingReset) {
+    if (strcmp(req.method, "POST") != 0) {
+      arm_drain(After::Error, 404, "not found", g_cors, already, req.content_length);
+      return;
+    }
+    if (req.content_length > kDrainMax) {
+      arm_drain(After::Error, 413, "內容太大", g_cors, 0, -1);
+      return;
+    }
+    arm_drain(After::TimingReset, 0, nullptr, g_cors, already, req.content_length);
+    return;
+  }
+
   if (g_route == Route::Fire && strcmp(req.method, "GET") == 0) {
     if (req.content_length > 0) {
       arm_drain(After::Error, 400, "請求格式不對", g_cors, already, req.content_length);
@@ -716,8 +868,23 @@ static void on_headers(size_t end) {
     return;
   }
 
+  if (g_route == Route::Timing && strcmp(req.method, "GET") == 0) {
+    if (req.content_length > 0) {
+      arm_drain(After::Error, 400, "請求格式不對", g_cors, already, req.content_length);
+      return;
+    }
+    char *body = format_timing_json(false);
+    if (body == nullptr) {
+      begin_error(500, "記憶體不足", g_cors);
+      return;
+    }
+    begin_send(200, kJsonType, body, strlen(body), body, g_cors);
+    return;
+  }
+
   const bool post_chords = g_route == Route::Chords && strcmp(req.method, "POST") == 0;
   const bool post_fire = g_route == Route::Fire && strcmp(req.method, "POST") == 0;
+  const bool post_timing = g_route == Route::Timing && strcmp(req.method, "POST") == 0;
   const bool get_chords = g_route == Route::Chords && strcmp(req.method, "GET") == 0;
   if (get_chords) {
     if (req.content_length > 0) {
@@ -727,7 +894,7 @@ static void on_headers(size_t end) {
     queue_or_error(ConfigJobKind::Get, nullptr, 0);
     return;
   }
-  if (!post_chords && !post_fire) {
+  if (!post_chords && !post_fire && !post_timing) {
     arm_drain(After::Error, 404, "not found", g_cors, already, req.content_length);
     return;
   }
@@ -735,7 +902,9 @@ static void on_headers(size_t end) {
     arm_drain(After::Error, 400, "沒有內容", g_cors, already, 0);
     return;
   }
-  const long cap = post_fire ? static_cast<long>(kFireBodyMax) : static_cast<long>(kChordsJsonMax);
+  const long cap = post_fire ? static_cast<long>(kFireBodyMax)
+                             : post_timing ? static_cast<long>(kTimingBodyMax)
+                                           : static_cast<long>(kChordsJsonMax);
   if (req.content_length > cap) {
     arm_drain(After::Error, 413, "內容太大", g_cors, already, req.content_length);
     return;

@@ -3,7 +3,8 @@
 ConfigJobQueue config_job_queue(ConfigJobView *job, ConfigJobKind kind, bool worker_up) {
   if (job == nullptr || job->phase != ConfigJobPhase::Idle) return ConfigJobQueue::Busy;
   if (!worker_up) return ConfigJobQueue::NoWorker;
-  if (kind != ConfigJobKind::Get && kind != ConfigJobKind::Post && kind != ConfigJobKind::Reset) {
+  if (kind != ConfigJobKind::Get && kind != ConfigJobKind::Post && kind != ConfigJobKind::Reset &&
+      kind != ConfigJobKind::TimingPost && kind != ConfigJobKind::TimingReset) {
     return ConfigJobQueue::Busy;
   }
   job->phase = ConfigJobPhase::Queued;
@@ -17,6 +18,8 @@ ConfigJobAction config_job_worker_action(ConfigJobView job) {
     if (job.kind == ConfigJobKind::Get) return ConfigJobAction::RunGet;
     if (job.kind == ConfigJobKind::Post) return ConfigJobAction::RunPost;
     if (job.kind == ConfigJobKind::Reset) return ConfigJobAction::RunReset;
+    if (job.kind == ConfigJobKind::TimingPost) return ConfigJobAction::RunTimingPost;
+    if (job.kind == ConfigJobKind::TimingReset) return ConfigJobAction::RunTimingReset;
     return ConfigJobAction::None;
   }
   if (job.phase == ConfigJobPhase::Resume) return ConfigJobAction::RunResume;

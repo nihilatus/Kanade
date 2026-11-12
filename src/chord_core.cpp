@@ -2,6 +2,8 @@
 
 #include <string.h>
 
+#include "chord_timing.h"
+
 static const char *const kKeyNames[kChordKeyCount] = {
     "LL",  "LU",  "LR",  "LD",  "LT0", "LT1", "LT2",
     "RL",  "RU",  "RR",  "RD",  "RT0", "RT1", "RT2",
@@ -77,7 +79,7 @@ bool chord_peak_broken(const ChordPeak &peak, uint16_t mask) {
 
 // ReleaseGuard has already seen every key up. A subset is keys from this
 // chord bouncing. A superset is the same chord still landing. Either counts
-// only inside kChordBounceMs; a later nested mask is the next chord.
+// only inside the running bounce window; a later nested mask is the next chord.
 static bool release_guard_same_chord(const ChordPeak &peak, uint16_t mask) {
   if (peak.count == 0) return true;
   const uint16_t shared = static_cast<uint16_t>(mask & peak.mask);
@@ -135,14 +137,14 @@ ChordStep chord_engine_step(ChordEngine *engine, uint16_t mask, uint32_t now_ms)
     case ChordPhase::ReleaseGuard:
       if (mask != 0) {
         const uint32_t gap = now_ms - engine->guard_since;
-        if (gap < kChordBounceMs && release_guard_same_chord(engine->peak, mask)) {
+        if (gap < chord_timing_bounce_ms() && release_guard_same_chord(engine->peak, mask)) {
           engine->phase = ChordPhase::Holding;
           chord_note_snapshot(&engine->peak, mask);
         } else {
           step = take_peak(engine);
           begin_hold(engine, mask);
         }
-      } else if ((now_ms - engine->guard_since) >= kChordReleaseGuardMs) {
+      } else if ((now_ms - engine->guard_since) >= chord_timing_current().release_guard_ms) {
         engine->phase = ChordPhase::Idle;
         step = take_peak(engine);
       }
@@ -218,25 +220,27 @@ ChordRepeatStep chord_repeat_step(ChordRepeat *rep, ChordPhase phase, uint16_t p
   if (!peak_repeats) return step;
 
   const uint32_t held_ms = now_ms - rep->since_ms;
+  const uint32_t delay_ms = chord_timing_current().repeat_delay_ms;
+  const uint32_t interval_ms = chord_timing_current().repeat_interval_ms;
   if (rep->phase == ChordRepeatPhase::Watching) {
     if (held_ms < kChordRepeatSettleMs) return step;
     step.send = true;
     step.mask = peak_mask;
     // A stalled poll may cross both marks. Still one tap; the next waits an interval.
-    if (held_ms >= kChordRepeatDelayMs) {
+    if (held_ms >= delay_ms) {
       rep->phase = ChordRepeatPhase::Repeating;
-      rep->next_ms = now_ms + kChordRepeatIntervalMs;
+      rep->next_ms = now_ms + interval_ms;
     } else {
       rep->phase = ChordRepeatPhase::Sent;
     }
     return step;
   }
   if (rep->phase == ChordRepeatPhase::Sent) {
-    if (held_ms < kChordRepeatDelayMs) return step;
+    if (held_ms < delay_ms) return step;
     step.send = true;
     step.mask = peak_mask;
     rep->phase = ChordRepeatPhase::Repeating;
-    rep->next_ms = now_ms + kChordRepeatIntervalMs;
+    rep->next_ms = now_ms + interval_ms;
     return step;
   }
   if (rep->phase == ChordRepeatPhase::Repeating) {
@@ -244,7 +248,7 @@ ChordRepeatStep chord_repeat_step(ChordRepeat *rep, ChordPhase phase, uint16_t p
     if (static_cast<int32_t>(now_ms - rep->next_ms) < 0) return step;
     step.send = true;
     step.mask = peak_mask;
-    rep->next_ms = now_ms + kChordRepeatIntervalMs;
+    rep->next_ms = now_ms + interval_ms;
   }
   return step;
 }
@@ -265,16 +269,17 @@ static uint32_t sooner(uint32_t now_ms, uint32_t wake, uint32_t at) {
 
 static uint32_t dispatch_wake(const ChordEngine &engine, const ChordRepeat &rep, bool peak_repeats,
                               uint32_t now_ms) {
+  const ChordTiming timing = chord_timing_current();
   uint32_t wake = 0;
   if (engine.phase == ChordPhase::ReleaseGuard) {
-    wake = sooner(now_ms, wake, engine.guard_since + kChordReleaseGuardMs);
+    wake = sooner(now_ms, wake, engine.guard_since + timing.release_guard_ms);
   }
   if (engine.phase != ChordPhase::Holding || engine.peak.mask == 0) return wake;
   if (rep.mask != engine.peak.mask || !peak_repeats) return wake;
   if (rep.phase == ChordRepeatPhase::Watching) {
     wake = sooner(now_ms, wake, rep.since_ms + kChordRepeatSettleMs);
   } else if (rep.phase == ChordRepeatPhase::Sent) {
-    wake = sooner(now_ms, wake, rep.since_ms + kChordRepeatDelayMs);
+    wake = sooner(now_ms, wake, rep.since_ms + timing.repeat_delay_ms);
   } else if (rep.phase == ChordRepeatPhase::Repeating) {
     wake = sooner(now_ms, wake, rep.next_ms);
   }

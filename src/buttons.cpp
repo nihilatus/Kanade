@@ -1,6 +1,7 @@
 #include "buttons.h"
 
 #include "chord_core.h"
+#include "chord_timing.h"
 
 static_assert(BTN_COUNT == kChordKeyCount, "button bits match chord_core");
 static_assert(BTN_LL == 0, "chord button ids start at bit 0");
@@ -26,10 +27,10 @@ const FillButtons g_fill_buttons;
 
 const ButtonDef *const kButtons = g_buttons;
 
-// Both edges. Cheap tactiles usually finish bouncing inside kChordBounceMs.
-// The chord engine waits again after this mask is empty, so a longer debounce
-// mostly adds release latency. Raise kChordDebounceMs in include/settings.h
-// if a noisy edge splits a chord or repeats a key.
+// Both edges. Cheap tactiles usually finish bouncing inside the bounce window
+// (factory kChordBounceMs). The chord engine waits again after this mask is
+// empty, so a longer debounce mostly adds release latency. The running value
+// is the hotspot override, or kChordDebounceMs when that store is clear.
 
 static bool raw_down[BTN_COUNT];
 static bool stable_down[BTN_COUNT];
@@ -111,7 +112,8 @@ void buttons_poll() {
       trace_push(now, ButtonTraceKind::Raw, i, down ? 1 : 0);
     }
 
-    if ((now - last_change_ms[i]) >= kChordDebounceMs && stable_down[i] != raw_down[i]) {
+    if ((now - last_change_ms[i]) >= chord_timing_current().debounce_ms &&
+        stable_down[i] != raw_down[i]) {
       stable_down[i] = raw_down[i];
     }
 

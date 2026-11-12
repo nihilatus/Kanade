@@ -71,6 +71,23 @@ extern "C" void test_get_finishes_without_touching_the_live_table(void) {
   TEST_ASSERT_TRUE(config_job_release(&job));
 }
 
+extern "C" void test_timing_post_finishes_on_the_worker(void) {
+  ConfigJobView job = idle_job();
+  TEST_ASSERT_TRUE(config_job_queue(&job, ConfigJobKind::TimingPost, true) == ConfigJobQueue::Ok);
+  TEST_ASSERT_TRUE(config_job_worker_action(job) == ConfigJobAction::RunTimingPost);
+  TEST_ASSERT_FALSE(config_job_need_main(&job));
+  TEST_ASSERT_TRUE(job.phase == ConfigJobPhase::Queued);
+  TEST_ASSERT_TRUE(config_job_finish(&job));
+  TEST_ASSERT_TRUE(config_job_release(&job));
+
+  TEST_ASSERT_TRUE(config_job_queue(&job, ConfigJobKind::TimingReset, true) == ConfigJobQueue::Ok);
+  TEST_ASSERT_TRUE(config_job_worker_action(job) == ConfigJobAction::RunTimingReset);
+  TEST_ASSERT_FALSE(config_job_need_main(&job));
+  TEST_ASSERT_TRUE(config_job_finish(&job));
+  TEST_ASSERT_TRUE(config_job_release(&job));
+  TEST_ASSERT_TRUE(job.phase == ConfigJobPhase::Idle);
+}
+
 extern "C" void test_reset_commit_returns_to_the_worker(void) {
   ConfigJobView job = idle_job();
   TEST_ASSERT_TRUE(config_job_queue(&job, ConfigJobKind::Reset, true) == ConfigJobQueue::Ok);
@@ -294,6 +311,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_post_reaches_main_before_resume);
   RUN_TEST(test_get_finishes_without_touching_the_live_table);
   RUN_TEST(test_reset_commit_returns_to_the_worker);
+  RUN_TEST(test_timing_post_finishes_on_the_worker);
   RUN_TEST(test_replace_keeps_previous_bytes_as_bak);
   RUN_TEST(test_replace_short_write_leaves_live);
   RUN_TEST(test_replace_open_failure_leaves_live);

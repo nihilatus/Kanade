@@ -91,6 +91,7 @@ def main() -> int:
     link_cmd = [
         emcc,
         str(ROOT / "wasm" / "chord_api.cpp"),
+        str(ROOT / "src" / "chord_timing.cpp"),
         str(ROOT / "src" / "chord_core.cpp"),
         "-I",
         str(ROOT / "include"),

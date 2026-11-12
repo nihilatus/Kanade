@@ -8,10 +8,11 @@
 // While the AP is up the caller does not scan chord keys or send USB HID.
 // This poll still reads and writes at most a small slice of one HTTP client
 // and returns, so a slow or oversized request cannot delay noticing the
-// switch open and resuming the keyboard. JSON parsing and LittleFS run on
-// the other core. If that task cannot start, chord GET, POST, and reset
-// answer 503 and do not run on this poll. The live chord table is swapped
-// only on this poll.
+// switch open and resuming the keyboard. JSON parsing, LittleFS, and timing
+// NVS writes run on the other core. If that task cannot start, chord GET,
+// POST, and reset, and timing POST and reset, answer 503 and do not run on
+// this poll. GET /api/timing reads the values already loaded at boot. The
+// live chord table is swapped only on this poll.
 //
 // config_ap_is_up() is true only after the AP has started. A closed switch
 // whose passphrase is missing or rejected leaves the AP down. In USB mode the
