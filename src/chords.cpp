@@ -658,7 +658,7 @@ void chords_begin() {
   console_ensure();
   g_engine.mode = fire_switch_mode();
   log_fire_mode();
-  console_println("序列指令：fire | drops");
+  console_println("序列指令：fire | drops | keys | trace | switches");
   g_fs = LittleFS.begin(false);
   if (!g_fs) {
     console_println("LittleFS 掛載失敗，格式化一次");
