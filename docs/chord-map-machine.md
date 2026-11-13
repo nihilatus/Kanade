@@ -15,7 +15,7 @@ The browser practice page [`../web/index.html`](../web/index.html) loads [`../we
 手改的是 [`../esp32-jis-chordboard-premapping.csv`](../esp32-jis-chordboard-premapping.csv)。檔首要有 UTF-8 BOM，Excel 才會把中文和假名當 UTF-8 開啟。第一行固定是：
 
 ```text
-section,label,output,left_fingers,right_fingers,left_thumb,right_thumb,repeat
+section,label,output,left_fingers,right_fingers,left_thumb,right_thumb,repeat,user_edit
 ```
 
 | 欄 | 意義 |
@@ -26,8 +26,9 @@ section,label,output,left_fingers,right_fingers,left_thumb,right_thumb,repeat
 | `left_fingers` / `right_fingers` | 手指鍵。左手 `LL` `LU` `LR` `LD`，右手 `RL` `RU` `RR` `RD`。鍵名用 `+` 連接，例如 `LL+LU`。建議打法見 [打法](playing.md) |
 | `left_thumb` / `right_thumb` | 拇指。`(RT0)` 表示這顆可按可不按；裸 `RT0` 是必按 |
 | `repeat` | `allow` 或 `no`。`allow` 在高峰仍按著時可以連送 |
+| `user_edit` | `no` 或 `label_output`。`label_output` 允許熱點只改這列的 `label`／`output`（機器表 `kana`／`output`）；鍵位與 `repeat` 仍鎖定。`no` 整列鎖定。比對引擎不讀這欄 |
 
-`label` 和 `output` 都空的列是空位，留在人編表裡，機器表略過，也不檢查 `repeat`。有顯示字或配方的列，`repeat` 必須是 `allow` 或 `no`。
+`label` 和 `output` 都空的列是空位，留在人編表裡，機器表略過，也不檢查 `repeat`／`user_edit`。有顯示字或配方的列，`repeat` 必須是 `allow` 或 `no`，`user_edit` 必須是 `no` 或 `label_output`。
 
 儲存格裡不要換行。鍵名大小寫必須是 `LL` 這組。列的順序就是機器表 `id` 的順序，不要整表排序。`、` 的輸出是逗號，存檔時那一格要保持引號。
 
@@ -44,8 +45,11 @@ Excel 請另存「CSV UTF-8 (逗號分隔)」。傳統「CSV (逗號分隔)」�
 | `keys_optional` | Sorted unique optional keys (`RT0` or empty) |
 | `category` | Short tag copied from the human `section` cell; blank there keeps the previous tag. May be empty |
 | `repeat` | `allow` or `no`, copied from the human `repeat` cell. `allow` may tap while that peak is still held (step 5) |
+| `user_edit` | `no` or `label_output`, copied from the human cell. Firmware and the hotspot page use this; matching does not |
 
 Empty `label` **and** empty `output` rows in the human CSV are spacing / reserved slots — they are **omitted** here (no no-op rows).
+
+A phone save (`chords.json`) must keep the factory row count and ids. Rows with `user_edit=no` must match the factory `required`／`optional`／`kana`／`output`／`repeat`. Rows with `label_output` may change only `kana` and `output`.
 
 ## Physical key ids (14)
 

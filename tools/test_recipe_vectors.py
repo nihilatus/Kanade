@@ -142,13 +142,54 @@ def _check_vectors(recipe) -> list[str]:
 def _check_machine_csv(recipe) -> list[str]:
     path = _root() / "data" / "chord_map.machine.csv"
     errors = []
+    editable = []
     with path.open(encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle)
+        fieldnames = list(reader.fieldnames or [])
+        if "user_edit" not in fieldnames:
+            errors.append(f"{path.name}: missing user_edit column")
         for row in reader:
             output = row.get("output") or ""
             reason = recipe.recipe_build_error(output)
             if reason:
                 errors.append(f"{path.name} id {row.get('id')}: {reason}")
+            user_edit = row.get("user_edit") or ""
+            if user_edit not in ("no", "label_output"):
+                errors.append(
+                    f"{path.name} id {row.get('id')}: bad user_edit {user_edit!r}"
+                )
+            if user_edit == "label_output":
+                editable.append(row.get("id"))
+    if len(editable) != 14:
+        errors.append(
+            f"{path.name}: expected 14 label_output rows, got {len(editable)} ({editable})"
+        )
+    return errors
+
+
+def _check_human_user_edit() -> list[str]:
+    path = _root() / "esp32-jis-chordboard-premapping.csv"
+    errors = []
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle)
+        if list(reader.fieldnames or [])[-1:] != ["user_edit"]:
+            # Full header checked by the build script; here only require the column.
+            if "user_edit" not in (reader.fieldnames or []):
+                return [f"{path.name}: missing user_edit column"]
+        for lineno, row in enumerate(reader, start=2):
+            label = (row.get("label") or "").strip()
+            output = (row.get("output") or "").strip()
+            if not label and not output:
+                continue
+            user_edit = (row.get("user_edit") or "").strip()
+            if user_edit not in ("no", "label_output"):
+                errors.append(f"{path.name} line {lineno}: bad user_edit {user_edit!r}")
+                continue
+            expect = "label_output" if 11 <= lineno <= 24 else "no"
+            if user_edit != expect:
+                errors.append(
+                    f"{path.name} line {lineno}: expected user_edit={expect}, got {user_edit}"
+                )
     return errors
 
 
@@ -179,6 +220,7 @@ def main() -> int:
     errors.extend(_check_cpp_mirror(recipe))
     errors.extend(_check_vectors(recipe))
     errors.extend(_check_machine_csv(recipe))
+    errors.extend(_check_human_user_edit())
     errors.extend(_check_build_helper(recipe))
     errors.extend(recipe.check_config_page())
     if errors:

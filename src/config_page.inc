@@ -25,7 +25,7 @@ R"HTML(
   .wrap { max-width: 760px; margin: 0 auto; }
   h1 { font-size: 18px; margin: 0 0 8px; }
   .hint { color: #aaa; font-size: 13px; margin: 0 0 10px; line-height: 1.4; }
-  #q, .output {
+  #q, .output, .kana-input {
     width: 100%;
     font-size: 16px;
     padding: 10px;
@@ -34,6 +34,8 @@ R"HTML(
     background: #0e0e0e;
     color: #eee;
   }
+  .kana-input { width: auto; min-width: 6em; max-width: 12em; display: inline-block; font-size: 22px; padding: 4px 8px; margin-right: 8px; }
+  .output[readonly], .kana-input[readonly] { opacity: 0.75; }
   .actions { display: flex; gap: 8px; margin-top: 10px; }
   button {
     font-size: 16px;
@@ -100,7 +102,7 @@ R"HTML(
 <div class="wrap">
   <header>
     <h1>Kanade</h1>
-    <p class="hint">假名列填羅馬字。符號與操作列從清單選鍵。必＝一定要按。可＝可有可無。同一顆不能兩個都勾。假名只供辨識。output 空白表示這列不送鍵。</p>
+    <p class="hint">只有標成可改的符號列能改顯示字與 output。鍵位與其他列鎖定。output 空白表示這列不送鍵。</p>
     <div class="actions">
       <button id="fire-release" class="mode" type="button" disabled>全放再送</button>
       <button id="fire-first" class="mode" type="button" disabled>首鍵放開就送</button>
@@ -132,34 +134,6 @@ R"HTML(
 </div>
 <script>
 const KEYS = ["LL","LU","LR","LD","LT0","LT1","LT2","RL","RU","RR","RD","RT0","RT1","RT2"];
-const KEY_OPTIONS = [
-  ["Hankaku", "半角/全角"],
-  ["Henkan", "変換"],
-  ["Muhenkan", "無変換"],
-  ["Kana", "カタカナひらがな"],
-  ["Eisuu", "英数（macOS）"],
-  ["Yen", "¥"],
-  ["Ro", "ろ"],
-  ["Backspace", "退格"],
-  ["Delete", "Delete"],
-  ["Space", "空白"],
-  ["Enter", "Enter"],
-  ["Esc", "Esc"],
-  ["Tab", "Tab"],
-  ["Up", "上"],
-  ["Down", "下"],
-  ["Left", "左"],
-  ["Right", "右"],
-  ["Home", "Home"],
-  ["End", "End"],
-  ["PageUp", "PageUp"],
-  ["PageDown", "PageDown"],
-  ["Insert", "Insert"],
-  ["CapsLock", "Caps Lock"],
-  ["F1", "F1"], ["F2", "F2"], ["F3", "F3"], ["F4", "F4"],
-  ["F5", "F5"], ["F6", "F6"], ["F7", "F7"], ["F8", "F8"],
-  ["F9", "F9"], ["F10", "F10"], ["F11", "F11"], ["F12", "F12"]
-];
 const qInput = document.getElementById("q");
 const list = document.getElementById("list");
 const none = document.getElementById("none");
@@ -194,6 +168,10 @@ function sourceLabel() {
   return name + " · " + rows.length + " 列";
 }
 
+function canEditLabelOutput(row) {
+  return row.user_edit === "label_output";
+}
+
 function norm(row) {
   const required = Array.isArray(row.required) ? row.required : [];
   const optional = Array.isArray(row.optional) ? row.optional : [];
@@ -202,6 +180,7 @@ function norm(row) {
     kana: row.kana || "",
     output: row.output || "",
     repeat: row.repeat === true,
+    user_edit: row.user_edit === "label_output" ? "label_output" : "no",
     required: KEYS.filter((name) => required.indexOf(name) !== -1),
     optional: KEYS.filter((name) => optional.indexOf(name) !== -1 && required.indexOf(name) === -1)
   };
@@ -215,9 +194,23 @@ function paintKey(box, row, name) {
 function renderRow(row, index) {
   const root = el("section", "row");
   root.dataset.index = String(index);
+  const editable = canEditLabelOutput(row);
   const title = el("div");
-  const kana = el("span", "kana", row.kana || "（無假名）");
-  const meta = el("span", "meta", "#" + row.id);
+  let kana;
+  if (editable) {
+    kana = document.createElement("input");
+    kana.className = "kana-input";
+    kana.type = "text";
+    kana.dataset.role = "kana";
+    kana.value = row.kana;
+    kana.maxLength = 47;
+    kana.placeholder = "顯示字";
+    kana.autocomplete = "off";
+    kana.spellcheck = false;
+  } else {
+    kana = el("span", "kana", row.kana || "（無假名）");
+  }
+  const meta = el("span", "meta", "#" + row.id + (editable ? " · 可改顯示／output" : ""));
   title.appendChild(kana);
   title.appendChild(meta);
   root.appendChild(title);
@@ -236,6 +229,7 @@ function renderRow(row, index) {
         input.type = "checkbox";
         input.dataset.role = role;
         input.checked = row[role].indexOf(name) !== -1;
+        input.disabled = true;
         label.appendChild(input);
         label.appendChild(document.createTextNode(role === "required" ? "必" : "可"));
         box.appendChild(label);
@@ -247,43 +241,17 @@ function renderRow(row, index) {
   });
   root.appendChild(hands);
 
-  const id = Number(row.id);
-  const symbolRow = id >= 4 && id <= 31;
-  let output;
-  if (symbolRow) {
-    output = document.createElement("select");
-    output.className = "output";
-    output.dataset.role = "output";
-    const known = KEY_OPTIONS.some((item) => item[0] === row.output);
-    if (row.output !== "" && !known) {
-      const keep = document.createElement("option");
-      keep.value = row.output;
-      keep.textContent = "目前配方：" + row.output;
-      output.appendChild(keep);
-    }
-    const blank = document.createElement("option");
-    blank.value = "";
-    blank.textContent = "不送鍵";
-    output.appendChild(blank);
-    KEY_OPTIONS.forEach((item) => {
-      const opt = document.createElement("option");
-      opt.value = item[0];
-      opt.textContent = item[1];
-      output.appendChild(opt);
-    });
-    output.value = row.output;
-  } else {
-    output = document.createElement("input");
-    output.className = "output";
-    output.type = "text";
-    output.dataset.role = "output";
-    output.value = row.output;
-    output.maxLength = 63;
-    output.placeholder = "output，例如 nn、Shift+1、Backspace";
-    output.autocomplete = "off";
-    output.autocapitalize = "off";
-    output.spellcheck = false;
-  }
+  const output = document.createElement("input");
+  output.className = "output";
+  output.type = "text";
+  output.dataset.role = "output";
+  output.value = row.output;
+  output.maxLength = 63;
+  output.placeholder = "output，例如 Shift+1、kome";
+  output.autocomplete = "off";
+  output.autocapitalize = "off";
+  output.spellcheck = false;
+  if (!editable) output.readOnly = true;
   root.appendChild(output);
   const hint = el("div", "empty-hint", "這列不送鍵");
   hint.hidden = row.output !== "";
@@ -322,7 +290,8 @@ function payload() {
       optional: KEYS.filter((name) => row.optional.indexOf(name) !== -1),
       kana: row.kana,
       output: row.output,
-      repeat: row.repeat === true
+      repeat: row.repeat === true,
+      user_edit: row.user_edit
     }))
   };
 }
@@ -336,6 +305,7 @@ function clientError() {
         return "第 " + (i + 1) + " 列的同一顆鍵不能又必按又可選";
       }
     }
+    if (row.kana.length > 47) return "第 " + (i + 1) + " 列的假名太長";
     if (row.output.length > 63) return "第 " + (i + 1) + " 列的 output 太長";
     for (let c = 0; c < row.output.length; c++) {
       const code = row.output.charCodeAt(c);
@@ -401,39 +371,23 @@ async function withBusy(fn) {
   }
 }
 
-function applyOutput(input) {
-  if (!input || input.dataset.role !== "output") return;
+function applyRowField(input) {
+  if (!input) return;
+  const role = input.dataset.role;
+  if (role !== "output" && role !== "kana") return;
   const rowEl = input.closest(".row");
   const row = rows[Number(rowEl.dataset.index)];
-  row.output = input.value;
-  rowEl.querySelector(".empty-hint").hidden = input.value !== "";
+  if (!canEditLabelOutput(row)) return;
+  if (role === "output") {
+    row.output = input.value;
+    rowEl.querySelector(".empty-hint").hidden = input.value !== "";
+  } else {
+    row.kana = input.value;
+  }
 }
 
-list.addEventListener("change", (ev) => {
-  const input = ev.target;
-  if (input && input.dataset.role === "output") {
-    applyOutput(input);
-    return;
-  }
-  if (!input || input.type !== "checkbox") return;
-  const rowEl = input.closest(".row");
-  const box = input.closest(".key");
-  const row = rows[Number(rowEl.dataset.index)];
-  const name = box.dataset.key;
-  const role = input.dataset.role;
-  const other = role === "required" ? "optional" : "required";
-  row.required = row.required.filter((key) => key !== name);
-  row.optional = row.optional.filter((key) => key !== name);
-  if (input.checked) {
-    const otherInput = box.querySelector('[data-role="' + other + '"]');
-    otherInput.checked = false;
-    row[role].push(name);
-  }
-  paintKey(box, row, name);
-});
-
 list.addEventListener("input", (ev) => {
-  applyOutput(ev.target);
+  applyRowField(ev.target);
 });
 
 qInput.addEventListener("input", () => {

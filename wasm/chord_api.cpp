@@ -93,6 +93,7 @@ int chord_wasm_set_rules(uint32_t count) {
     row.kana = kEmpty;
     row.output = kEmpty;
     row.repeat = g_rules_in[i].repeat != 0;
+    row.user_edit = kChordUserEditNo;
   }
   return 0;
 }

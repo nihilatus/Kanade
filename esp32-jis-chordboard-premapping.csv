@@ -1,250 +1,250 @@
-﻿section,label,output,left_fingers,right_fingers,left_thumb,right_thumb,repeat
-,ん,nn,,,LT1,,no
-,っ,ltu,,,,RT1,no
-,-,-,,,LT1,RT1,no
-,,Up,LT0,RU,,,allow
-,,Down,LT0,RD,,,allow
-,,Left,LT0,RL,,,allow
-,,Right,LT0,RR,,,allow
-符號,「,[,LL,RT0,,RT2,no
-,」,],LR,RT0,,RT2,no
-,！,Shift+1,LU,RT0,,RT2,no
-,？,Shift+/,LD,RT0,,RT2,no
-,『,z [,LL+LU,RT0,,RT2,no
-,』,z ],LR+LU,RT0,,RT2,no
-,・,/,LL+LD,RT0,,RT2,no
-,……,z . z .,LR+LD,RT0,,RT2,no
-,（,Shift+8,LT0,RL,LT2,,no
-,）,Shift+9,LT0,RR,LT2,,no
-,※,kome,LT0,RU,LT2,,no
-,○,maru,LT0,RD,LT2,,no
-,★ ☆,hosi,LT0,RL+RU,LT2,,no
-,―,dassyu,LT0,RR+RU,LT2,,no
-,,kigou,LT0,RL+RD,LT2,,no
-,→,yajirushi,LT0,RR+RD,LT2,,no
-,、,",",LL+LD+LR,,,,no
-,。,.,,RL+RD+RR,,,no
-操作功能,退格,Backspace,,,LT2,,allow
-,空白（變換）,Space,,,,RT2,no
-,變片假名,Ctrl+i,LT0,,LT2,RT2,no
-,變平假名,Ctrl+u,,RT0+RL+RR,LT2,RT2,no
-,,[ESC],LU+LR+LT0,,,,no
-,,Enter,LL+LD+LR,RL+RD+RR,,,no
-單母音,あ,a,,RT0,,,no
-,い,i,,RL,,,no
-,う,u,,RU,,,no
-,え,e,,RR,,,no
-,お,o,,RD,,,no
-,や,ya,,RR+RU,,,no
-,ゆ,yu,,RL+RU,,,no
-,よ,yo,,RL+RD,,,no
-消失又重出的Ye,いぇ,ye,,RR+RD,,,no
-小字 單母音+半母音,ぁ,la,,RT0,LT1,,no
-,ぃ,li,,RL,LT1,,no
-,ぅ,lu,,RU,LT1,,no
-,ぇ,le,,RR,LT1,,no
-,ぉ,lo,,RD,LT1,,no
-,ゃ,lya,,RR+RU,LT1,,no
-,ゅ,lyu,,RL+RU,LT1,,no
-,ょ,lyo,,RL+RD,LT1,,no
-小字ゎ,ゎ,lwa,,RR+RD,LT1,,no
-傳統 た 行,た,ta,LD,(RT0),,,no
-,ち,ti,LD,RL,,,no
-,つ,tu,LD,RU,,,no
-,て,te,LD,RR,,,no
-,と,to,LD,RD,,,no
-,ちゃ,tya,LD,RR+RU,,,no
-,ちゅ,tyu,LD,RL+RU,,,no
-,ちょ,tyo,LD,RL+RD,,,no
-傳統 か 行,か,ka,LU,(RT0),,,no
-,き,ki,LU,RL,,,no
-,く,ku,LU,RU,,,no
-,け,ke,LU,RR,,,no
-,こ,ko,LU,RD,,,no
-,きゃ,kya,LU,RR+RU,,,no
-,きゅ,kyu,LU,RL+RU,,,no
-,きょ,kyo,LU,RL+RD,,,no
-傳統 な 行,な,na,LL,(RT0),,,no
-,に,ni,LL,RL,,,no
-,ぬ,nu,LL,RU,,,no
-,ね,ne,LL,RR,,,no
-,の,no,LL,RD,,,no
-,にゃ,nya,LL,RR+RU,,,no
-,にゅ,nyu,LL,RL+RU,,,no
-,にょ,nyo,LL,RL+RD,,,no
-傳統 さ 行,さ,sa,LR,(RT0),,,no
-,し,si,LR,RL,,,no
-,す,su,LR,RU,,,no
-,せ,se,LR,RR,,,no
-,そ,so,LR,RD,,,no
-,しゃ,sya,LR,RR+RU,,,no
-,しゅ,syu,LR,RL+RU,,,no
-,しょ,syo,LR,RL+RD,,,no
-傳統 ら 行,ら,ra,LL+LD,(RT0),,,no
-,り,ri,LL+LD,RL,,,no
-,る,ru,LL+LD,RU,,,no
-,れ,re,LL+LD,RR,,,no
-,ろ,ro,LL+LD,RD,,,no
-,りゃ,rya,LL+LD,RR+RU,,,no
-,りゅ,ryu,LL+LD,RL+RU,,,no
-,りょ,ryo,LL+LD,RL+RD,,,no
-傳統 ま 行,ま,ma,LR+LD,(RT0),,,no
-,み,mi,LR+LD,RL,,,no
-,む,mu,LR+LD,RU,,,no
-,め,me,LR+LD,RR,,,no
-,も,mo,LR+LD,RD,,,no
-,みゃ,mya,LR+LD,RR+RU,,,no
-,みゅ,myu,LR+LD,RL+RU,,,no
-,みょ,myo,LR+LD,RL+RD,,,no
-外來語 w,わ,wa,LL+LU,(RT0),,,no
-,うぃ,whi,LL+LU,RL,,,no
-,う,whu,LL+LU,RU,,,no
-,うぇ,whe,LL+LU,RR,,,no
-,を,wo,LL+LU,RD,,,no
-,うぉ,who,LL+LU,RR+RU,,,no
-,,,LL+LU,RL+RU,,,
-,うぁ,wha,LL+LU,RL+RD,,,no
-傳統 は 行,は,ha,LR+LU,(RT0),,,no
-,ひ,hi,LR+LU,RL,,,no
-,ふ,hu,LR+LU,RU,,,no
-,へ,he,LR+LU,RR,,,no
-,ほ,ho,LR+LU,RD,,,no
-,ひゃ,hya,LR+LU,RR+RU,,,no
-,ひゅ,hyu,LR+LU,RL+RU,,,no
-,ひょ,hyo,LR+LU,RL+RD,,,no
-傳統 だ 行,だ,da,LD,(RT0),,RT1,no
-,ぢ,di,LD,RL,,RT1,no
-,づ,du,LD,RU,,RT1,no
-,で,de,LD,RR,,RT1,no
-,ど,do,LD,RD,,RT1,no
-,ぢゃ,dya,LD,RR+RU,,RT1,no
-,ぢゅ,dyu,LD,RL+RU,,RT1,no
-,ぢょ,dyo,LD,RL+RD,,RT1,no
-傳統 が 行,が,ga,LU,(RT0),,RT1,no
-,ぎ,gi,LU,RL,,RT1,no
-,ぐ,gu,LU,RU,,RT1,no
-,げ,ge,LU,RR,,RT1,no
-,ご,go,LU,RD,,RT1,no
-,ぎゃ,gya,LU,RR+RU,,RT1,no
-,ぎゅ,gyu,LU,RL+RU,,RT1,no
-,ぎょ,gyo,LU,RL+RD,,RT1,no
-傳統 ざ 行,ざ,za,LR,(RT0),,RT1,no
-,じ,zi,LR,RL,,RT1,no
-,ず,zu,LR,RU,,RT1,no
-,ぜ,ze,LR,RR,,RT1,no
-,ぞ,zo,LR,RD,,RT1,no
-,じゃ,zya,LR,RR+RU,,RT1,no
-,じゅ,zyu,LR,RL+RU,,RT1,no
-,じょ,zyo,LR,RL+RD,,RT1,no
-傳統 ば 行,ば,ba,LR+LU,(RT0),,RT1,no
-,び,bi,LR+LU,RL,,RT1,no
-,ぶ,bu,LR+LU,RU,,RT1,no
-,べ,be,LR+LU,RR,,RT1,no
-,ぼ,bo,LR+LU,RD,,RT1,no
-,びゃ,bya,LR+LU,RR+RU,,RT1,no
-,びゅ,byu,LR+LU,RL+RU,,RT1,no
-,びょ,byo,LR+LU,RL+RD,,RT1,no
-傳統 ぱ 行,ぱ,pa,LR+LU,(RT0),LT1,,no
-,ぴ,pi,LR+LU,RL,LT1,,no
-,ぷ,pu,LR+LU,RU,LT1,,no
-,ぺ,pe,LR+LU,RR,LT1,,no
-,ぽ,po,LR+LU,RD,LT1,,no
-,ぴゃ,pya,LR+LU,RR+RU,LT1,,no
-,ぴゅ,pyu,LR+LU,RL+RU,LT1,,no
-,ぴょ,pyo,LR+LU,RL+RD,LT1,,no
-外來語 f,ふぁ,fa,LL+LU,(RT0),LT1,,no
-,ふぃ,fi,LL+LU,RL,LT1,,no
-,ふ,fu,LL+LU,RU,LT1,,no
-,ふぇ,fe,LL+LU,RR,LT1,,no
-,ふぉ,fo,LL+LU,RD,LT1,,no
-,ふゃ,fya,LL+LU,RR+RU,LT1,,no
-,ふゅ,fyu,LL+LU,RL+RU,LT1,,no
-,ふょ,fyo,LL+LU,RL+RD,LT1,,no
-外來語 v,ゔぁ,va,LL+LU,(RT0),LT1,RT1,no
-,ゔぃ,vi,LL+LU,RL,LT1,RT1,no
-,ゔ,vu,LL+LU,RU,LT1,RT1,no
-,ゔぇ,ve,LL+LU,RR,LT1,RT1,no
-,ゔぉ,vo,LL+LU,RD,LT1,RT1,no
-,ゔゃ,vya,LL+LU,RR+RU,LT1,RT1,no
-,ゔゅ,vyu,LL+LU,RL+RU,LT1,RT1,no
-,ゔょ,vyo,LL+LU,RL+RD,LT1,RT1,no
-外來語 kw,くぁ,qa,LU,(RT0),LT1,,no
-,くぃ,qi,LU,RL,LT1,,no
-,く,qu,LU,RU,LT1,,no
-,くぇ,qe,LU,RR,LT1,,no
-,くぉ,qo,LU,RD,LT1,,no
-,,,LU,RR+RU,LT1,,
-,,,LU,RL+RU,LT1,,
-,,,LU,RL+RD,LT1,,
-外來語 gw,ぐぁ,gwa,LU,(RT0),LT1,RT1,no
-,ぐぃ,gwi,LU,RL,LT1,RT1,no
-,ぐぅ,gwu,LU,RU,LT1,RT1,no
-,ぐぇ,gwe,LU,RR,LT1,RT1,no
-,ぐぉ,gwo,LU,RD,LT1,RT1,no
-,,,LU,RR+RU,LT1,RT1,
-,,,LU,RL+RU,LT1,RT1,
-,,,LU,RL+RD,LT1,RT1,
-外來語 sh,しゃ,sya,LR,(RT0),LT1,,no
-,しぃ,syi,LR,RL,LT1,,no
-,しゅ,syu,LR,RU,LT1,,no
-,しぇ,sye,LR,RR,LT1,,no
-,しょ,syo,LR,RD,LT1,,no
-,しゃ,sya,LR,RR+RU,LT1,,no
-,しゅ,syu,LR,RL+RU,LT1,,no
-,しょ,syo,LR,RL+RD,LT1,,no
-外來語 j,じゃ,ja,LR,(RT0),LT1,RT1,no
-,じ,ji,LR,RL,LT1,RT1,no
-,じゅ,ju,LR,RU,LT1,RT1,no
-,じぇ,je,LR,RR,LT1,RT1,no
-,じょ,jo,LR,RD,LT1,RT1,no
-,じゃ,jya,LR,RR+RU,LT1,RT1,no
-,じゅ,jyu,LR,RL+RU,LT1,RT1,no
-,じょ,jyo,LR,RL+RD,LT1,RT1,no
-外來語 ch,ちゃ,cha,LL,(RT0),LT1,,no
-,ち,chi,LL,RL,LT1,,no
-,,,LL,RU,LT1,,
-,ちぇ,che,LL,RR,LT1,,no
-,ちょ,cho,LL,RD,LT1,,no
-,,,LL,RR+RU,LT1,,
-,ちゅ,chu,LL,RL+RU,LT1,,no
-,,,LL,RL+RD,LT1,,
-外來語 ts,つぁ,tsa,LD,(RT0),LT1,,no
-,つぃ,tsi,LD,RL,LT1,,no
-,つ,tsu,LD,RU,LT1,,no
-,つぇ,tse,LD,RR,LT1,,no
-,つぉ,tso,LD,RD,LT1,,no
-,,,LD,RR+RU,LT1,,
-,,,LD,RL+RU,LT1,,
-,,,LD,RL+RD,LT1,,
-外來語 ti,てゃ,tha,LR+LD,(RT0),LT1,,no
-,てぃ,thi,LR+LD,RL,LT1,,no
-,,,LR+LD,RU,LT1,,
-,てぇ,the,LR+LD,RR,LT1,,no
-,てょ,tho,LR+LD,RD,LT1,,no
-,,,LR+LD,RR+RU,LT1,,
-,てゅ,thu,LR+LD,RL+RU,LT1,,no
-,,,LR+LD,RL+RD,LT1,,
-外來語 di,でゃ,dha,LR+LD,(RT0),LT1,RT1,no
-,でぃ,dhi,LR+LD,RL,LT1,RT1,no
-,,,LR+LD,RU,LT1,RT1,
-,でぇ,dhe,LR+LD,RR,LT1,RT1,no
-,でょ,dho,LR+LD,RD,LT1,RT1,no
-,,,LR+LD,RR+RU,LT1,RT1,
-,でゅ,dhu,LR+LD,RL+RU,LT1,RT1,no
-,,,LR+LD,RL+RD,LT1,RT1,
-外來語 tu,とぁ,twa,LL+LD,(RT0),LT1,,no
-,とぃ,twi,LL+LD,RL,LT1,,no
-,とぅ,twu,LL+LD,RU,LT1,,no
-,とぇ,twe,LL+LD,RR,LT1,,no
-,とぉ,two,LL+LD,RD,LT1,,no
-,,,LL+LD,RR+RU,LT1,,
-,,,LL+LD,RL+RU,LT1,,
-,,,LL+LD,RL+RD,LT1,,
-外來語 du,どぁ,dwa,LL+LD,(RT0),LT1,RT1,no
-,どぃ,dwi,LL+LD,RL,LT1,RT1,no
-,どぅ,dwu,LL+LD,RU,LT1,RT1,no
-,どぇ,dwe,LL+LD,RR,LT1,RT1,no
-,どぉ,dwo,LL+LD,RD,LT1,RT1,no
-,,,LL+LD,RR+RU,LT1,RT1,
-,,,LL+LD,RL+RU,LT1,RT1,
-,,,LL+LD,RL+RD,LT1,RT1,
+﻿section,label,output,left_fingers,right_fingers,left_thumb,right_thumb,repeat,user_edit
+,ん,nn,,,LT1,,no,no
+,っ,ltu,,,,RT1,no,no
+,-,-,,,LT1,RT1,no,no
+,,Up,LT0,RU,,,allow,no
+,,Down,LT0,RD,,,allow,no
+,,Left,LT0,RL,,,allow,no
+,,Right,LT0,RR,,,allow,no
+符號,「,[,LL,RT0,,RT2,no,no
+,」,],LR,RT0,,RT2,no,no
+,！,Shift+1,LU,RT0,,RT2,no,label_output
+,？,Shift+/,LD,RT0,,RT2,no,label_output
+,『,z [,LL+LU,RT0,,RT2,no,label_output
+,』,z ],LR+LU,RT0,,RT2,no,label_output
+,・,/,LL+LD,RT0,,RT2,no,label_output
+,……,z . z .,LR+LD,RT0,,RT2,no,label_output
+,（,Shift+8,LT0,RL,LT2,,no,label_output
+,）,Shift+9,LT0,RR,LT2,,no,label_output
+,※,kome,LT0,RU,LT2,,no,label_output
+,○,maru,LT0,RD,LT2,,no,label_output
+,★ ☆,hosi,LT0,RL+RU,LT2,,no,label_output
+,―,dassyu,LT0,RR+RU,LT2,,no,label_output
+,,kigou,LT0,RL+RD,LT2,,no,label_output
+,→,yajirushi,LT0,RR+RD,LT2,,no,label_output
+,、,",",LL+LD+LR,,,,no,no
+,。,.,,RL+RD+RR,,,no,no
+操作功能,退格,Backspace,,,LT2,,allow,no
+,空白（變換）,Space,,,,RT2,no,no
+,變片假名,Ctrl+i,LT0,,LT2,RT2,no,no
+,變平假名,Ctrl+u,,RT0+RL+RR,LT2,RT2,no,no
+,,[ESC],LU+LR+LT0,,,,no,no
+,,Enter,LL+LD+LR,RL+RD+RR,,,no,no
+單母音,あ,a,,RT0,,,no,no
+,い,i,,RL,,,no,no
+,う,u,,RU,,,no,no
+,え,e,,RR,,,no,no
+,お,o,,RD,,,no,no
+,や,ya,,RR+RU,,,no,no
+,ゆ,yu,,RL+RU,,,no,no
+,よ,yo,,RL+RD,,,no,no
+消失又重出的Ye,いぇ,ye,,RR+RD,,,no,no
+小字 單母音+半母音,ぁ,la,,RT0,LT1,,no,no
+,ぃ,li,,RL,LT1,,no,no
+,ぅ,lu,,RU,LT1,,no,no
+,ぇ,le,,RR,LT1,,no,no
+,ぉ,lo,,RD,LT1,,no,no
+,ゃ,lya,,RR+RU,LT1,,no,no
+,ゅ,lyu,,RL+RU,LT1,,no,no
+,ょ,lyo,,RL+RD,LT1,,no,no
+小字ゎ,ゎ,lwa,,RR+RD,LT1,,no,no
+傳統 た 行,た,ta,LD,(RT0),,,no,no
+,ち,ti,LD,RL,,,no,no
+,つ,tu,LD,RU,,,no,no
+,て,te,LD,RR,,,no,no
+,と,to,LD,RD,,,no,no
+,ちゃ,tya,LD,RR+RU,,,no,no
+,ちゅ,tyu,LD,RL+RU,,,no,no
+,ちょ,tyo,LD,RL+RD,,,no,no
+傳統 か 行,か,ka,LU,(RT0),,,no,no
+,き,ki,LU,RL,,,no,no
+,く,ku,LU,RU,,,no,no
+,け,ke,LU,RR,,,no,no
+,こ,ko,LU,RD,,,no,no
+,きゃ,kya,LU,RR+RU,,,no,no
+,きゅ,kyu,LU,RL+RU,,,no,no
+,きょ,kyo,LU,RL+RD,,,no,no
+傳統 な 行,な,na,LL,(RT0),,,no,no
+,に,ni,LL,RL,,,no,no
+,ぬ,nu,LL,RU,,,no,no
+,ね,ne,LL,RR,,,no,no
+,の,no,LL,RD,,,no,no
+,にゃ,nya,LL,RR+RU,,,no,no
+,にゅ,nyu,LL,RL+RU,,,no,no
+,にょ,nyo,LL,RL+RD,,,no,no
+傳統 さ 行,さ,sa,LR,(RT0),,,no,no
+,し,si,LR,RL,,,no,no
+,す,su,LR,RU,,,no,no
+,せ,se,LR,RR,,,no,no
+,そ,so,LR,RD,,,no,no
+,しゃ,sya,LR,RR+RU,,,no,no
+,しゅ,syu,LR,RL+RU,,,no,no
+,しょ,syo,LR,RL+RD,,,no,no
+傳統 ら 行,ら,ra,LL+LD,(RT0),,,no,no
+,り,ri,LL+LD,RL,,,no,no
+,る,ru,LL+LD,RU,,,no,no
+,れ,re,LL+LD,RR,,,no,no
+,ろ,ro,LL+LD,RD,,,no,no
+,りゃ,rya,LL+LD,RR+RU,,,no,no
+,りゅ,ryu,LL+LD,RL+RU,,,no,no
+,りょ,ryo,LL+LD,RL+RD,,,no,no
+傳統 ま 行,ま,ma,LR+LD,(RT0),,,no,no
+,み,mi,LR+LD,RL,,,no,no
+,む,mu,LR+LD,RU,,,no,no
+,め,me,LR+LD,RR,,,no,no
+,も,mo,LR+LD,RD,,,no,no
+,みゃ,mya,LR+LD,RR+RU,,,no,no
+,みゅ,myu,LR+LD,RL+RU,,,no,no
+,みょ,myo,LR+LD,RL+RD,,,no,no
+外來語 w,わ,wa,LL+LU,(RT0),,,no,no
+,うぃ,whi,LL+LU,RL,,,no,no
+,う,whu,LL+LU,RU,,,no,no
+,うぇ,whe,LL+LU,RR,,,no,no
+,を,wo,LL+LU,RD,,,no,no
+,うぉ,who,LL+LU,RR+RU,,,no,no
+,,,LL+LU,RL+RU,,,,no
+,うぁ,wha,LL+LU,RL+RD,,,no,no
+傳統 は 行,は,ha,LR+LU,(RT0),,,no,no
+,ひ,hi,LR+LU,RL,,,no,no
+,ふ,hu,LR+LU,RU,,,no,no
+,へ,he,LR+LU,RR,,,no,no
+,ほ,ho,LR+LU,RD,,,no,no
+,ひゃ,hya,LR+LU,RR+RU,,,no,no
+,ひゅ,hyu,LR+LU,RL+RU,,,no,no
+,ひょ,hyo,LR+LU,RL+RD,,,no,no
+傳統 だ 行,だ,da,LD,(RT0),,RT1,no,no
+,ぢ,di,LD,RL,,RT1,no,no
+,づ,du,LD,RU,,RT1,no,no
+,で,de,LD,RR,,RT1,no,no
+,ど,do,LD,RD,,RT1,no,no
+,ぢゃ,dya,LD,RR+RU,,RT1,no,no
+,ぢゅ,dyu,LD,RL+RU,,RT1,no,no
+,ぢょ,dyo,LD,RL+RD,,RT1,no,no
+傳統 が 行,が,ga,LU,(RT0),,RT1,no,no
+,ぎ,gi,LU,RL,,RT1,no,no
+,ぐ,gu,LU,RU,,RT1,no,no
+,げ,ge,LU,RR,,RT1,no,no
+,ご,go,LU,RD,,RT1,no,no
+,ぎゃ,gya,LU,RR+RU,,RT1,no,no
+,ぎゅ,gyu,LU,RL+RU,,RT1,no,no
+,ぎょ,gyo,LU,RL+RD,,RT1,no,no
+傳統 ざ 行,ざ,za,LR,(RT0),,RT1,no,no
+,じ,zi,LR,RL,,RT1,no,no
+,ず,zu,LR,RU,,RT1,no,no
+,ぜ,ze,LR,RR,,RT1,no,no
+,ぞ,zo,LR,RD,,RT1,no,no
+,じゃ,zya,LR,RR+RU,,RT1,no,no
+,じゅ,zyu,LR,RL+RU,,RT1,no,no
+,じょ,zyo,LR,RL+RD,,RT1,no,no
+傳統 ば 行,ば,ba,LR+LU,(RT0),,RT1,no,no
+,び,bi,LR+LU,RL,,RT1,no,no
+,ぶ,bu,LR+LU,RU,,RT1,no,no
+,べ,be,LR+LU,RR,,RT1,no,no
+,ぼ,bo,LR+LU,RD,,RT1,no,no
+,びゃ,bya,LR+LU,RR+RU,,RT1,no,no
+,びゅ,byu,LR+LU,RL+RU,,RT1,no,no
+,びょ,byo,LR+LU,RL+RD,,RT1,no,no
+傳統 ぱ 行,ぱ,pa,LR+LU,(RT0),LT1,,no,no
+,ぴ,pi,LR+LU,RL,LT1,,no,no
+,ぷ,pu,LR+LU,RU,LT1,,no,no
+,ぺ,pe,LR+LU,RR,LT1,,no,no
+,ぽ,po,LR+LU,RD,LT1,,no,no
+,ぴゃ,pya,LR+LU,RR+RU,LT1,,no,no
+,ぴゅ,pyu,LR+LU,RL+RU,LT1,,no,no
+,ぴょ,pyo,LR+LU,RL+RD,LT1,,no,no
+外來語 f,ふぁ,fa,LL+LU,(RT0),LT1,,no,no
+,ふぃ,fi,LL+LU,RL,LT1,,no,no
+,ふ,fu,LL+LU,RU,LT1,,no,no
+,ふぇ,fe,LL+LU,RR,LT1,,no,no
+,ふぉ,fo,LL+LU,RD,LT1,,no,no
+,ふゃ,fya,LL+LU,RR+RU,LT1,,no,no
+,ふゅ,fyu,LL+LU,RL+RU,LT1,,no,no
+,ふょ,fyo,LL+LU,RL+RD,LT1,,no,no
+外來語 v,ゔぁ,va,LL+LU,(RT0),LT1,RT1,no,no
+,ゔぃ,vi,LL+LU,RL,LT1,RT1,no,no
+,ゔ,vu,LL+LU,RU,LT1,RT1,no,no
+,ゔぇ,ve,LL+LU,RR,LT1,RT1,no,no
+,ゔぉ,vo,LL+LU,RD,LT1,RT1,no,no
+,ゔゃ,vya,LL+LU,RR+RU,LT1,RT1,no,no
+,ゔゅ,vyu,LL+LU,RL+RU,LT1,RT1,no,no
+,ゔょ,vyo,LL+LU,RL+RD,LT1,RT1,no,no
+外來語 kw,くぁ,qa,LU,(RT0),LT1,,no,no
+,くぃ,qi,LU,RL,LT1,,no,no
+,く,qu,LU,RU,LT1,,no,no
+,くぇ,qe,LU,RR,LT1,,no,no
+,くぉ,qo,LU,RD,LT1,,no,no
+,,,LU,RR+RU,LT1,,,no
+,,,LU,RL+RU,LT1,,,no
+,,,LU,RL+RD,LT1,,,no
+外來語 gw,ぐぁ,gwa,LU,(RT0),LT1,RT1,no,no
+,ぐぃ,gwi,LU,RL,LT1,RT1,no,no
+,ぐぅ,gwu,LU,RU,LT1,RT1,no,no
+,ぐぇ,gwe,LU,RR,LT1,RT1,no,no
+,ぐぉ,gwo,LU,RD,LT1,RT1,no,no
+,,,LU,RR+RU,LT1,RT1,,no
+,,,LU,RL+RU,LT1,RT1,,no
+,,,LU,RL+RD,LT1,RT1,,no
+外來語 sh,しゃ,sya,LR,(RT0),LT1,,no,no
+,しぃ,syi,LR,RL,LT1,,no,no
+,しゅ,syu,LR,RU,LT1,,no,no
+,しぇ,sye,LR,RR,LT1,,no,no
+,しょ,syo,LR,RD,LT1,,no,no
+,しゃ,sya,LR,RR+RU,LT1,,no,no
+,しゅ,syu,LR,RL+RU,LT1,,no,no
+,しょ,syo,LR,RL+RD,LT1,,no,no
+外來語 j,じゃ,ja,LR,(RT0),LT1,RT1,no,no
+,じ,ji,LR,RL,LT1,RT1,no,no
+,じゅ,ju,LR,RU,LT1,RT1,no,no
+,じぇ,je,LR,RR,LT1,RT1,no,no
+,じょ,jo,LR,RD,LT1,RT1,no,no
+,じゃ,jya,LR,RR+RU,LT1,RT1,no,no
+,じゅ,jyu,LR,RL+RU,LT1,RT1,no,no
+,じょ,jyo,LR,RL+RD,LT1,RT1,no,no
+外來語 ch,ちゃ,cha,LL,(RT0),LT1,,no,no
+,ち,chi,LL,RL,LT1,,no,no
+,,,LL,RU,LT1,,,no
+,ちぇ,che,LL,RR,LT1,,no,no
+,ちょ,cho,LL,RD,LT1,,no,no
+,,,LL,RR+RU,LT1,,,no
+,ちゅ,chu,LL,RL+RU,LT1,,no,no
+,,,LL,RL+RD,LT1,,,no
+外來語 ts,つぁ,tsa,LD,(RT0),LT1,,no,no
+,つぃ,tsi,LD,RL,LT1,,no,no
+,つ,tsu,LD,RU,LT1,,no,no
+,つぇ,tse,LD,RR,LT1,,no,no
+,つぉ,tso,LD,RD,LT1,,no,no
+,,,LD,RR+RU,LT1,,,no
+,,,LD,RL+RU,LT1,,,no
+,,,LD,RL+RD,LT1,,,no
+外來語 ti,てゃ,tha,LR+LD,(RT0),LT1,,no,no
+,てぃ,thi,LR+LD,RL,LT1,,no,no
+,,,LR+LD,RU,LT1,,,no
+,てぇ,the,LR+LD,RR,LT1,,no,no
+,てょ,tho,LR+LD,RD,LT1,,no,no
+,,,LR+LD,RR+RU,LT1,,,no
+,てゅ,thu,LR+LD,RL+RU,LT1,,no,no
+,,,LR+LD,RL+RD,LT1,,,no
+外來語 di,でゃ,dha,LR+LD,(RT0),LT1,RT1,no,no
+,でぃ,dhi,LR+LD,RL,LT1,RT1,no,no
+,,,LR+LD,RU,LT1,RT1,,no
+,でぇ,dhe,LR+LD,RR,LT1,RT1,no,no
+,でょ,dho,LR+LD,RD,LT1,RT1,no,no
+,,,LR+LD,RR+RU,LT1,RT1,,no
+,でゅ,dhu,LR+LD,RL+RU,LT1,RT1,no,no
+,,,LR+LD,RL+RD,LT1,RT1,,no
+外來語 tu,とぁ,twa,LL+LD,(RT0),LT1,,no,no
+,とぃ,twi,LL+LD,RL,LT1,,no,no
+,とぅ,twu,LL+LD,RU,LT1,,no,no
+,とぇ,twe,LL+LD,RR,LT1,,no,no
+,とぉ,two,LL+LD,RD,LT1,,no,no
+,,,LL+LD,RR+RU,LT1,,,no
+,,,LL+LD,RL+RU,LT1,,,no
+,,,LL+LD,RL+RD,LT1,,,no
+外來語 du,どぁ,dwa,LL+LD,(RT0),LT1,RT1,no,no
+,どぃ,dwi,LL+LD,RL,LT1,RT1,no,no
+,どぅ,dwu,LL+LD,RU,LT1,RT1,no,no
+,どぇ,dwe,LL+LD,RR,LT1,RT1,no,no
+,どぉ,dwo,LL+LD,RD,LT1,RT1,no,no
+,,,LL+LD,RR+RU,LT1,RT1,,no
+,,,LL+LD,RL+RU,LT1,RT1,,no
+,,,LL+LD,RL+RD,LT1,RT1,,no

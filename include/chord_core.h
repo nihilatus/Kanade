@@ -16,6 +16,13 @@
 const char *chord_key_name(int index);
 int chord_key_index(const char *name);
 
+// Hotspot may change kana/output only when this is LabelOutput. Matching
+// ignores the field; factory CSV user_edit is the authority on save.
+enum ChordUserEdit : uint8_t {
+  kChordUserEditNo = 0,
+  kChordUserEditLabelOutput = 1,
+};
+
 struct ChordRule {
   uint16_t id;
   uint16_t required;
@@ -25,6 +32,7 @@ struct ChordRule {
   // True when the machine-table column repeat is allow. The caller decides
   // whether a held peak may tap again. This is not the release/first timing.
   bool repeat;
+  ChordUserEdit user_edit;
 };
 
 // required ⊆ mask ⊆ required ∪ optional.

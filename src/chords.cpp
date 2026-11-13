@@ -327,10 +327,22 @@ bool chords_load_factory() {
     g_live[i].kana = "";
     g_live[i].output = "";
     g_live[i].repeat = false;
+    g_live[i].user_edit = kChordUserEditNo;
   }
   g_live_count = kFactoryCount;
   g_from_file = false;
   return true;
+}
+
+static const ChordRule *factory_by_id(uint16_t id) {
+  for (size_t i = 0; i < kFactoryCount; ++i) {
+    if (kFactory[i].id == id) return &kFactory[i];
+  }
+  return nullptr;
+}
+
+static const char *user_edit_name(ChordUserEdit value) {
+  return value == kChordUserEditLabelOutput ? "label_output" : "no";
 }
 
 ChordStageStatus chords_stage_json(const char *json, size_t len, char *err, size_t err_len) {
@@ -365,6 +377,8 @@ ChordStageStatus chords_stage_json(const char *json, size_t len, char *err, size
   if (arr.isNull()) return set_err(err, err_len, "缺少 chords");
   if (arr.size() == 0) return set_err(err, err_len, "至少要有一列");
   if (arr.size() > kChordsMaxRows) return set_err(err, err_len, "列數太多");
+  // Saved tables keep the factory shape. Only label_output rows may change kana/output.
+  if (arr.size() != kFactoryCount) return set_err(err, err_len, "列數必須與出廠表相同");
 
   size_t pool_used = 0;
   for (size_t i = 0; i < arr.size(); ++i) {
@@ -414,6 +428,21 @@ ChordStageStatus chords_stage_json(const char *json, size_t len, char *err, size
       }
     }
 
+    const ChordRule *factory = factory_by_id(static_cast<uint16_t>(id));
+    if (factory == nullptr) {
+      return set_row_err(err, err_len, row_no, "的 id 不在出廠表");
+    }
+    const char *factory_kana = factory->kana != nullptr ? factory->kana : "";
+    const char *factory_output = factory->output != nullptr ? factory->output : "";
+    if (required != factory->required || optional != factory->optional || repeat != factory->repeat) {
+      return set_row_err(err, err_len, row_no, "的鍵位或連射不可改");
+    }
+    if (factory->user_edit == kChordUserEditNo) {
+      if (strcmp(kana, factory_kana) != 0 || strcmp(output, factory_output) != 0) {
+        return set_row_err(err, err_len, row_no, "不可修改");
+      }
+    }
+
     const char *kana_copy = "";
     const char *output_copy = "";
     if (!copy_text(g_stage_pool, &pool_used, kana, &kana_copy) ||
@@ -428,6 +457,7 @@ ChordStageStatus chords_stage_json(const char *json, size_t len, char *err, size
     dst.kana = kana_copy;
     dst.output = output_copy;
     dst.repeat = repeat;
+    dst.user_edit = factory->user_edit;
   }
 
   g_stage_count = arr.size();
@@ -456,6 +486,7 @@ bool chords_commit_staged() {
     g_live[i].kana = "";
     g_live[i].output = "";
     g_live[i].repeat = false;
+    g_live[i].user_edit = kChordUserEditNo;
   }
   g_live_count = g_stage_count;
   g_from_file = true;
@@ -480,6 +511,7 @@ char *chords_format_json() {
     obj["kana"] = row.kana != nullptr ? row.kana : "";
     obj["output"] = row.output != nullptr ? row.output : "";
     obj["repeat"] = row.repeat;
+    obj["user_edit"] = user_edit_name(row.user_edit);
   }
   if (doc.overflowed()) return nullptr;
   const size_t need = measureJson(doc) + 1;

@@ -64,6 +64,7 @@
 | 掃描與送鍵 | `loop` 不為了打完一串字而停住。配方排成佇列，到點最多送一個 HID report。重複字母（例如 `nn`）不用 `Keyboard.write()`：那會在主機一次 poll 之前把按下與放開都送出，兩下會併成一下。BLE 也是上一包送完才送下一包，重複字母不會在同一次連線事件裡壓成一下。佇列最後一格留給 `release-all`，避免修飾鍵漏到下一組。 |
 | 純邏輯 | `chord_core` 不碰 Arduino、GPIO、檔案、USB。宿主測試 `pio test -e native` 編譯的就是這份。判斷規則要加在這裡，不要只寫進 `chords.cpp`。 |
 | 表的來源 | 唯一可手改的是 `esp32-jis-chordboard-premapping.csv`。機器表與 `include/chord_map.inc` 由腳本產生。出廠表編進韌體，不必上傳 LittleFS 映像。手機存檔 `chords.json` 蓋過出廠表，直到網頁還原出廠。 |
+| 使用者改表 | 只有人編 CSV 標成 `user_edit=label_output` 的列（目前是符號 ！～→，不含 「」與 、。）可在熱點改 `label`／`output`。鍵位、`repeat`、與其餘列鎖定。存檔必須維持出廠列數與 id；權威是出廠表的 `user_edit`，不是客戶端自報。若要改假名的行列配置（哪一音對哪幾顆鍵、羅馬字配方等），請改人編 CSV、重建並自行燒機；熱點不做這件事。 |
 | 配方裡認不得的 token | 裝置上略過那個 token，其餘仍送。略過紀錄溢位時仍送出其餘內容，只少記 token 文字。事件緩衝放不下，整份配方不送。出廠表不允許靠略過：建置時認不得的 token 會讓 `pio run` 失敗。 |
 | 熱點 | 只在 GPIO15 接到 GND 時開 SoftAP，不加入家裡的路由器，沒有 HTTPS。密碼是信任邊界。`WIFI_API_TOKEN` 非空時用那組，不印到序列埠。留空時第一次開機產生 token、寫進 NVS，並只印一次；之後 `/api/*` 都要 `X-Api-Token`。瀏覽器仍要 `Origin` 是 `http://192.168.4.1` 或沒有這個標頭。密碼不印到序列埠，`include/secrets.h` 不進 git。 |
 | 輸出開關 | GPIO16 開路是 USB HID，導通到 GND 是 BLE HID，一次一種。這塊板的 Arduino 預編是 NimBLE，不是經典藍牙。模式不寫進 NVS 或 LittleFS，切換消彈跳後先放開按鍵再重啟。配對是 Just Works bonding，金鑰在 NimBLE 自己的 NVS；切換不清 bond、不強制重新配對。藍牙模式若 GPIO15 也導通，不啟動 BLE，只服務熱點；這個開關再變也重啟。USB 模式的熱點仍是運行中開關。藍牙模式不呼叫 `Keyboard.begin()`，OTG 不列舉成鍵盤；既有 USB CDC 日誌不變。 |

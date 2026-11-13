@@ -36,21 +36,20 @@
 
 開機應看到送出模式那一行：`送出模式：全放再送（全部放開並維持 N ms）`，或 `送出模式：首鍵放開就送（高峰後第一顆放開即送，其餘放開前不接新和弦）`。N 是 `kChordReleaseGuardMs`，目前是 10。沒有存檔時是 `chords: factory table (N rows)`。有有效存檔時是 `chords: loaded N rows from /chords.json`。`LittleFS 掛載失敗，格式化一次` 表示這輪的存檔已被清掉，存檔相關項不算通過。
 
-表 A、表 B 只用一列，方便斷電後分辨。在連上熱點的電腦放兩個檔（GPIO15 維持接地）。PowerShell 裡用 `curl.exe`，`curl` 本身是 `Invoke-WebRequest`。
+表 A、表 B 必須是**完整出廠列數**，只改一列 `user_edit=label_output` 的 output（出廠 id 10，`！`），方便斷電後分辨。縮表或改鍵位會被拒絕。在連上熱點的電腦（GPIO15 維持接地）先抓出廠表再改：
 
-`table-a.json`：
-
-```json
-{"chords":[{"id":1,"required":["LL"],"optional":[],"kana":"","output":"aaa"}]}
+```bat
+curl.exe -s -H "X-Api-Token: （你的 token）" http://192.168.4.1/api/chords -o factory.json
+python -c "import json;d=json.load(open('factory.json',encoding='utf-8'));chs=d['chords'];[c.__setitem__('output','aaa') for c in chs if c['id']==10];json.dump({'chords':chs},open('table-a.json','w'),ensure_ascii=False);[c.__setitem__('output','bbb') for c in chs if c['id']==10];json.dump({'chords':chs},open('table-b.json','w'),ensure_ascii=False)"
 ```
 
-`table-b.json` 只把 `aaa` 改成 `bbb`。送表 A：
+PowerShell 裡用 `curl.exe`，`curl` 本身是 `Invoke-WebRequest`。送表 A：
 
 ```bat
 curl.exe -s -H "Content-Type: application/json" --data-binary @table-a.json http://192.168.4.1/api/chords
 ```
 
-成功正文是 `{"ok":true,"source":"saved","count":1}`。表 B 把檔名換成 `table-b.json`。
+成功正文是 `{"ok":true,"source":"saved","count":N}`，N 與出廠列數相同。表 B 把檔名換成 `table-b.json`。驗證時按 `LU+RT0+RT2`（id 10），不是改 `LL`。
 
 ## 每次大改必跑
 
@@ -77,11 +76,11 @@ curl.exe -s -H "Content-Type: application/json" --data-binary @table-a.json http
   curl.exe -i -H "Content-Type: application/json" --data-binary @bad-overlap.json http://192.168.4.1/api/chords
   ```
 
-  第一筆正文 `{"ok":false,"error":"JSON 格式不對"}`。第二筆 `{"ok":false,"error":"第 1 列的同一顆鍵不能又必按又可選"}`。再打 `LT1`，輸出與送出前相同。重開機仍是原來的 factory 或 loaded 列數，不是這兩筆的內容。
+  第一筆正文 `{"ok":false,"error":"JSON 格式不對"}`。第二筆正文 `{"ok":false,"error":"列數必須與出廠表相同"}`（單列 payload 會先被這條擋下）。再打 `LT1`，輸出與送出前相同。重開機仍是原來的 factory 或 loaded 列數，不是這兩筆的內容。
 
 - [ ] **4. 好存檔**
 
-  送表 A。回應 `{"ok":true,"source":"saved","count":1}`。只按 `LL` 再放開，記事本是 `aaa`。重開機印 `chords: loaded 1 rows from /chords.json`。再按 `LL` 仍是 `aaa`。`LT1` 已不在這張表裡，序列埠是 `無符合規則 LT1`，記事本不增加字。
+  送表 A。回應 `{"ok":true,"source":"saved","count":N}`（N 為出廠列數）。按 `LU+RT0+RT2` 再放開，記事本是 `aaa`。重開機印 `chords: loaded N rows from /chords.json`。再按同一組仍是 `aaa`。只按 `LT1` 仍是 `nn`（鎖定列未被拿掉）。
 
 - [ ] **5. 還原出廠**
 
@@ -95,17 +94,17 @@ curl.exe -s -H "Content-Type: application/json" --data-binary @table-a.json http
 
 - [ ] **6. 存檔中途斷電**
 
-  先送表 A，確認 `LL` 打出 `aaa`。再送表 B，手機或 `curl.exe` 還沒顯示成功時拔掉板子供電（USB 供電就拔線）。接回後看 UART，再按 `LL`。至少做 3 次。
+  先送表 A，確認 `LU+RT0+RT2` 打出 `aaa`。再送表 B，手機或 `curl.exe` 還沒顯示成功時拔掉板子供電（USB 供電就拔線）。接回後看 UART，再按同一組。至少做 3 次。
 
   拔電點是統計的。人無法卡在某一次 rename。寫入順序是：寫完 `/chords.json.tmp` 並 flush、舊的 `/chords.json` 改名 `/chords.json.bak`、`.tmp` 改成 `/chords.json`。開機時活檔還在就用活檔；活檔不在才先驗證 `.tmp`，再驗證 `.bak`，通過才改回 `/chords.json`。
 
   每次只允許一種結局：
 
-  - 仍是 A：`LL` 為 `aaa`。序列埠是 `loaded`，或先 `chords: restored /chords.json.bak` 再 `loaded`。
-  - 已是 B：`LL` 為 `bbb`。序列埠是 `loaded`，或先 `chords: restored /chords.json.tmp` 再 `loaded`。
-  - 出廠：`LL` 為 `na`，且 factory 那一行帶原因（例如 `saved table rejected`）。`LT1` 再次打出 `nn`。
+  - 仍是 A：`LU+RT0+RT2` 為 `aaa`。序列埠是 `loaded`，或先 `chords: restored /chords.json.bak` 再 `loaded`。
+  - 已是 B：`LU+RT0+RT2` 為 `bbb`。序列埠是 `loaded`，或先 `chords: restored /chords.json.tmp` 再 `loaded`。
+  - 出廠：`LU+RT0+RT2` 為 `！`（`Shift+1`），且 factory 那一行帶原因（例如 `saved table rejected`）。`LT1` 再次打出 `nn`。
 
-  不允許 `LL` 打出 `aaa` 與 `bbb` 以外的半截、開機後已知和弦完全不打字、或記事本裡黏著 Shift／Ctrl。出現 `LittleFS 掛載失敗，格式化一次` 這項不通過。
+  不允許該和弦打出 `aaa` 與 `bbb` 以外的半截、開機後已知和弦完全不打字、或記事本裡黏著 Shift／Ctrl。出現 `LittleFS 掛載失敗，格式化一次` 這項不通過。
 
 - [ ] **7. 熱點開著不打字**
 

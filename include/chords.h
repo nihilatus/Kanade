@@ -71,7 +71,10 @@ void chords_drop_staged();
 bool chords_load_factory();
 
 // {"source":"factory"|"saved","count":N,"chords":[...]}
-// Key masks are arrays of LL..RT2 names. Caller frees with chords_release().
+// Key masks are arrays of LL..RT2 names. Each chord includes user_edit from
+// the factory row ("no" or "label_output"). Caller frees with chords_release().
 // Null if the document cannot be built.
+// POST staging keeps the factory row count and ids. label_output rows may
+// change kana/output only; other fields and locked rows must match factory.
 char *chords_format_json();
 void chords_release(void *pointer);

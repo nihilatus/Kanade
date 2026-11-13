@@ -196,6 +196,18 @@ static bool load_csv() {
       snprintf(g_error, sizeof(g_error), "bad repeat on id %ld", id);
       return false;
     }
+    ChordUserEdit user_edit = kChordUserEditNo;
+    if (nfields >= 8) {
+      if (strcmp(fields[7], "no") == 0) {
+        user_edit = kChordUserEditNo;
+      } else if (strcmp(fields[7], "label_output") == 0) {
+        user_edit = kChordUserEditLabelOutput;
+      } else {
+        free(text);
+        snprintf(g_error, sizeof(g_error), "bad user_edit on id %ld", id);
+        return false;
+      }
+    }
     ChordRule &row = g_rules[g_count++];
     row.id = static_cast<uint16_t>(id);
     row.required = required;
@@ -203,6 +215,7 @@ static bool load_csv() {
     row.kana = kana;
     row.output = output;
     row.repeat = strcmp(fields[6], "allow") == 0;
+    row.user_edit = user_edit;
   }
   free(text);
   if (!header_seen || g_count == 0) {
@@ -1340,6 +1353,32 @@ extern "C" void test_csv_repeat_comes_from_column(void) {
   TEST_ASSERT_EQUAL_INT(5, allows);
 }
 
+extern "C" void test_csv_user_edit_comes_from_column(void) {
+  TEST_ASSERT_TRUE_MESSAGE(load_csv(), g_error);
+  const uint16_t editable_ids[] = {10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23};
+  for (uint16_t id : editable_ids) {
+    const ChordRule *row = rule_by_id(id);
+    char msg[56];
+    snprintf(msg, sizeof(msg), "id %u should be label_output", static_cast<unsigned>(id));
+    TEST_ASSERT_NOT_NULL_MESSAGE(row, msg);
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(kChordUserEditLabelOutput, row->user_edit, msg);
+  }
+  const ChordRule *nn = rule_by_id(1);
+  const ChordRule *open_quote = rule_by_id(8);
+  const ChordRule *comma = rule_by_id(24);
+  TEST_ASSERT_NOT_NULL(nn);
+  TEST_ASSERT_NOT_NULL(open_quote);
+  TEST_ASSERT_NOT_NULL(comma);
+  TEST_ASSERT_EQUAL_UINT8(kChordUserEditNo, nn->user_edit);
+  TEST_ASSERT_EQUAL_UINT8(kChordUserEditNo, open_quote->user_edit);
+  TEST_ASSERT_EQUAL_UINT8(kChordUserEditNo, comma->user_edit);
+  int editable = 0;
+  for (size_t i = 0; i < g_count; ++i) {
+    if (g_rules[i].user_edit == kChordUserEditLabelOutput) ++editable;
+  }
+  TEST_ASSERT_EQUAL_INT(14, editable);
+}
+
 extern "C" void test_repeat_settle_then_interval(void) {
   ChordEngine engine;
   ChordRepeat rep;
@@ -1869,6 +1908,7 @@ int main(int argc, char **argv) {
   RUN_TEST(test_each_csv_row_matches_spec);
   RUN_TEST(test_each_csv_output_parses);
   RUN_TEST(test_csv_repeat_comes_from_column);
+  RUN_TEST(test_csv_user_edit_comes_from_column);
   RUN_TEST(test_repeat_settle_then_interval);
   RUN_TEST(test_repeat_short_tap_uses_release_fire);
   RUN_TEST(test_repeat_release_after_first_tap_is_swallowed);
