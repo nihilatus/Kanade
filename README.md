@@ -78,6 +78,7 @@ python tools/build_chord_map_machine.py
 ```
 
 宿主測試（不燒板）：`pio test -e native`  
+Mozc 轉換回歸（需 `mozc_emacs_helper`，Ubuntu：`sudo apt-get install -y emacs-mozc-bin`）：`python tools/test_mozc_chord_map.py` — 用 Mozc 近似檢查表上羅馬字能否轉成預期假名；`kome`～`yajirushi` 只確認配方被接受，不比對符號 label。  
 實機大改後照 [`docs/device-acceptance.md`](docs/device-acceptance.md) 跑一輪。
 
 一般鍵盤試打（不接板、不送 HID）：根目錄 `python -m http.server 8765`，開 <http://127.0.0.1:8765/web/>。判讀來自 `web/chord_core.wasm`（`src/chord_core.cpp`）；改判斷後重編：`python tools/build_chord_wasm.py`。

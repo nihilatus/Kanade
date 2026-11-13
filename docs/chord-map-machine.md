@@ -108,6 +108,14 @@ pio test -e native
 
 The chord test reads every row of [`../data/chord_map.machine.csv`](../data/chord_map.machine.csv) and rebuilds the expected match from that row. Recipe tokens are locked by [`../test/recipe_vectors.tsv`](../test/recipe_vectors.tsv): that test and `python tools/test_recipe_vectors.py` both read that file. `pio test -e native` runs the Python check first, then the chord tests and the config HTTP and job tests. The native build compiles `chord_core.cpp`, `chord_timing.cpp`, `config_http.cpp`, `config_job.cpp`, and `config_files.cpp`.
 
+To check that factory `output` recipes still compose under Mozc (an approximation of Google 日本語入力, not the Windows binary, and not a substitute for device acceptance):
+
+```text
+python tools/test_mozc_chord_map.py
+```
+
+Needs `mozc_emacs_helper` (Ubuntu: `sudo apt-get install -y emacs-mozc-bin`). Most rows with a `kana` must commit to that string. The reading/symbol recipes `kome`–`yajirushi` (human CSV lines 19–24) only require Mozc to accept the typed output; their `label` is a Space-conversion hint for the user, not a fixed commit target. Function keys, modifier chords, and bare JIS punctuation are skipped. CI runs this after the recipe vectors.
+
 After a change to the guard, bounce, first-up, repeat, or match order, rebuild the practice module with the emsdk version in [`../wasm/emsdk-version.txt`](../wasm/emsdk-version.txt):
 
 ```text

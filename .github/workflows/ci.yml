@@ -31,6 +31,12 @@ jobs:
       - name: Recipe vectors
         run: python tools/test_recipe_vectors.py
 
+      - name: Install Mozc helper
+        run: sudo apt-get update && sudo apt-get install -y emacs-mozc-bin
+
+      - name: Mozc chord map conversion
+        run: python tools/test_mozc_chord_map.py
+
       - name: Cache emsdk
         uses: actions/cache@v4
         with:
