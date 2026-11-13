@@ -99,5 +99,3 @@ python tools/build_chord_map_machine.py
 | [`docs/pinout.md`](docs/pinout.md) | 腳位、熱點、開關 |
 | [`docs/device-acceptance.md`](docs/device-acceptance.md) | 實機驗收 |
 | [`docs/history.md`](docs/history.md) | 演進紀錄 |
-
-尚未：外殼／PCB。試作 VID/PID，有別人要用再申請（見設計取捨）。
