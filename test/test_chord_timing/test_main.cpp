@@ -1,5 +1,6 @@
 #include "chord_core.h"
 #include "chord_timing.h"
+#include "chord_timing_nv.h"
 
 #include <string.h>
 
@@ -91,6 +92,36 @@ extern "C" void test_longer_release_guard_holds_the_engine(void) {
   TEST_ASSERT_EQUAL_UINT32(kChordBounceMs, chord_timing_bounce_ms());
 }
 
+extern "C" void test_timing_nv_round_trip(void) {
+  const ChordTiming timing = chord_timing_factory();
+  ChordTimingNv nv;
+  chord_timing_nv_pack(timing, &nv);
+  TEST_ASSERT_EQUAL_UINT8(kChordTimingNvVersion, nv.version);
+  TEST_ASSERT_EQUAL_UINT8(0, nv.reserved);
+  ChordTiming out;
+  memset(&out, 0xff, sizeof(out));
+  TEST_ASSERT_TRUE(chord_timing_nv_unpack(&nv, sizeof(nv), &out));
+  TEST_ASSERT_EQUAL_UINT16(timing.debounce_ms, out.debounce_ms);
+  TEST_ASSERT_EQUAL_UINT16(timing.release_guard_ms, out.release_guard_ms);
+  TEST_ASSERT_EQUAL_UINT16(timing.repeat_delay_ms, out.repeat_delay_ms);
+  TEST_ASSERT_EQUAL_UINT16(timing.repeat_interval_ms, out.repeat_interval_ms);
+}
+
+extern "C" void test_timing_nv_rejects_wrong_version(void) {
+  ChordTimingNv nv;
+  chord_timing_nv_pack(chord_timing_factory(), &nv);
+  nv.version = static_cast<uint8_t>(kChordTimingNvVersion + 1);
+  ChordTiming out;
+  TEST_ASSERT_FALSE(chord_timing_nv_unpack(&nv, sizeof(nv), &out));
+}
+
+extern "C" void test_timing_nv_rejects_short_blob(void) {
+  ChordTimingNv nv;
+  chord_timing_nv_pack(chord_timing_factory(), &nv);
+  ChordTiming out;
+  TEST_ASSERT_FALSE(chord_timing_nv_unpack(&nv, sizeof(nv) - 1, &out));
+}
+
 int main(int argc, char **argv) {
   (void)argc;
   (void)argv;
@@ -101,5 +132,8 @@ int main(int argc, char **argv) {
   RUN_TEST(test_repeat_delay_at_settle_is_rejected);
   RUN_TEST(test_repeat_interval_at_two_taps_is_rejected);
   RUN_TEST(test_longer_release_guard_holds_the_engine);
+  RUN_TEST(test_timing_nv_round_trip);
+  RUN_TEST(test_timing_nv_rejects_wrong_version);
+  RUN_TEST(test_timing_nv_rejects_short_blob);
   return UNITY_END();
 }
