@@ -1,7 +1,12 @@
 #include "buttons.h"
 
+#include <esp_rom_sys.h>
+
 #include "chord_core.h"
 #include "chord_timing.h"
+
+// The pull-up has just been enabled. Wait before the level is trusted.
+static constexpr uint32_t kButtonSettleUs = 100;
 
 static_assert(BTN_COUNT == kChordKeyCount, "button bits match chord_core");
 static_assert(BTN_LL == 0, "chord button ids start at bit 0");
@@ -70,21 +75,7 @@ bool button_trace_at(size_t oldest_index, ButtonTraceEvent *out) {
   return true;
 }
 
-void buttons_begin() {
-  const uint32_t now = millis();
-  trace_reset();
-  for (uint8_t i = 0; i < BTN_COUNT; ++i) {
-    raw_down[i] = false;
-    stable_down[i] = false;
-    prev_down[i] = false;
-    edge_press[i] = false;
-    edge_release[i] = false;
-    last_change_ms[i] = now;
-    pinMode(kButtons[i].pin, INPUT_PULLUP);
-  }
-}
-
-void buttons_resync() {
+static void sample_levels_stable() {
   const uint32_t now = millis();
   for (uint8_t i = 0; i < BTN_COUNT; ++i) {
     const bool down = digitalRead(kButtons[i].pin) == LOW;
@@ -97,6 +88,17 @@ void buttons_resync() {
   }
   g_trace_stable = buttons_mask();
 }
+
+void buttons_begin() {
+  trace_reset();
+  for (uint8_t i = 0; i < BTN_COUNT; ++i) {
+    pinMode(kButtons[i].pin, INPUT_PULLUP);
+  }
+  esp_rom_delay_us(kButtonSettleUs);
+  sample_levels_stable();
+}
+
+void buttons_resync() { sample_levels_stable(); }
 
 void buttons_poll() {
   const uint32_t now = millis();

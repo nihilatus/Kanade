@@ -43,8 +43,10 @@ void buttons_begin();
 void buttons_poll();  // sample GPIOs + per-key debounce
 
 // Sample each GPIO and treat that level as already stable. Clears edges.
-// Does not write a trace event. Call when the AP goes off, before the next
-// buttons_poll, so presses and releases during the AP are not a chord.
+// Does not write a trace event. buttons_begin samples after pull-ups settle.
+// Also call when the AP goes off, before the next buttons_poll, so presses
+// and releases during the AP are not a chord; and after boot/AP wait-for-up
+// before arming chord input.
 void buttons_resync();
 
 bool button_pressed(ButtonId id);  // debounced level (pressed → true)
