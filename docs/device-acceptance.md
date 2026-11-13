@@ -110,7 +110,7 @@ curl.exe -s -H "Content-Type: application/json" --data-binary @table-a.json http
 
   還原出廠並重開，確認 `LT1` 是 `nn`。GPIO15 接地，序列埠有 `AP ` 與 `http://192.168.4.1/`。開著設定頁，或正在送表 A 時，連打 `LT1`，並按住 `LT2` 或 `LT0+RU`。記事本不增加字元，也沒有黏住的 Shift 或 Ctrl。
 
-  序列埠輸入 `drops`。`recipes` 不因熱點開著或這輪按鍵而增加。`tokens` 只有配方裡有認不得的 token 才增加；出廠表這兩組應保持 0。撥開 GPIO15，印 `AP off`。再按 `LT1`，仍是 `nn`。
+  序列埠輸入 `drops`。`recipes` 與 `queue_full` 不因熱點開著或這輪按鍵而增加。`tokens` 只有配方裡有認不得的 token 才增加；出廠表這三組應保持 0。撥開 GPIO15，印 `AP off`。再按 `LT1`，仍是 `nn`。
 
   另一次：開機時 GPIO15 已經接地。在撥開之前按 `LT1`，記事本不增加字。撥開並看到 `AP off` 之後，`LT1` 才是 `nn`。
 
@@ -151,7 +151,7 @@ curl.exe -s -H "Content-Type: application/json" --data-binary @table-a.json http
 
 - [ ] **主機還沒列舉**
 
-  UART 保持接上。拔掉 OTG，等主機卸下這個鍵盤。按一次 `LT1`。接回 OTG，等記事本再次認得鍵盤。剛才那一次不補送 `nn`。序列埠 `drops` 的 `not_ready` 比拔線前大。在記事本打幾個字，沒有黏住的 Shift 或 Ctrl。
+  UART 保持接上。拔掉 OTG，等主機卸下這個鍵盤。按一次 `LT1`。接回 OTG，等記事本再次認得鍵盤。剛才那一次不補送 `nn`。序列埠 `drops` 的 `not_ready` 比拔線前大；`queue_full` 不因這次按鍵而增加。在記事本打幾個字，沒有黏住的 Shift 或 Ctrl。
 
 - [ ] **日文配列**
 
@@ -207,11 +207,11 @@ GPIO16 開路是 USB，導通到 GND 是藍牙。切換會印 `output switch res
 
 - [ ] **藍牙還沒訂閱不補送**
 
-  GPIO16 導通，主機還沒連上或還沒訂閱（還沒看到 `BLE subscribed`）。按一次 `LT1`。等記事本認得鍵盤之後，剛才那一次不補送 `nn`。序列埠 `drops` 的 `not_ready` 比按之前大。之後打幾個字，沒有黏住的 Shift 或 Ctrl。
+  GPIO16 導通，主機還沒連上或還沒訂閱（還沒看到 `BLE subscribed`）。按一次 `LT1`。等記事本認得鍵盤之後，剛才那一次不補送 `nn`。序列埠 `drops` 的 `not_ready` 比按之前大；`queue_full` 不因這次按鍵而增加。之後打幾個字，沒有黏住的 Shift 或 Ctrl。
 
 - [ ] **藍牙按住退格連射**
 
-  GPIO16 導通，已看到 `BLE subscribed`。記事本先打一行字。按住 `LT2` 數秒再放開。退格連續刪字，中間沒有突然停住；放開後不再多退，也沒有黏住的修飾鍵。序列埠沒有 `hid queue full`。
+  GPIO16 導通，已看到 `BLE subscribed`。記事本先打一行字。按住 `LT2` 數秒再放開。退格連續刪字，中間沒有突然停住；放開後不再多退，也沒有黏住的修飾鍵。序列埠沒有 `hid queue full`；`drops` 的 `queue_full` 不增加。
 
 - [ ] **藍牙連打 nn 不併鍵**
 

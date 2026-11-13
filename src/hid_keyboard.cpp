@@ -11,10 +11,12 @@
 #include "host_layout.h"
 
 static bool g_begun = false;
-// Whole outputs not queued, tokens skipped while the rest was kept, and
+// Whole outputs not queued (parse/layout/romaji refuse), tokens skipped while
+// the rest was kept, batches refused because the HID queue was full, and
 // outputs refused because the host was not enumerated or was asleep.
 static uint32_t g_drop_recipes = 0;
 static uint32_t g_skip_tokens = 0;
+static uint32_t g_queue_full = 0;
 static uint32_t g_not_ready = 0;
 
 static void note_dropped() { g_drop_recipes++; }
@@ -85,11 +87,16 @@ static void log_queue_full(const char *what) {
 #endif
 }
 
+static void note_queue_full(const char *what) {
+  g_queue_full++;
+  log_queue_full(what);
+}
+
 static bool take_slot(HidOp op, uint8_t code, uint8_t gap, size_t *added, const char *what,
                       bool allow_last = false) {
   if (!enqueue(op, code, gap, allow_last)) {
     rollback(*added);
-    log_queue_full(what);
+    note_queue_full(what);
     return false;
   }
   *added += 1;
@@ -176,8 +183,7 @@ static bool enqueue_strokes(const Stroke *strokes, size_t count, bool release_fi
   for (size_t i = 0; i < count; ++i) need += strokes[i].expand ? 2 : 1;
   if (need == 0) return true;
   if (g_count + need + 1 > kQueueCap) {
-    note_dropped();
-    log_queue_full(what);
+    note_queue_full(what);
     return false;
   }
   size_t added = 0;
@@ -392,9 +398,9 @@ void hid_release_all() {
 }
 
 void hid_print_drops() {
-  char line[72];
-  snprintf(line, sizeof(line), "drops recipes=%u tokens=%u not_ready=%u",
+  char line[104];
+  snprintf(line, sizeof(line), "drops recipes=%u tokens=%u queue_full=%u not_ready=%u",
            static_cast<unsigned>(g_drop_recipes), static_cast<unsigned>(g_skip_tokens),
-           static_cast<unsigned>(g_not_ready));
+           static_cast<unsigned>(g_queue_full), static_cast<unsigned>(g_not_ready));
   console_println(line);
 }

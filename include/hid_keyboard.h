@@ -49,8 +49,9 @@ void hid_type_romaji(const char *text);
 // An unrecognized token is skipped and the rest is typed. Skip storage keeps
 // the first kChordSkipCap tokens; further skips are counted and the rest of
 // the recipe is still typed. A token that does not fit in the event buffer
-// drops the whole recipe. hid_print_drops() counts recipes not queued, tokens
-// skipped, and sends refused because the host was not ready.
+// drops the whole recipe. hid_print_drops() counts recipes refused for
+// parse/layout/romaji reasons, tokens skipped, batches refused because the
+// HID queue was full, and sends refused because the host was not ready.
 // Not reentrant: the parser buffer is owned by this module. Call only from loop().
 // If a previous recipe is still playing, this one is appended after a
 // release-all so a modifier cannot leak into the next chord.
@@ -60,5 +61,7 @@ void hid_type_recipe(const char *recipe);
 void hid_tap_key(uint8_t keycode);
 void hid_release_all();
 
-// Totals since boot, on UART0 and USB CDC. `drops` on the serial console.
+// Totals since boot, on UART0 and USB CDC. Serial command `drops` prints
+// recipes, tokens, queue_full, and not_ready. Host-not-ready drops are not
+// replayed; a full queue drops the whole batch.
 void hid_print_drops();

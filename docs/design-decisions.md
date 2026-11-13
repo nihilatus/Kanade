@@ -62,6 +62,7 @@
 | 按鍵接法 | 14 鍵各接一隻 GPIO 到 GND，內部上拉，按下為 LOW。沒有矩陣、沒有二極體、沒有外加上拉、沒有並在開關上的電容。 |
 | 接腳對應 | 功能看符號，腳號只在 `include/pin_map.h`。掃描、熱點、輸出開關與送出時機都查這張表，不在別處寫 GPIO 號碼。新的輸入（例如移動腳）加一列，不放進 14 個和弦位元。行為開關的顆數與切換後果在 `include/mode_switches.h`；新的行為開關加一列，和弦鍵與其他輸入不加。 |
 | 掃描與送鍵 | `loop` 不為了打完一串字而停住。配方排成佇列，到點最多送一個 HID report。重複字母（例如 `nn`）不用 `Keyboard.write()`：那會在主機一次 poll 之前把按下與放開都送出，兩下會併成一下。BLE 也是上一包送完才送下一包，重複字母不會在同一次連線事件裡壓成一下。佇列最後一格留給 `release-all`，避免修飾鍵漏到下一組。 |
+| 未就緒與佇列滿 | 主機未就緒（USB 未列舉、BLE 未連上或未訂閱、或 `begin` 失敗）時放棄該次輸出，**不補送**。佇列放不下時丟整包配方，避免半套修飾鍵留在主機上。已在佇列的 report 若 `can_send` 失敗，留在隊頭下一圈再試，那不算 drop。診斷只走序列埠 `drops`：`recipes` 是解析／配列／romaji 整包拒收，`tokens` 是略過的 token，`queue_full` 是佇列空間不足，`not_ready` 是主機未就緒。不要改成 HID／LED 回饋，也不要順手做暫存補送或加大佇列。 |
 | 純邏輯 | `chord_core` 不碰 Arduino、GPIO、檔案、USB。宿主測試 `pio test -e native` 編譯的就是這份。判斷規則要加在這裡，不要只寫進 `chords.cpp`。 |
 | 表的來源 | 唯一可手改的是 `esp32-jis-chordboard-premapping.csv`。機器表與 `include/chord_map.inc` 由腳本產生。出廠表編進韌體，不必上傳 LittleFS 映像。手機存檔 `chords.json` 蓋過出廠表，直到網頁還原出廠。 |
 | 使用者改表 | 只有人編 CSV 標成 `user_edit=label_output` 的列（目前是符號 ！～→，不含 「」與 、。）可在熱點改 `label`／`output`。鍵位、`repeat`、與其餘列鎖定。存檔必須維持出廠列數與 id；權威是出廠表的 `user_edit`，不是客戶端自報。若要改假名的行列配置（哪一音對哪幾顆鍵、羅馬字配方等），請改人編 CSV、重建並自行燒機；熱點不做這件事。 |
