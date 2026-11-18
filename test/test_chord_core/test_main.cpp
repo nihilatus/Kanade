@@ -335,6 +335,29 @@ extern "C" void test_key_order(void) {
   TEST_ASSERT_NULL(chord_key_name(kChordKeyCount));
 }
 
+extern "C" void test_format_mask(void) {
+  char buf[32];
+
+  chord_format_mask(0, buf, sizeof(buf));
+  TEST_ASSERT_EQUAL_STRING("-", buf);
+
+  chord_format_mask(static_cast<uint16_t>(1u << 0), buf, sizeof(buf));
+  TEST_ASSERT_EQUAL_STRING("LL", buf);
+
+  chord_format_mask(static_cast<uint16_t>((1u << 0) | (1u << 7)), buf, sizeof(buf));
+  TEST_ASSERT_EQUAL_STRING("LL+RL", buf);
+
+  char tiny[3];
+  chord_format_mask(static_cast<uint16_t>((1u << 0) | (1u << 1)), tiny, sizeof(tiny));
+  TEST_ASSERT_EQUAL_STRING("LL", tiny);
+  TEST_ASSERT_EQUAL_INT('\0', tiny[2]);
+
+  char one[1];
+  one[0] = 'x';
+  chord_format_mask(0, one, sizeof(one));
+  TEST_ASSERT_EQUAL_INT('\0', one[0]);
+}
+
 extern "C" void test_csv_bits_match_firmware_table(void) {
   TEST_ASSERT_TRUE_MESSAGE(load_csv(), g_error);
   const ChordRule *n = rule_by_id(1);
@@ -1887,6 +1910,7 @@ int main(int argc, char **argv) {
   (void)argv;
   UNITY_BEGIN();
   RUN_TEST(test_key_order);
+  RUN_TEST(test_format_mask);
   RUN_TEST(test_snapshot_keeps_largest_then_later);
   RUN_TEST(test_release_mode_waits_ten_ms);
   RUN_TEST(test_first_up_fires_then_drains);

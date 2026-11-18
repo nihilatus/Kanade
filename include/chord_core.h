@@ -16,6 +16,10 @@
 const char *chord_key_name(int index);
 int chord_key_index(const char *name);
 
+// "LL+RU", or "-" when no named bit is set. Stops on a key boundary when the
+// buffer cannot hold the next name. Always NUL-terminated when buflen > 0.
+void chord_format_mask(uint16_t mask, char *buf, size_t buflen);
+
 // Hotspot may change kana/output only when this is LabelOutput. Matching
 // ignores the field; factory CSV user_edit is the authority on save.
 enum ChordUserEdit : uint8_t {

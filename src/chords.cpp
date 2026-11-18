@@ -105,14 +105,11 @@ static bool ensure_live_bufs() {
 }
 
 static bool ensure_stage_bufs() {
-  if (g_stage_rules != nullptr && g_stage_pool != nullptr) return true;
-  g_stage_rules = static_cast<ChordRule *>(ps_malloc(sizeof(ChordRule) * kChordsMaxRows));
-  g_stage_pool = static_cast<char *>(ps_malloc(kPoolSize));
-  if (g_stage_rules == nullptr || g_stage_pool == nullptr) {
-    chords_release(g_stage_rules);
-    chords_release(g_stage_pool);
-    g_stage_rules = static_cast<ChordRule *>(malloc(sizeof(ChordRule) * kChordsMaxRows));
-    g_stage_pool = static_cast<char *>(malloc(kPoolSize));
+  if (g_stage_rules == nullptr) {
+    g_stage_rules = static_cast<ChordRule *>(alloc_spiram_first(sizeof(ChordRule) * kChordsMaxRows));
+  }
+  if (g_stage_pool == nullptr) {
+    g_stage_pool = static_cast<char *>(alloc_spiram_first(kPoolSize));
   }
   return g_stage_rules != nullptr && g_stage_pool != nullptr;
 }
@@ -182,51 +179,15 @@ static void add_key_names(JsonArray arr, uint16_t mask) {
   }
 }
 
-static void format_mask(uint16_t mask, char *buf, size_t buflen) {
-  if (buflen == 0) return;
-  buf[0] = '\0';
-  size_t used = 0;
-  bool any = false;
-  for (int i = 0; i < kChordKeyCount; ++i) {
-    if ((mask & static_cast<uint16_t>(1u << i)) == 0) continue;
-    const char *name = chord_key_name(i);
-    const size_t len = strlen(name);
-    const size_t extra = any ? 1 : 0;
-    if (used + extra + len + 1 > buflen) break;
-    if (any) buf[used++] = '+';
-    memcpy(buf + used, name, len);
-    used += len;
-    buf[used] = '\0';
-    any = true;
-  }
-  if (!any) {
-    strncpy(buf, "-", buflen);
-    buf[buflen - 1] = '\0';
-  }
-}
-
 static void log_chord(const char *kind, uint16_t id, uint16_t mask, const char *kana,
                       const char *output) {
-#if ARDUINO_USB_CDC_ON_BOOT
   char keys[80];
-  format_mask(mask, keys, sizeof(keys));
-  Serial.print(F("chord "));
-  Serial.print(kind);
-  Serial.print(F(" id="));
-  Serial.print(id);
-  Serial.print(F(" keys="));
-  Serial.print(keys);
-  Serial.print(F(" kana="));
-  Serial.print(kana != nullptr ? kana : "");
-  Serial.print(F(" output="));
-  Serial.println(output != nullptr ? output : "");
-#else
-  (void)kind;
-  (void)id;
-  (void)mask;
-  (void)kana;
-  (void)output;
-#endif
+  char line[256];
+  chord_format_mask(mask, keys, sizeof(keys));
+  snprintf(line, sizeof(line), "chord %s id=%u keys=%s kana=%s output=%s",
+           kind != nullptr ? kind : "", static_cast<unsigned>(id), keys,
+           kana != nullptr ? kana : "", output != nullptr ? output : "");
+  console_println(line);
 }
 
 static void fire(uint16_t mask);  // defined below; send path uses the live table
@@ -266,7 +227,7 @@ static void fire(uint16_t mask) {
   if (index < 0) {
     char keys[80];
     char line[96];
-    format_mask(mask, keys, sizeof(keys));
+    chord_format_mask(mask, keys, sizeof(keys));
     snprintf(line, sizeof(line), "無符合規則 %s", keys);
     console_println(line);
     return;
@@ -515,8 +476,7 @@ char *chords_format_json() {
   }
   if (doc.overflowed()) return nullptr;
   const size_t need = measureJson(doc) + 1;
-  char *buf = static_cast<char *>(ps_malloc(need));
-  if (buf == nullptr) buf = static_cast<char *>(malloc(need));
+  char *buf = static_cast<char *>(alloc_spiram_first(need));
   if (buf == nullptr) return nullptr;
   const size_t wrote = serializeJson(doc, buf, need);
   if (wrote == 0 || wrote >= need) {
@@ -557,8 +517,7 @@ static LoadResult stage_saved(const char *path, char *err, size_t err_len) {
     return LoadResult::Rejected;
   }
 
-  char *buf = static_cast<char *>(ps_malloc(n + 1));
-  if (buf == nullptr) buf = static_cast<char *>(malloc(n + 1));
+  char *buf = static_cast<char *>(alloc_spiram_first(n + 1));
   if (buf == nullptr) {
     file.close();
     set_err(err, err_len, "saved table rejected (no memory)");

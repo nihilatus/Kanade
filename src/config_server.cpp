@@ -52,7 +52,8 @@
 static const char kApSsid[] = WIFI_AP_SSID;
 static const char kApPassword[] = WIFI_AP_PASSWORD;
 static const char kApiToken[] = WIFI_API_TOKEN;
-// Same NVS namespace as the chord fire mode. The key is separate.
+// Generated or handwritten API token. Namespace jis, key apitoken.
+// Fire timing is the GPIO switch and is not stored. Chord timing uses chordtime.
 static constexpr char kApiTokenNs[] = "jis";
 static constexpr char kApiTokenKey[] = "apitoken";
 static constexpr size_t kApiTokenRandomBytes = 16;

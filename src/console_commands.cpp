@@ -64,28 +64,6 @@ static void print_switches() {
   }
 }
 
-static void format_key_trace(uint16_t mask, char *buf, size_t buflen) {
-  if (buflen == 0) return;
-  size_t used = 0;
-  buf[0] = '\0';
-  for (int i = 0; i < kChordKeyCount; ++i) {
-    if ((mask & static_cast<uint16_t>(1u << i)) == 0) continue;
-    const char *name = chord_key_name(i);
-    if (name == nullptr) continue;
-    const size_t len = strlen(name);
-    const size_t extra = used == 0 ? 0 : 1;
-    if (used + extra + len + 1 > buflen) break;
-    if (extra != 0) buf[used++] = '+';
-    memcpy(buf + used, name, len);
-    used += len;
-    buf[used] = '\0';
-  }
-  if (used == 0 && buflen > 1) {
-    buf[0] = '-';
-    buf[1] = '\0';
-  }
-}
-
 static void dump_button_trace() {
   const size_t n = button_trace_count();
   if (n == 0) {
@@ -103,7 +81,7 @@ static void dump_button_trace() {
       snprintf(line, sizeof(line), "%lu raw %s %s", static_cast<unsigned long>(ev.ms), name,
                ev.value != 0 ? "down" : "up");
     } else {
-      format_key_trace(ev.value, keys, sizeof(keys));
+      chord_format_mask(ev.value, keys, sizeof(keys));
       snprintf(line, sizeof(line), "%lu stable %s", static_cast<unsigned long>(ev.ms), keys);
     }
     console_println(line);
@@ -211,6 +189,6 @@ void console_commands_trace_keys() {
   if (mask == g_key_trace_mask) return;
   g_key_trace_mask = mask;
   char line[64];
-  format_key_trace(mask, line, sizeof(line));
+  chord_format_mask(mask, line, sizeof(line));
   console_println(line);
 }

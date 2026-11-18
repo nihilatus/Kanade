@@ -33,20 +33,23 @@ void setup() {
   chord_timing_store_load();
 #if ARDUINO_USB_CDC_ON_BOOT
   delay(200);
-  Serial.println();
-  Serial.println(F("Kanade"));
-  Serial.print(F("14 direct keys, active-low, "));
-  Serial.print(chord_timing_current().debounce_ms);
-  Serial.println(F(" ms debounce"));
-  Serial.print(F("pins"));
-  for (uint8_t i = 0; i < BTN_COUNT; ++i) {
-    Serial.print(' ');
-    Serial.print(kButtons[i].name);
-    Serial.print(F("=GPIO"));
-    Serial.print(kButtons[i].pin);
-  }
-  Serial.println();
 #endif
+  console_println("");
+  console_println("Kanade");
+  char line[192];
+  snprintf(line, sizeof(line), "14 direct keys, active-low, %u ms debounce",
+           static_cast<unsigned>(chord_timing_current().debounce_ms));
+  console_println(line);
+  size_t used = 0;
+  int wrote = snprintf(line, sizeof(line), "pins");
+  if (wrote > 0) used = static_cast<size_t>(wrote);
+  for (uint8_t i = 0; i < BTN_COUNT && used < sizeof(line); ++i) {
+    wrote = snprintf(line + used, sizeof(line) - used, " %s=GPIO%d", kButtons[i].name,
+                     kButtons[i].pin);
+    if (wrote < 0 || static_cast<size_t>(wrote) >= sizeof(line) - used) break;
+    used += static_cast<size_t>(wrote);
+  }
+  console_println(line);
 
   buttons_begin();
   output_switch_begin();

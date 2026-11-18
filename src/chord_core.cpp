@@ -22,6 +22,28 @@ int chord_key_index(const char *name) {
   return -1;
 }
 
+void chord_format_mask(uint16_t mask, char *buf, size_t buflen) {
+  if (buf == nullptr || buflen == 0) return;
+  buf[0] = '\0';
+  size_t used = 0;
+  for (int i = 0; i < kChordKeyCount; ++i) {
+    if ((mask & static_cast<uint16_t>(1u << i)) == 0) continue;
+    const char *name = chord_key_name(i);
+    if (name == nullptr) continue;
+    const size_t len = strlen(name);
+    const size_t extra = used == 0 ? 0 : 1;
+    if (used + extra + len + 1 > buflen) break;
+    if (extra != 0) buf[used++] = '+';
+    memcpy(buf + used, name, len);
+    used += len;
+    buf[used] = '\0';
+  }
+  if (used == 0 && buflen > 1) {
+    buf[0] = '-';
+    buf[1] = '\0';
+  }
+}
+
 static uint8_t popcount16(uint16_t value) {
   uint8_t n = 0;
   while (value != 0) {

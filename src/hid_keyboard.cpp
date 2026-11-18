@@ -56,12 +56,9 @@ bool hid_keyboard_begin(OutputMode mode) {
 bool hid_keyboard_ready() { return g_begun && hid_link_ready(); }
 
 static void log_skip(const char *token) {
-#if ARDUINO_USB_CDC_ON_BOOT
-  Serial.print(F("hid skip token: "));
-  Serial.println(token);
-#else
-  (void)token;
-#endif
+  char line[64];
+  snprintf(line, sizeof(line), "hid skip token: %s", token != nullptr ? token : "");
+  console_println(line);
 }
 
 static bool enqueue(HidOp op, uint8_t code, uint8_t gap_after_ms, bool allow_last) {
@@ -79,12 +76,9 @@ static void rollback(size_t added) {
 }
 
 static void log_queue_full(const char *what) {
-#if ARDUINO_USB_CDC_ON_BOOT
-  Serial.print(F("hid queue full, "));
-  Serial.println(what);
-#else
-  (void)what;
-#endif
+  char line[64];
+  snprintf(line, sizeof(line), "hid queue full, %s", what != nullptr ? what : "");
+  console_println(line);
 }
 
 static void note_queue_full(const char *what) {
@@ -215,21 +209,15 @@ static bool queue_busy() {
 }
 
 static void log_long_token(size_t len) {
-#if ARDUINO_USB_CDC_ON_BOOT
-  Serial.print(F("hid skip long token, len="));
-  Serial.println(len);
-#else
-  (void)len;
-#endif
+  char line[48];
+  snprintf(line, sizeof(line), "hid skip long token, len=%u", static_cast<unsigned>(len));
+  console_println(line);
 }
 
 static void log_unrecorded_skips(size_t count) {
-#if ARDUINO_USB_CDC_ON_BOOT
-  Serial.print(F("hid skip tokens not logged: "));
-  Serial.println(count);
-#else
-  (void)count;
-#endif
+  char line[48];
+  snprintf(line, sizeof(line), "hid skip tokens not logged: %u", static_cast<unsigned>(count));
+  console_println(line);
 }
 
 static uint8_t press_code(const ChordEvent &event) {
@@ -324,18 +312,14 @@ void hid_type_recipe(const char *recipe) {
   // means later skip text was not stored; skip_total still counts those tokens.
   if (!parsed_ok || parsed.failed) {
     note_dropped();
-#if ARDUINO_USB_CDC_ON_BOOT
-    Serial.println(F("hid recipe too long, skipped"));
-#endif
+    console_println("hid recipe too long, skipped");
     return;
   }
 
   size_t folded_count = 0;
   if (!layout_apply(&kLayoutJis, parsed.events, parsed.count, g_folded, kChordRecipeCap, &folded_count)) {
     note_dropped();
-#if ARDUINO_USB_CDC_ON_BOOT
-    Serial.println(F("hid layout rewrite failed, skipped"));
-#endif
+    console_println("hid layout rewrite failed, skipped");
     return;
   }
   if (folded_count == 0 && !release_first) {
@@ -357,9 +341,7 @@ void hid_type_romaji(const char *text) {
   const size_t len = strlen(text);
   if (len > kRomajiMax) {
     note_dropped();
-#if ARDUINO_USB_CDC_ON_BOOT
-    Serial.println(F("hid romaji too long, skipped"));
-#endif
+    console_println("hid romaji too long, skipped");
     return;
   }
   if (len == 0 && !release_first) return;
@@ -367,9 +349,7 @@ void hid_type_romaji(const char *text) {
     // Keyboard.press() treats 0x80–0x87 as modifiers and 0x88+ as non-printing keys.
     if (static_cast<unsigned char>(text[i]) >= 0x80) {
       note_dropped();
-#if ARDUINO_USB_CDC_ON_BOOT
-      Serial.println(F("hid romaji non-ascii, skipped"));
-#endif
+      console_println("hid romaji non-ascii, skipped");
       return;
     }
   }
